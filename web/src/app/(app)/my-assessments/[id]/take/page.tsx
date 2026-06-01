@@ -683,12 +683,21 @@ export default function TakeAssessmentPage() {
   const id = params.id as string;
 
   const { data: assessment, error, isLoading } = useApi<AssessmentDto>(`/assessments/${id}`);
-  const { data: competencies, isLoading: loadingComps } = useApi<CompetencyDto[]>(
+
+  const needsCompetencies =
     assessment?.assessmentType === AssessmentType.FEEDBACK_360 ||
-    assessment?.assessmentType === AssessmentType.COMPETENCY
-      ? `/assessments/${id}/competencies`
-      : null,
+    assessment?.assessmentType === AssessmentType.COMPETENCY;
+
+  const { data: allCompetencies, isLoading: loadingComps } = useApi<CompetencyDto[]>(
+    needsCompetencies ? '/items/competencies' : null,
   );
+
+  // Narrow to only the competencies configured for this assessment
+  const configIds: string[] = (assessment?.config as any)?.competencyIds ?? [];
+  const competencies =
+    configIds.length > 0 && allCompetencies
+      ? allCompetencies.filter((c) => configIds.includes(c.id))
+      : allCompetencies;
 
   if (isLoading || loadingComps) return <PageSpinner />;
   if (error || !assessment) {

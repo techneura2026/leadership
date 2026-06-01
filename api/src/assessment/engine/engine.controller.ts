@@ -43,7 +43,15 @@ export class EngineController {
     return this.engineService.findAll(req.user.orgId, filters);
   }
 
+  @Get('mine')
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @ApiOperation({ summary: 'Get active assessments the current user is a participant in' })
+  findMine(@Request() req: any) {
+    return this.engineService.findMine(req.user.sub, req.user.orgId);
+  }
+
   @Get(':id')
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
   @ApiOperation({ summary: 'Get assessment by ID' })
   findOne(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.engineService.findOne(id, req.user.orgId);

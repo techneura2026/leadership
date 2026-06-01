@@ -336,4 +336,28 @@ export class EngineService {
       completedAt: p.completedAt,
     }));
   }
+
+  async findMine(
+    userId: string,
+    orgId: string,
+  ): Promise<Array<Assessment & { participantStatus: string; completionPercentage: number }>> {
+    const participations = await this.participantRepo.find({
+      where: { userId },
+      relations: ['assessment'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return participations
+      .filter(
+        (p) =>
+          p.assessment &&
+          p.assessment.organisationId === orgId &&
+          p.assessment.status === AssessmentStatus.ACTIVE,
+      )
+      .map((p) => ({
+        ...p.assessment,
+        participantStatus: p.status as any,
+        completionPercentage: p.status === 'completed' ? 100 : p.status === 'in_progress' ? 50 : 0,
+      }));
+  }
 }

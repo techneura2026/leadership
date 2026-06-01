@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -42,10 +42,40 @@ export class UsersService {
     firstName: string;
     lastName: string;
     role: UserRole;
+    jobTitle?: string;
+    departmentId?: string;
   }): Promise<User> {
+    const existing = await this.userRepo.findOne({
+      where: { organisationId: data.organisationId, email: data.email.toLowerCase() },
+      withDeleted: true,
+    });
+    if (existing) throw new ConflictException('Email already in use within this organisation');
+
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
     const passwordHash = await bcrypt.hash(data.password, rounds);
-    const user = this.userRepo.create({ ...data, passwordHash });
+    const user = this.userRepo.create({
+      ...data,
+      email: data.email.toLowerCase(),
+      passwordHash,
+      emailVerified: true,
+    });
+    return this.userRepo.save(user);
+  }
+
+  async update(
+    id: string,
+    organisationId: string,
+    data: Partial<{
+      firstName: string;
+      lastName: string;
+      role: UserRole;
+      jobTitle: string | null;
+      departmentId: string | null;
+      isActive: boolean;
+    }>,
+  ): Promise<User> {
+    const user = await this.findById(id, organisationId);
+    Object.assign(user, data);
     return this.userRepo.save(user);
   }
 

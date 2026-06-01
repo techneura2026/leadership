@@ -5,7 +5,8 @@ import { format } from 'date-fns';
 import { useApi } from '@/hooks/useApi';
 import { Badge } from '@/components/ui/Badge';
 import { PageSpinner } from '@/components/ui/Spinner';
-import { AssessmentDto, AssessmentStatus, AssessmentType } from '@leaderprism/shared';
+import { useAuthStore } from '@/store/auth.store';
+import { AssessmentDto, AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 
 interface DashboardMetrics {
   activeAssessments: number;
@@ -31,9 +32,22 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { data: metrics, isLoading, error } = useApi<DashboardMetrics>('/analytics/dashboard');
+  const user = useAuthStore((s) => s.user);
+
+  const isAdmin = user?.role === UserRole.ORG_ADMIN || user?.role === UserRole.HR_MANAGER;
+
+  // Only fetch analytics for roles that have access; skip for participants/managers
+  const { data: metrics, isLoading, error } = useApi<DashboardMetrics>(
+    isAdmin ? '/analytics/dashboard' : null,
+  );
 
   if (isLoading) return <PageSpinner />;
+
+  // Participants and managers have no admin dashboard — send them to their assessments
+  if (!isAdmin) {
+    router.replace('/my-assessments');
+    return <PageSpinner />;
+  }
 
   const stats = [
     {
