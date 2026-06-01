@@ -1,0 +1,25 @@
+{
+  "rater": {
+    "landing_title": "You have been invited to provide feedback",
+    "anonymity_note": "Your responses are completely anonymous. Results will only be shared when a minimum of 3 raters have responded from each group.",
+    "begin": "Begin Feedback",
+    "rarely": "Rarely",
+    "occasionally": "Occasionally",
+    "sometimes": "Sometimes",
+    "often": "Often",
+    "consistently": "Consistently",
+    "comment_placeholder": "Optional: add a comment about this competency cluster",
+    "overall_effectiveness": "Overall Leadership Effectiveness",
+    "development_focus": "What is the one thing this leader should focus on developing?",
+    "submit": "Submit Feedback",
+    "thank_you": "Thank you for your feedback",
+    "thank_you_message": "Your responses have been recorded anonymously."
+  },
+  "assessment": {
+    "rarely": "Rarely (1)",
+    "consistently": "Consistently (5)",
+    "save_continue": "Save & Continue",
+    "previous": "Previous",
+    "submit": "Submit Assessment"
+  }
+}

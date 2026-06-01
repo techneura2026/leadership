@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Personality Profile — {{participantName}}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 13px; }
+    .cover { background: #4c1d95; color: #fff; padding: 60px 48px; }
+    .cover h1 { font-size: 28px; font-weight: 700; }
+    .section { padding: 32px 48px; border-bottom: 1px solid #e5e7eb; }
+    .section h2 { font-size: 18px; font-weight: 700; color: #4c1d95; margin-bottom: 16px; }
+    .factor-row { margin-bottom: 28px; }
+    .factor-name { font-size: 15px; font-weight: 700; color: #4c1d95; margin-bottom: 4px; }
+    .factor-scores { display: flex; gap: 24px; margin-bottom: 10px; font-size: 12px; color: #6b7280; }
+    .factor-scores span { font-weight: 600; color: #1f2937; }
+    .spectrum-container { position: relative; margin-bottom: 8px; }
+    .spectrum-bar { height: 12px; border-radius: 6px; background: linear-gradient(to right, #e0e7ff, #4f46e5); }
+    .spectrum-marker { position: absolute; top: -4px; width: 20px; height: 20px; border-radius: 50%; background: #4f46e5; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .spectrum-labels { display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; margin-top: 4px; }
+    .narrative-box { background: #f5f3ff; border-left: 3px solid #7c3aed; padding: 12px 16px; font-size: 12px; line-height: 1.7; color: #374151; border-radius: 0 6px 6px 0; margin-top: 8px; }
+    .percentile-badge { display: inline-block; background: #ede9fe; color: #4c1d95; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px; margin-left: 8px; }
+    .intro-box { background: #f5f3ff; border-radius: 8px; padding: 16px 20px; font-size: 12px; line-height: 1.7; margin-bottom: 24px; }
+    .footer { padding: 24px 48px; background: #f9fafb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+
+<div class="cover">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:8px;">LeaderPrism — Confidential</div>
+  <h1>Big Five Personality Profile</h1>
+  <h2 style="font-size:16px;font-weight:400;opacity:0.85;margin-top:8px;">{{assessmentTitle}}</h2>
+  <div style="margin-top:20px;font-size:22px;font-weight:300;">{{participantName}}</div>
+  <div style="font-size:13px;opacity:0.7;margin-top:4px;">{{jobTitle}}</div>
+  <div style="margin-top:32px;font-size:11px;opacity:0.6;">Generated: {{generatedDate}} &nbsp;|&nbsp; {{organisationName}}</div>
+</div>
+
+<div class="section">
+  <h2>Understanding Your Profile</h2>
+  <div class="intro-box">
+    The Big Five (OCEAN) personality framework is the most widely validated model of human personality. Your scores are based on
+    norm-referenced T-scores (mean=50, SD=10) relative to a comparable professional population. A T-score of 50 represents the average;
+    scores above 60 indicate above-average traits, while scores below 40 indicate below-average traits — neither is inherently better or
+    worse. Each factor profile has strengths and development opportunities in different leadership contexts.
+  </div>
+</div>
+
+<div class="section">
+  <h2>Big Five Factor Scores</h2>
+
+  {{#each factors}}
+  <div class="factor-row">
+    <div class="factor-name">
+      {{label}}
+      <span class="percentile-badge">{{percentile}}th percentile</span>
+    </div>
+    <div class="factor-scores">
+      T-Score: <span>{{tScore}}</span> &nbsp;&nbsp; Raw Score: <span>{{rawScore}}</span>
+    </div>
+    <div class="spectrum-container">
+      <div class="spectrum-bar"></div>
+      <div class="spectrum-marker" style="left: calc({{markerPosition}}% - 10px);"></div>
+    </div>
+    <div class="spectrum-labels">
+      <span>Very Low (T=20)</span>
+      <span>Average (T=50)</span>
+      <span>Very High (T=80)</span>
+    </div>
+    <div class="narrative-box">{{narrative}}</div>
+  </div>
+  {{/each}}
+</div>
+
+<div class="section">
+  <h2>Leadership Implications</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">
+    Based on your personality profile, the following leadership style tendencies and development considerations are highlighted.
+  </p>
+  {{#each leadershipImplications}}
+  <div style="margin-bottom:12px;padding:12px;background:#faf5ff;border-radius:6px;border:1px solid #e9d5ff;">
+    <div style="font-weight:600;font-size:12px;color:#4c1d95;margin-bottom:4px;">{{factor}}</div>
+    <div style="font-size:12px;line-height:1.6;">{{implication}}</div>
+  </div>
+  {{/each}}
+</div>
+
+<div class="footer">
+  <span>LeaderPrism Personality Report — Confidential</span>
+  <span>{{generatedDate}}</span>
+</div>
+
+</body>
+</html>

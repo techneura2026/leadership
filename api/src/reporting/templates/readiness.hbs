@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Readiness Assessment — {{participantName}}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 13px; }
+    .cover { background: #7c2d12; color: #fff; padding: 60px 48px; }
+    .cover h1 { font-size: 28px; font-weight: 700; }
+    .section { padding: 32px 48px; border-bottom: 1px solid #e5e7eb; }
+    .section h2 { font-size: 18px; font-weight: 700; color: #7c2d12; margin-bottom: 16px; }
+    .readiness-badge { display: inline-block; padding: 6px 20px; border-radius: 24px; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-ready-now { background: #dcfce7; color: #14532d; }
+    .badge-1-2-years { background: #fef9c3; color: #713f12; }
+    .badge-developing { background: #fff7ed; color: #9a3412; }
+    .badge-not-yet { background: #fee2e2; color: #7f1d1d; }
+    .composite-score { font-size: 48px; font-weight: 800; color: #7c2d12; }
+    .composite-label { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    .component-row { display: flex; align-items: center; margin-bottom: 12px; gap: 16px; }
+    .component-name { width: 180px; font-size: 12px; font-weight: 500; }
+    .component-weight { width: 40px; font-size: 11px; color: #9ca3af; text-align: right; }
+    .component-bar-container { flex: 1; background: #f3f4f6; height: 10px; border-radius: 5px; }
+    .component-bar { height: 10px; border-radius: 5px; background: #ea580c; }
+    .component-score { width: 50px; text-align: right; font-weight: 700; font-size: 13px; color: #7c2d12; }
+    .nine-box { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 300px; margin: 24px 0; }
+    .nine-box-cell { height: 80px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; text-align: center; padding: 8px; }
+    .cell-active { background: #7c2d12; color: #fff; }
+    .cell-inactive { background: #f3f4f6; color: #9ca3af; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { background: #7c2d12; color: #fff; padding: 8px 12px; font-size: 11px; text-align: left; }
+    td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .dev-action { background: #fff7ed; border-left: 3px solid #ea580c; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 10px; font-size: 12px; line-height: 1.6; }
+    .footer { padding: 24px 48px; background: #f9fafb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
+    .page-break { page-break-after: always; }
+  </style>
+</head>
+<body>
+
+<div class="cover">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:8px;">LeaderPrism — Confidential</div>
+  <h1>Leadership Readiness Report</h1>
+  <h2 style="font-size:16px;font-weight:400;opacity:0.85;margin-top:8px;">{{assessmentTitle}}</h2>
+  <div style="margin-top:20px;font-size:22px;font-weight:300;">{{participantName}}</div>
+  <div style="font-size:13px;opacity:0.7;margin-top:4px;">{{jobTitle}}</div>
+  {{#if targetRole}}
+  <div style="font-size:13px;opacity:0.8;margin-top:8px;">Target Role: <strong>{{targetRole}}</strong></div>
+  {{/if}}
+  <div style="margin-top:32px;font-size:11px;opacity:0.6;">Generated: {{generatedDate}} &nbsp;|&nbsp; {{organisationName}}</div>
+</div>
+
+<div class="section">
+  <h2>Readiness Summary</h2>
+  <div style="display:flex;gap:48px;align-items:flex-start;">
+    <div>
+      <div class="composite-score">{{compositeScore}}</div>
+      <div class="composite-label">Composite Score (out of 100)</div>
+      <div style="margin-top:16px;">
+        <span class="readiness-badge {{readinessBadgeClass readinessRating}}">{{readinessLabel readinessRating}}</span>
+      </div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:12px;line-height:1.7;color:#374151;">{{readinessNarrative readinessRating participantName}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Component Scores</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:20px;">All scores normalised to 0–100. Weights reflect validated predictive value for leadership readiness.</p>
+
+  <div class="component-row">
+    <span class="component-name">Competency Assessment</span>
+    <span class="component-weight">30%</span>
+    <div class="component-bar-container">
+      <div class="component-bar" style="width:{{competencyScore}}%;"></div>
+    </div>
+    <span class="component-score">{{competencyScore}}</span>
+  </div>
+  <div class="component-row">
+    <span class="component-name">360° Feedback</span>
+    <span class="component-weight">25%</span>
+    <div class="component-bar-container">
+      <div class="component-bar" style="width:{{feedbackScore}}%;"></div>
+    </div>
+    <span class="component-score">{{feedbackScore}}</span>
+  </div>
+  <div class="component-row">
+    <span class="component-name">SJT (Situational Judgment)</span>
+    <span class="component-weight">25%</span>
+    <div class="component-bar-container">
+      <div class="component-bar" style="width:{{sjtScore}}%;"></div>
+    </div>
+    <span class="component-score">{{sjtScore}}</span>
+  </div>
+  <div class="component-row">
+    <span class="component-name">Learning Agility</span>
+    <span class="component-weight">15%</span>
+    <div class="component-bar-container">
+      <div class="component-bar" style="width:{{learningAgilityScore}}%;"></div>
+    </div>
+    <span class="component-score">{{learningAgilityScore}}</span>
+  </div>
+  <div class="component-row">
+    <span class="component-name">Personality Fit</span>
+    <span class="component-weight">5%</span>
+    <div class="component-bar-container">
+      <div class="component-bar" style="width:{{personalityFitScore}}%;"></div>
+    </div>
+    <span class="component-score">{{personalityFitScore}}</span>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<div class="section">
+  <h2>9-Box Position</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Performance axis reflects 360° feedback effectiveness score. Potential axis reflects learning agility, personality fit, and SJT scores.</p>
+  <div style="font-size:12px;margin-bottom:8px;color:#374151;">
+    Performance: <strong>{{gridPerformance}}</strong> &nbsp;|&nbsp; Potential: <strong>{{gridPotential}}</strong>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Development Plan</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Prioritised development actions based on the readiness assessment results.</p>
+  {{#each developmentActions}}
+  <div class="dev-action">
+    <div style="font-weight:600;font-size:12px;color:#7c2d12;margin-bottom:4px;">{{priority}}. {{area}}</div>
+    <div style="font-size:12px;line-height:1.6;">{{action}}</div>
+    {{#if timeline}}<div style="font-size:11px;color:#9a3412;margin-top:4px;">Timeline: {{timeline}}</div>{{/if}}
+  </div>
+  {{/each}}
+</div>
+
+<div class="footer">
+  <span>LeaderPrism Readiness Report — Confidential</span>
+  <span>{{generatedDate}}</span>
+</div>
+
+</body>
+</html>

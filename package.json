@@ -1,0 +1,30 @@
+{
+  "name": "leaderprism",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "api",
+    "web",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w api\" \"npm run dev -w web\"",
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w shared && npm run build -w api && npm run build -w web",
+    "test": "npm run test -w api && npm run test -w web",
+    "lint": "npm run lint -w api && npm run lint -w web",
+    "db:up": "docker compose up db redis -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up db redis -d && sleep 3 && npm run db:migrate && npm run db:seed",
+    "db:migrate": "npm run migration:run -w api",
+    "db:seed": "npm run seed -w api",
+    "migration:generate": "npm run migration:generate -w api --",
+    "e2e": "npm run e2e:check && npm run test:e2e -w api",
+    "e2e:clean": "npm run e2e:check && node -e \"process.env.CLEAN_UP_E2E='true'; require('child_process').execSync('npm run test:e2e -w api', {stdio: 'inherit'})\"",
+    "e2e:check": "node api/test/e2e/scripts/check-services.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

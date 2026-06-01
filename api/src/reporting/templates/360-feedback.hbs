@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>360° Feedback Report — {{participantName}}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 13px; }
+    .cover { background: #1e3a5f; color: #fff; padding: 60px 48px; min-height: 260px; }
+    .cover h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .cover h2 { font-size: 16px; font-weight: 400; opacity: 0.85; }
+    .cover .meta { margin-top: 32px; font-size: 12px; opacity: 0.7; }
+    .section { padding: 32px 48px; border-bottom: 1px solid #e5e7eb; }
+    .section h2 { font-size: 18px; font-weight: 700; color: #1e3a5f; margin-bottom: 16px; }
+    .section h3 { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 10px; margin-top: 20px; }
+    .intro-box { background: #f0f4ff; border-left: 4px solid #1e3a5f; padding: 16px 20px; border-radius: 4px; margin-bottom: 24px; font-size: 12px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th { background: #1e3a5f; color: #fff; padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .score-bar-container { width: 100%; background: #e5e7eb; height: 8px; border-radius: 4px; }
+    .score-bar { height: 8px; border-radius: 4px; background: #3b82f6; }
+    .score-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-high { background: #dcfce7; color: #166534; }
+    .badge-medium { background: #fef9c3; color: #854d0e; }
+    .badge-low { background: #fee2e2; color: #991b1b; }
+    .gap-positive { color: #166534; font-weight: 600; }
+    .gap-negative { color: #991b1b; font-weight: 600; }
+    .gap-zero { color: #6b7280; }
+    .comment-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; font-style: italic; color: #374151; }
+    .footer { padding: 24px 48px; background: #f9fafb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
+    .page-break { page-break-after: always; }
+    .chart-placeholder { background: #f0f4ff; border: 2px dashed #93c5fd; border-radius: 8px; padding: 32px; text-align: center; color: #3b82f6; font-size: 12px; margin-bottom: 24px; }
+    .chart-table td.col-label { font-weight: 500; width: 200px; }
+    .chart-table td.col-score { width: 60px; text-align: right; font-weight: 600; color: #1e3a5f; }
+    .chart-table td.col-bar { padding: 0 12px; }
+  </style>
+</head>
+<body>
+
+<!-- Cover Page -->
+<div class="cover">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:8px;">LeaderPrism — Confidential</div>
+  <h1>360° Leadership Feedback</h1>
+  <h2>{{assessmentTitle}}</h2>
+  <div style="margin-top:20px;font-size:22px;font-weight:300;">{{participantName}}</div>
+  <div style="margin-top:4px;font-size:13px;opacity:0.7;">{{jobTitle}}</div>
+  <div class="meta">
+    Report generated: {{generatedDate}} &nbsp;|&nbsp; Organisation: {{organisationName}}<br/>
+    Total raters: {{totalRaters}} &nbsp;|&nbsp; Perspectives: {{perspectives}}
+  </div>
+</div>
+
+<div class="section">
+  <div class="intro-box">
+    This report summarises structured feedback from your colleagues across multiple perspectives. All peer and direct report responses are
+    presented anonymously — a minimum of 3 responses is required per group before scores are displayed. Ratings use a
+    {{ratingScale}}-point behavioural scale. Use this feedback as a starting point for development conversations.
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- Overall Summary -->
+<div class="section">
+  <h2>Overall Summary</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Competency</th>
+        <th>Self</th>
+        <th>Supervisor</th>
+        <th>Peers</th>
+        <th>Direct Reports</th>
+        <th>Overall Mean</th>
+        <th>Gap (vs Self)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each scores}}
+      <tr>
+        <td>{{competencyName}}</td>
+        <td>{{formatScore byPerspective.self.mean}}</td>
+        <td>{{formatScore byPerspective.supervisor.mean}}</td>
+        <td>{{formatScore byPerspective.peer.mean}}</td>
+        <td>{{formatScore byPerspective.direct_report.mean}}</td>
+        <td style="font-weight:600;color:#1e3a5f;">{{formatScore overallMean}}</td>
+        <td class="{{gapClass gapVsSelf}}">{{formatGap gapVsSelf}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Score Chart (radar data as table for PDF) -->
+<div class="section">
+  <h2>Competency Scores by Perspective</h2>
+  <table class="chart-table">
+    <thead>
+      <tr>
+        <th class="col-label">Competency</th>
+        <th class="col-score">Mean</th>
+        <th class="col-bar">Visual</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each scores}}
+      <tr>
+        <td class="col-label">{{competencyName}}</td>
+        <td class="col-score">{{formatScore overallMean}}</td>
+        <td class="col-bar">
+          <div class="score-bar-container">
+            <div class="score-bar" style="width:{{barWidth overallMean maxScale}}%;"></div>
+          </div>
+        </td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</div>
+
+<div class="page-break"></div>
+
+<!-- Verbatim Comments -->
+{{#if openComments}}
+<div class="section">
+  <h2>Qualitative Feedback</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Comments have been anonymised and shuffled to protect rater confidentiality.</p>
+  {{#each openComments}}
+  <div class="comment-block">"{{this}}"</div>
+  {{/each}}
+</div>
+{{/if}}
+
+<!-- Development Suggestions -->
+<div class="section">
+  <h2>Suggested Development Focus Areas</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">Based on your lowest-scoring competencies and largest gaps between self and others' perceptions.</p>
+  {{#each developmentAreas}}
+  <div style="margin-bottom:16px;">
+    <div style="font-weight:600;font-size:13px;color:#1e3a5f;">{{competencyName}}</div>
+    <div style="font-size:12px;color:#4b5563;margin-top:4px;">Score: {{formatScore score}} &nbsp;|&nbsp; Gap: {{formatGap gap}}</div>
+    <div style="font-size:12px;color:#374151;margin-top:6px;line-height:1.6;">{{suggestion}}</div>
+  </div>
+  {{/each}}
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <span>LeaderPrism 360° Report — Confidential</span>
+  <span>Generated {{generatedDate}}</span>
+</div>
+
+</body>
+</html>

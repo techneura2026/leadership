@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Competency Profile — {{participantName}}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1f2937; font-size: 13px; }
+    .cover { background: #064e3b; color: #fff; padding: 60px 48px; }
+    .cover h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .section { padding: 32px 48px; border-bottom: 1px solid #e5e7eb; }
+    .section h2 { font-size: 18px; font-weight: 700; color: #064e3b; margin-bottom: 16px; }
+    .domain-header { background: #f0fdf4; border-left: 4px solid #059669; padding: 10px 16px; font-weight: 600; font-size: 14px; color: #064e3b; margin-bottom: 8px; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    th { background: #064e3b; color: #fff; padding: 7px 12px; text-align: left; font-size: 11px; }
+    td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .level-pip { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 3px; background: #d1fae5; border: 1px solid #6ee7b7; }
+    .level-pip.filled { background: #059669; border-color: #047857; }
+    .gap-badge { font-size: 11px; padding: 2px 6px; border-radius: 10px; }
+    .gap-positive { background: #d1fae5; color: #065f46; }
+    .gap-negative { background: #fee2e2; color: #991b1b; }
+    .gap-zero { background: #f3f4f6; color: #6b7280; }
+    .footer { padding: 24px 48px; background: #f9fafb; font-size: 10px; color: #9ca3af; display: flex; justify-content: space-between; }
+    .page-break { page-break-after: always; }
+  </style>
+</head>
+<body>
+
+<div class="cover">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:8px;">LeaderPrism — Confidential</div>
+  <h1>Competency Assessment Profile</h1>
+  <h2 style="font-size:16px;font-weight:400;opacity:0.85;">{{assessmentTitle}}</h2>
+  <div style="margin-top:20px;font-size:22px;font-weight:300;">{{participantName}}</div>
+  <div style="margin-top:4px;font-size:13px;opacity:0.7;">{{jobTitle}}</div>
+  <div style="margin-top:32px;font-size:11px;opacity:0.6;">Generated: {{generatedDate}} &nbsp;|&nbsp; {{organisationName}}</div>
+</div>
+
+<div class="section">
+  <h2>Competency Framework Overview</h2>
+  <p style="font-size:12px;color:#6b7280;margin-bottom:16px;">
+    Ratings use a 4-level behavioural scale: 1=Developing, 2=Proficient, 3=Advanced, 4=Expert.<br/>
+    Gap = Manager rating minus Self rating. Positive gap indicates manager rates you higher than self-perception.
+  </p>
+
+  {{#each domains}}
+  <div class="domain-header" style="border-left-color:{{colour}}">{{domainName}}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Competency</th>
+        <th>Self Rating</th>
+        <th>Manager Rating</th>
+        <th>Gap</th>
+        <th>Evidence / Comments</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each competencies}}
+      <tr>
+        <td style="font-weight:500;">{{name}}</td>
+        <td>
+          {{#times selfRating}}<span class="level-pip filled"></span>{{/times}}
+          {{#timesRemaining selfRating 4}}<span class="level-pip"></span>{{/timesRemaining}}
+          <span style="font-size:11px;color:#6b7280;margin-left:4px;">({{selfRating}})</span>
+        </td>
+        <td>
+          {{#times managerRating}}<span class="level-pip filled" style="background:#059669;"></span>{{/times}}
+          {{#timesRemaining managerRating 4}}<span class="level-pip"></span>{{/timesRemaining}}
+          <span style="font-size:11px;color:#6b7280;margin-left:4px;">({{managerRating}})</span>
+        </td>
+        <td>
+          <span class="gap-badge {{gapClass gap}}">{{formatGap gap}}</span>
+        </td>
+        <td style="font-size:11px;color:#4b5563;">{{evidenceText}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">
+    Domain Average — Self: {{formatScore averageSelfRating}} &nbsp;|&nbsp; Manager: {{formatScore averageManagerRating}}
+  </div>
+  {{/each}}
+</div>
+
+<div class="page-break"></div>
+
+<div class="section">
+  <h2>Development Priority Areas</h2>
+  {{#each developmentAreas}}
+  <div style="margin-bottom:20px;padding:14px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;">
+    <div style="font-weight:600;font-size:13px;color:#064e3b;">{{competencyName}}</div>
+    <div style="font-size:11px;color:#6b7280;margin-top:2px;">Manager: {{managerRating}}/4 &nbsp;|&nbsp; Self: {{selfRating}}/4 &nbsp;|&nbsp; Gap: {{formatGap gap}}</div>
+    {{#if developmentComment}}
+    <div style="font-size:12px;color:#374151;margin-top:8px;font-style:italic;">"{{developmentComment}}"</div>
+    {{/if}}
+  </div>
+  {{/each}}
+</div>
+
+<div class="footer">
+  <span>LeaderPrism Competency Report — Confidential</span>
+  <span>{{generatedDate}}</span>
+</div>
+
+</body>
+</html>
