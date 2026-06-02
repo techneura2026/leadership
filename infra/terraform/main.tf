@@ -64,7 +64,7 @@ resource "azurerm_redis_cache" "redis" {
   capacity            = 0
   family              = "C"
   sku_name            = "Basic"
-  enable_non_ssl_port = false
+  non_ssl_port_enabled = false
 }
 
 # Storage Account
