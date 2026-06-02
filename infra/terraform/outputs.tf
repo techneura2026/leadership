@@ -11,5 +11,5 @@ output "postgres_server_name" {
 }
 
 output "redis_hostname" {
-  value = azurerm_redis_cache.redis.hostname
+  value = azurerm_managed_redis.redis.hostname
 }

@@ -62,15 +62,14 @@ resource "azurerm_postgresql_flexible_server_database" "db" {
   charset   = "utf8"
 }
 
-# Redis
-resource "azurerm_redis_cache" "redis" {
+# Redis (Azure Managed Redis)
+resource "azurerm_managed_redis" "redis" {
   name                = "${var.app_name}-redis-${var.environment}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  capacity            = 0
-  family              = "C"
-  sku_name            = "Basic"
-  non_ssl_port_enabled = false
+  sku_name            = "Balanced_B0"
+
+  default_database {}
 }
 
 # Storage Account
@@ -88,7 +87,7 @@ resource "azurerm_service_plan" "plan" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   os_type             = "Linux"
-  sku_name            = "B1"
+  sku_name            = "F1"
 }
 
 # App Service - API
@@ -108,7 +107,7 @@ resource "azurerm_linux_web_app" "api" {
     "NODE_ENV"                        = "production"
     "PORT"                            = "3001"
     "DATABASE_URL"                    = "postgresql://leaderprism:${local.postgres_admin_password}@${azurerm_postgresql_flexible_server.postgres.name}.postgres.database.azure.com/leaderprism?sslmode=require"
-    "REDIS_URL"                       = "redis://${azurerm_redis_cache.redis.hostname}:${azurerm_redis_cache.redis.ssl_port},password=${azurerm_redis_cache.redis.primary_access_key},ssl=True,abortConnect=False"
+    "REDIS_URL"                       = "redis://${azurerm_managed_redis.redis.hostname}:10000,password=${azurerm_managed_redis.redis.default_database[0].primary_access_key},ssl=True,abortConnect=False"
     "AZURE_STORAGE_CONNECTION_STRING" = azurerm_storage_account.storage.primary_connection_string
     "AZURE_KEY_VAULT_URI"             = azurerm_key_vault.kv.vault_uri
   }
