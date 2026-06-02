@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env.test') });
 import { DataSource } from 'typeorm';
 import { seedCompetencyFramework } from '../../../src/database/seeds/competency-framework.seed';
 import { seedPersonalityItems } from '../../../src/database/seeds/personality-items.seed';
+import { seedReadinessItems } from '../../../src/database/seeds/readiness-items.seed';
 import { seedNormativeData } from '../../../src/database/seeds/normative-data.seed';
 import { seedAdminAccount } from '../../../src/database/seeds/admin.seed';
 
@@ -63,6 +64,7 @@ export default async function globalSetup() {
   // 3. Seed reference data (competency framework, Big Five items, normative data)
   await seedCompetencyFramework(ds);
   await seedPersonalityItems(ds);
+  await seedReadinessItems(ds);
   await seedNormativeData(ds);
   console.log('   ✓ Reference data seeded');
 

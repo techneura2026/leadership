@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/useApi';
 import { Badge } from '@/components/ui/Badge';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { useAuthStore } from '@/store/auth.store';
+import { useEffect } from 'react';
 import { AssessmentDto, AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 
 interface DashboardMetrics {
@@ -41,13 +42,13 @@ export default function DashboardPage() {
     isAdmin ? '/analytics/dashboard' : null,
   );
 
-  if (isLoading) return <PageSpinner />;
+  useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      router.replace('/my-assessments');
+    }
+  }, [isLoading, isAdmin, router]);
 
-  // Participants and managers have no admin dashboard — send them to their assessments
-  if (!isAdmin) {
-    router.replace('/my-assessments');
-    return <PageSpinner />;
-  }
+  if (isLoading || !isAdmin) return <PageSpinner />;
 
   const stats = [
     {

@@ -18,6 +18,7 @@ import {
   RaterNominationDto,
   ReportDto,
 } from '@leaderprism/shared';
+import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Participant {
@@ -39,6 +40,7 @@ const TAB_LIST = [
   { key: 'overview', label: 'Overview' },
   { key: 'participants', label: 'Participants' },
   { key: 'nominations', label: 'Nominations' },
+  { key: 'results', label: 'Results' },
   { key: 'reports', label: 'Reports' },
 ];
 
@@ -623,6 +625,151 @@ function ReportsTab({
   );
 }
 
+// ── Personality Results Tab ───────────────────────────────────────────────────
+
+interface FactorScore {
+  factor: string;
+  rawScore: number;
+  tScore: number;
+  percentile: number;
+  narrative: string;
+}
+
+const ADMIN_FACTOR_ORDER = [
+  'openness',
+  'conscientiousness',
+  'extraversion',
+  'agreeableness',
+  'emotional_stability',
+];
+
+const ADMIN_FACTOR_LABELS: Record<string, string> = {
+  openness: 'Openness',
+  conscientiousness: 'Conscientiousness',
+  extraversion: 'Extraversion',
+  agreeableness: 'Agreeableness',
+  emotional_stability: 'Emotional Stability',
+};
+
+function tScoreBandVariant(t: number): 'success' | 'warning' | 'info' {
+  if (t >= 60) return 'success';
+  if (t < 40) return 'info';
+  return 'warning';
+}
+
+function ParticipantRadarCard({
+  participant,
+  assessmentId,
+}: {
+  participant: Participant;
+  assessmentId: string;
+}) {
+  const { data: scores } = useApi<FactorScore[]>(
+    participant.status === 'completed'
+      ? `/assessments/${assessmentId}/personality/scores/${participant.id}`
+      : null,
+  );
+
+  if (participant.status !== 'completed') {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-gray-900">
+            {participant.user?.firstName} {participant.user?.lastName}
+          </p>
+          <Badge variant="neutral">Not completed</Badge>
+        </div>
+        <p className="text-xs text-gray-400">Results will appear once the participant submits.</p>
+      </div>
+    );
+  }
+
+  const axes: RadarAxis[] = ADMIN_FACTOR_ORDER.map((key) => {
+    const s = scores?.find((sc) => sc.factor === key);
+    return { key, label: ADMIN_FACTOR_LABELS[key] ?? key, value: s ? Math.round(s.percentile) : 0 };
+  });
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-semibold text-gray-900">
+          {participant.user?.firstName} {participant.user?.lastName}
+        </p>
+        <Badge variant="success">Completed</Badge>
+      </div>
+
+      {!scores ? (
+        <div className="flex justify-center py-6">
+          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-center mb-4">
+            <RadarChart axes={axes} size={200} />
+          </div>
+
+          <div className="space-y-2">
+            {ADMIN_FACTOR_ORDER.map((key) => {
+              const score = scores.find((s) => s.factor === key);
+              if (!score) return null;
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-600 w-28 shrink-0">{ADMIN_FACTOR_LABELS[key]}</span>
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full"
+                      style={{ width: `${Math.round(score.percentile)}%` }}
+                    />
+                  </div>
+                  <Badge variant={tScoreBandVariant(score.tScore)} className="text-xs">
+                    {Math.round(score.percentile)}th
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PersonalityResultsTab({
+  assessmentId,
+  participants,
+}: {
+  assessmentId: string;
+  participants: Participant[];
+}) {
+  const completed = participants.filter((p) => p.status === 'completed');
+  const pending = participants.filter((p) => p.status !== 'completed');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">
+          Personality Results — {completed.length}/{participants.length} completed
+        </h3>
+      </div>
+
+      {participants.length === 0 && (
+        <EmptyState title="No participants" description="Add participants to begin the assessment." />
+      )}
+
+      {participants.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {completed.map((p) => (
+            <ParticipantRadarCard key={p.id} participant={p} assessmentId={assessmentId} />
+          ))}
+          {pending.map((p) => (
+            <ParticipantRadarCard key={p.id} participant={p} assessmentId={assessmentId} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── cn helper (inline to avoid extra import issue) ────────────────────────────
 function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ');
@@ -643,9 +790,12 @@ export default function AssessmentDetailPage() {
   } = useApi<Participant[]>(`/assessments/${id}/participants`);
 
   const is360 = assessment?.assessmentType === AssessmentType.FEEDBACK_360;
+  const isPersonality = assessment?.assessmentType === AssessmentType.PERSONALITY;
 
   const visibleTabs = TAB_LIST.filter(
-    (t) => t.key !== 'nominations' || is360,
+    (t) =>
+      (t.key !== 'nominations' || is360) &&
+      (t.key !== 'results' || isPersonality),
   );
 
   if (isLoading) return <PageSpinner />;
@@ -697,6 +847,10 @@ export default function AssessmentDetailPage() {
 
       {activeTab === 'nominations' && is360 && (
         <NominationsTab assessmentId={id} participants={participants ?? []} />
+      )}
+
+      {activeTab === 'results' && isPersonality && (
+        <PersonalityResultsTab assessmentId={id} participants={participants ?? []} />
       )}
 
       {activeTab === 'reports' && (

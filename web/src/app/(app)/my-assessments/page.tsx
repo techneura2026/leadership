@@ -49,13 +49,18 @@ export default function MyAssessmentsPage() {
 
       {!isLoading && assessments && assessments.length > 0 && (
         <div className="space-y-4">
-          {assessments.map((assessment) => (
-            <AssessmentCard
-              key={assessment.id}
-              assessment={assessment}
-              onStart={() => router.push(`/my-assessments/${assessment.id}/take`)}
-            />
-          ))}
+          {assessments.map((assessment) => {
+            const isCompleted = assessment.participantStatus === 'completed';
+            const canViewResults = isCompleted && assessment.assessmentType === AssessmentType.PERSONALITY;
+            return (
+              <AssessmentCard
+                key={assessment.id}
+                assessment={assessment}
+                onStart={() => router.push(`/my-assessments/${assessment.id}`)}
+                resultsEnabled={canViewResults}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -65,9 +70,11 @@ export default function MyAssessmentsPage() {
 function AssessmentCard({
   assessment,
   onStart,
+  resultsEnabled = false,
 }: {
   assessment: ParticipantAssessment;
   onStart: () => void;
+  resultsEnabled?: boolean;
 }) {
   const status = assessment.participantStatus ?? 'not_started';
   const completion = assessment.completionPercentage ?? 0;
@@ -121,7 +128,7 @@ function AssessmentCard({
         <div className="shrink-0">
           <button
             onClick={onStart}
-            disabled={status === 'completed'}
+            disabled={status === 'completed' && !resultsEnabled}
             className={
               getCtaVariant() === 'primary'
                 ? 'bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-5 py-2.5 transition-colors disabled:opacity-50 whitespace-nowrap'

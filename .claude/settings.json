@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(New-Item -ItemType Directory -Force -Path \"c:\\\\Work\\\\leader\\\\web\\\\src\\\\app\\\\\\(app\\)\\\\my-assessments\\\\[id]\\\\results\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Work\\\\leader\\\\web\\\\e2e\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(test\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Work\\leader\\web\\src\\app\\(app)\\my-assessments\\[id]"
+    ]
+  }
+}

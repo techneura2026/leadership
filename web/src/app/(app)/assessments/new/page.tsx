@@ -19,6 +19,7 @@ interface WizardState {
   title: string;
   startDate: string;
   endDate: string;
+  isRatingMandatory: boolean;
   competencyIds: string[];
   participantIds: string[];
 }
@@ -142,15 +143,21 @@ function StepType({
 
 // ── Step 2: Details ────────────────────────────────────────────────────────────
 function StepDetails({
+  assessmentType,
   title,
   startDate,
   endDate,
+  isRatingMandatory,
   onChange,
+  onToggleMandatory,
 }: {
+  assessmentType: AssessmentType | null;
   title: string;
   startDate: string;
   endDate: string;
+  isRatingMandatory: boolean;
   onChange: (field: 'title' | 'startDate' | 'endDate', value: string) => void;
+  onToggleMandatory: (val: boolean) => void;
 }) {
   return (
     <div>
@@ -191,6 +198,48 @@ function StepDetails({
             />
           </div>
         </div>
+
+        {assessmentType === AssessmentType.PERSONALITY && (
+          <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-800">Questionnaire Completion</p>
+            <div className="flex flex-col gap-2">
+              <label className={cn(
+                'flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
+                isRatingMandatory ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300',
+              )}>
+                <input
+                  type="radio"
+                  checked={isRatingMandatory}
+                  onChange={() => onToggleMandatory(true)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Mandatory</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Participants must complete all questionnaire items before results are generated.
+                  </p>
+                </div>
+              </label>
+              <label className={cn(
+                'flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all',
+                !isRatingMandatory ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300',
+              )}>
+                <input
+                  type="radio"
+                  checked={!isRatingMandatory}
+                  onChange={() => onToggleMandatory(false)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Optional</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    After completing the questionnaire, participants are immediately shown their personality results in radar charts.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -206,7 +255,7 @@ function StepCompetencies({
   selected: string[];
   onToggle: (id: string) => void;
 }) {
-  const { data: competencies, isLoading } = useApi<CompetencyDto[]>('/competencies');
+  const { data: competencies, isLoading } = useApi<CompetencyDto[]>('/items/competencies');
   const needsCompetencies =
     assessmentType === AssessmentType.FEEDBACK_360 ||
     assessmentType === AssessmentType.COMPETENCY;
@@ -399,6 +448,12 @@ function StepReview({
               : 'None (not required)'
           }
         />
+        {state.type === AssessmentType.PERSONALITY && (
+          <Row
+            label="Questionnaire"
+            value={state.isRatingMandatory ? 'Mandatory' : 'Optional — results shown after completion'}
+          />
+        )}
         <Row label="Participants" value={`${state.participantIds.length} selected`} />
       </div>
 
@@ -453,6 +508,7 @@ export default function NewAssessmentPage() {
     title: '',
     startDate: '',
     endDate: '',
+    isRatingMandatory: true,
     competencyIds: [],
     participantIds: [],
   });
@@ -503,6 +559,9 @@ export default function NewAssessmentPage() {
         endDate: state.endDate || null,
         config: {
           competencyIds: state.competencyIds.length ? state.competencyIds : undefined,
+          ...(state.type === AssessmentType.PERSONALITY
+            ? { isRatingMandatory: state.isRatingMandatory }
+            : {}),
         },
       };
 
@@ -537,13 +596,13 @@ export default function NewAssessmentPage() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => router.back()}
+          onClick={() => (state.step > 1 ? prev() : router.back())}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back
+          {state.step > 1 ? `Back to ${STEPS[state.step - 2].label}` : 'Back'}
         </button>
         <h1 className="text-2xl font-semibold text-gray-900 mt-2">New Assessment</h1>
       </div>
@@ -562,10 +621,13 @@ export default function NewAssessmentPage() {
         )}
         {state.step === 2 && (
           <StepDetails
+            assessmentType={state.type}
             title={state.title}
             startDate={state.startDate}
             endDate={state.endDate}
+            isRatingMandatory={state.isRatingMandatory}
             onChange={(field, value) => update({ [field]: value })}
+            onToggleMandatory={(val) => update({ isRatingMandatory: val })}
           />
         )}
         {state.step === 3 && (

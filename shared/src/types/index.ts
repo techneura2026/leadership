@@ -97,6 +97,7 @@ export interface AssessmentConfig {
   reminderDays?: number[];
   instructions?: string;
   targetRoleId?: string;
+  isRatingMandatory?: boolean;
 }
 
 // ── 360 Feedback ─────────────────────────────────────────────

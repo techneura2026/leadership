@@ -23,6 +23,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env.test') });
 import { DataSource } from 'typeorm';
 import { seedCompetencyFramework } from '../../../src/database/seeds/competency-framework.seed';
 import { seedPersonalityItems } from '../../../src/database/seeds/personality-items.seed';
+import { seedReadinessItems } from '../../../src/database/seeds/readiness-items.seed';
 import { seedNormativeData } from '../../../src/database/seeds/normative-data.seed';
 
 async function main() {
@@ -76,6 +77,11 @@ async function main() {
   await seedPersonalityItems(ds);
   const itemCount = await ds.query(`SELECT COUNT(*) FROM items WHERE module = 'personality'`);
   console.log(`   ✓ Personality items seeded (${itemCount[0].count} items)`);
+
+  await seedReadinessItems(ds);
+  const readinessSjtCount = await ds.query(`SELECT COUNT(*) FROM items WHERE module = 'sjt'`);
+  const readinessLaCount = await ds.query(`SELECT COUNT(*) FROM items WHERE module = 'learning_agility'`);
+  console.log(`   ✓ Readiness items seeded (${readinessSjtCount[0].count} SJT, ${readinessLaCount[0].count} LA items)`);
 
   await seedNormativeData(ds);
   const normCount = await ds.query(`SELECT COUNT(*) FROM normative_data`);

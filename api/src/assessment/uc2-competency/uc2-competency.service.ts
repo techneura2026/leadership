@@ -97,7 +97,32 @@ export class Uc2CompetencyService {
       assessorType: 'self',
     });
 
-    const saved = await this.caRepo.save(ca);
+    let saved: CompetencyAssessment;
+    try {
+      saved = await this.caRepo.save(ca);
+    } catch (err: any) {
+      if (err.code === '23505' || err.message?.includes('UQ_competency_assessment_unique')) {
+        this.logger.warn(
+          `Self-assessment already exists for participant ${participantId} due to concurrent race.`,
+        );
+        const existingAfterRace = await this.caRepo.findOne({
+          where: {
+            assessmentId,
+            participantId,
+            assessorId: participant.userId,
+            assessorType: 'self',
+          },
+        });
+        if (existingAfterRace) return existingAfterRace;
+      }
+      throw err;
+    }
+
+    if (participant.status === 'invited') {
+      participant.status = 'in_progress';
+      await this.participantRepo.save(participant);
+    }
+
     this.logger.log(`Started self-assessment CA ${saved.id} for participant ${participantId}`);
     return saved;
   }
@@ -141,6 +166,14 @@ export class Uc2CompetencyService {
 
     ca.submittedAt = new Date();
     const saved = await this.caRepo.save(ca);
+
+    const participant = await this.participantRepo.findOne({ where: { id: participantId } });
+    if (participant && participant.status !== 'completed') {
+      participant.status = 'completed';
+      participant.completedAt = new Date();
+      await this.participantRepo.save(participant);
+    }
+
     this.logger.log(`Submitted self-ratings for CA ${caId}`);
     return saved;
   }
@@ -174,7 +207,21 @@ export class Uc2CompetencyService {
       assessorType: 'manager',
     });
 
-    const saved = await this.caRepo.save(ca);
+    let saved: CompetencyAssessment;
+    try {
+      saved = await this.caRepo.save(ca);
+    } catch (err: any) {
+      if (err.code === '23505' || err.message?.includes('UQ_competency_assessment_unique')) {
+        this.logger.warn(
+          `Manager assessment already exists for participant ${participantId} due to concurrent race.`,
+        );
+        const existingAfterRace = await this.caRepo.findOne({
+          where: { assessmentId, participantId, assessorId: managerId, assessorType: 'manager' },
+        });
+        if (existingAfterRace) return existingAfterRace;
+      }
+      throw err;
+    }
     this.logger.log(`Started manager assessment CA ${saved.id} for participant ${participantId}`);
     return saved;
   }

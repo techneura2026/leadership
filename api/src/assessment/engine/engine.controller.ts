@@ -88,6 +88,7 @@ export class EngineController {
   }
 
   @Get(':id/participants')
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
   @ApiOperation({ summary: 'Get all participants with completion status' })
   getParticipants(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.engineService.getParticipants(id, req.user.orgId);
