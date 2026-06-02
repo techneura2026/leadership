@@ -1,15 +1,8 @@
-output "api_url" {
-  value = "https://${azurerm_linux_web_app.api.default_hostname}"
+output "vm_public_ip" {
+  value = azurerm_public_ip.pip.ip_address
 }
 
-output "web_url" {
-  value = "https://${azurerm_linux_web_app.web.default_hostname}"
-}
-
-output "postgres_server_name" {
-  value = azurerm_postgresql_flexible_server.postgres.name
-}
-
-output "redis_hostname" {
-  value = azurerm_managed_redis.redis.hostname
+output "ssh_private_key" {
+  value     = tls_private_key.ssh.private_key_pem
+  sensitive = true
 }

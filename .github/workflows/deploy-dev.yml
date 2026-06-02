@@ -1,4 +1,4 @@
-name: Deploy to Dev
+name: Deploy to Dev VM
 
 on:
   push:
@@ -17,8 +17,16 @@ jobs:
     name: 'Terraform Apply'
     runs-on: ubuntu-latest
     environment: dev
+    outputs:
+      vm_public_ip: ${{ steps.apply.outputs.vm_public_ip }}
+      ssh_private_key: ${{ steps.apply.outputs.ssh_private_key }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -28,16 +36,21 @@ jobs:
         run: terraform init
         
       - name: Terraform Apply
+        id: apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: "a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40"
-          TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
-          TF_VAR_jwt_access_secret: ${{ secrets.JWT_ACCESS_SECRET }}
-          TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
-        run: terraform apply -auto-approve
+        run: |
+          terraform apply -auto-approve
+          echo "vm_public_ip=$(terraform output -raw vm_public_ip)" >> "$GITHUB_OUTPUT"
+          
+          # Capture multi-line SSH Private Key output safely
+          echo "ssh_private_key<<EOF" >> "$GITHUB_OUTPUT"
+          terraform output -raw ssh_private_key >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: 'Deploy Apps'
@@ -64,19 +77,63 @@ jobs:
       - name: Build web
         run: npm run build -w web
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      - name: Create package tarball
+        run: |
+          # Create a deployment package excluding unneeded source files and large dev node_modules
+          tar -czf deploy.tar.gz api/dist web/.next shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql
 
-      - name: Deploy API
-        uses: azure/webapps-deploy@v3
+      - name: Copy files to VM
+        uses: appleboy/scp-action@master
         with:
-          app-name: leaderprism-api-dev
-          package: ./api
+          host: ${{ needs.terraform.outputs.vm_public_ip }}
+          username: ubuntu
+          key: ${{ needs.terraform.outputs.ssh_private_key }}
+          source: "deploy.tar.gz"
+          target: "/home/ubuntu/app"
 
-      - name: Deploy Web
-        uses: azure/webapps-deploy@v3
+      - name: Deploy and start application on VM
+        uses: appleboy/ssh-action@master
         with:
-          app-name: leaderprism-web-dev
-          package: ./web
+          host: ${{ needs.terraform.outputs.vm_public_ip }}
+          username: ubuntu
+          key: ${{ needs.terraform.outputs.ssh_private_key }}
+          script: |
+            # Create target folder and extract
+            mkdir -p /home/ubuntu/app
+            cd /home/ubuntu/app
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz
+            
+            # Write environment variables
+            cat <<EOT > .env
+            DATABASE_URL=postgresql://leaderprism:leaderprism_dev@localhost:5432/leaderprism?sslmode=disable
+            REDIS_URL=redis://localhost:6379
+            JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+            JWT_ACCESS_EXPIRY=15m
+            JWT_REFRESH_EXPIRY=30d
+            BCRYPT_ROUNDS=10
+            PORT=3001
+            NODE_ENV=production
+            EOT
+            
+            # Start database and redis in Docker
+            docker compose up -d
+            
+            # Wait for DB to be healthy
+            echo "Waiting for database to be ready..."
+            until docker exec leaderprism_db pg_isready -U leaderprism; do
+              sleep 1
+            done
+            
+            # Install production dependencies on the host VM
+            npm ci --omit=dev
+            
+            # Run database seeds
+            npm run seed -w api
+            
+            # Start NestJS API and NextJS Web Frontend using PM2
+            pm2 delete all || true
+            pm2 start api/dist/api/src/main.js --name "api" --update-env
+            pm2 start npm --name "web" -- run start -w web
+            pm2 save

@@ -1,134 +1,166 @@
-data "azurerm_client_config" "current" {}
-
-locals {
-  postgres_admin_password = var.postgres_admin_password != "" ? var.postgres_admin_password : "SecureAdminPassword123!"
-  jwt_access_secret       = var.jwt_access_secret != "" ? var.jwt_access_secret : "dev-access-secret-min-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  jwt_refresh_secret      = var.jwt_refresh_secret != "" ? var.jwt_refresh_secret : "dev-refresh-secret-min-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-}
-
 resource "azurerm_resource_group" "rg" {
   name     = "${var.app_name}-rg-${var.environment}"
   location = var.location
 }
 
-# Key Vault
-resource "azurerm_key_vault" "kv" {
-  name                = "${var.app_name}-kv-${var.environment}-2"
+# SSH Key Generation
+resource "tls_private_key" "ssh" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# Virtual Network
+resource "azurerm_virtual_network" "vnet" {
+  name                = "${var.app_name}-vnet-${var.environment}"
+  address_space       = ["10.0.0.0/16"]
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
-  sku_name            = "standard"
+}
 
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+# Subnet
+resource "azurerm_subnet" "subnet" {
+  name                 = "${var.app_name}-subnet-${var.environment}"
+  resource_group_name  = azurerm_resource_group.rg.name
+  virtual_network_name = azurerm_virtual_network.vnet.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
 
-    secret_permissions = [
-      "Get", "List", "Set", "Delete", "Purge"
-    ]
+# Public IP
+resource "azurerm_public_ip" "pip" {
+  name                = "${var.app_name}-pip-${var.environment}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+# Network Security Group
+resource "azurerm_network_security_group" "nsg" {
+  name                = "${var.app_name}-nsg-${var.environment}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+
+  security_rule {
+    name                       = "SSH"
+    priority                   = 1001
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "HTTP"
+    priority                   = 1002
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "80"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "HTTPS"
+    priority                   = 1003
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "443"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "API"
+    priority                   = 1004
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3001"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "Web"
+    priority                   = 1005
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3000"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
   }
 }
 
-resource "azurerm_key_vault_secret" "jwt_access_secret" {
-  name         = "jwt-access-secret"
-  value        = local.jwt_access_secret
-  key_vault_id = azurerm_key_vault.kv.id
-}
-
-resource "azurerm_key_vault_secret" "jwt_refresh_secret" {
-  name         = "jwt-refresh-secret"
-  value        = local.jwt_refresh_secret
-  key_vault_id = azurerm_key_vault.kv.id
-}
-
-# Postgres Flexible Server
-resource "azurerm_postgresql_flexible_server" "postgres" {
-  name                   = "${var.app_name}-postgres-${var.environment}"
-  resource_group_name    = azurerm_resource_group.rg.name
-  location               = azurerm_resource_group.rg.location
-  version                = "16"
-  administrator_login    = "leaderprism"
-  administrator_password = local.postgres_admin_password
-  storage_mb             = 32768
-  sku_name               = "B_Standard_B1ms"
-  backup_retention_days  = 7
-  geo_redundant_backup_enabled = false
-}
-
-resource "azurerm_postgresql_flexible_server_database" "db" {
-  name      = "leaderprism"
-  server_id = azurerm_postgresql_flexible_server.postgres.id
-  collation = "en_US.utf8"
-  charset   = "utf8"
-}
-
-# Redis (Azure Managed Redis)
-resource "azurerm_managed_redis" "redis" {
-  name                = "${var.app_name}-redis-${var.environment}"
+# Network Interface
+resource "azurerm_network_interface" "nic" {
+  name                = "${var.app_name}-nic-${var.environment}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  sku_name            = "Balanced_B0"
 
-  default_database {}
-}
-
-# Storage Account
-resource "azurerm_storage_account" "storage" {
-  name                     = replace("${var.app_name}st${var.environment}", "-", "")
-  resource_group_name      = azurerm_resource_group.rg.name
-  location                 = azurerm_resource_group.rg.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-}
-
-# App Service Plan
-resource "azurerm_service_plan" "plan" {
-  name                = "${var.app_name}-plan-${var.environment}"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  os_type             = "Linux"
-  sku_name            = "F1"
-}
-
-# App Service - API
-resource "azurerm_linux_web_app" "api" {
-  name                = "${var.app_name}-api-${var.environment}"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  service_plan_id     = azurerm_service_plan.plan.id
-
-  site_config {
-    application_stack {
-      node_version = "20-lts"
-    }
-  }
-
-  app_settings = {
-    "NODE_ENV"                        = "production"
-    "PORT"                            = "3001"
-    "DATABASE_URL"                    = "postgresql://leaderprism:${local.postgres_admin_password}@${azurerm_postgresql_flexible_server.postgres.name}.postgres.database.azure.com/leaderprism?sslmode=require"
-    "REDIS_URL"                       = "redis://${azurerm_managed_redis.redis.hostname}:10000,password=${azurerm_managed_redis.redis.default_database[0].primary_access_key},ssl=True,abortConnect=False"
-    "AZURE_STORAGE_CONNECTION_STRING" = azurerm_storage_account.storage.primary_connection_string
-    "AZURE_KEY_VAULT_URI"             = azurerm_key_vault.kv.vault_uri
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.pip.id
   }
 }
 
-# App Service - Web
-resource "azurerm_linux_web_app" "web" {
-  name                = "${var.app_name}-web-${var.environment}"
+# Connect NSG to NIC
+resource "azurerm_network_interface_security_group_association" "association" {
+  network_interface_id      = azurerm_network_interface.nic.id
+  network_security_group_id = azurerm_network_security_group.nsg.id
+}
+
+# Virtual Machine
+resource "azurerm_linux_virtual_machine" "vm" {
+  name                = "${var.app_name}-vm-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  service_plan_id     = azurerm_service_plan.plan.id
+  size                = "Standard_B2s" # 2 vCPU, 4GB RAM - Cheap & solid for dev
+  admin_username      = "ubuntu"
+  network_interface_ids = [
+    azurerm_network_interface.nic.id,
+  ]
 
-  site_config {
-    application_stack {
-      node_version = "20-lts"
-    }
+  admin_ssh_key {
+    username   = "ubuntu"
+    public_key = tls_private_key.ssh.public_key_openssh
   }
 
-  app_settings = {
-    "NODE_ENV"            = "production"
-    "INTERNAL_API_URL"    = "https://${azurerm_linux_web_app.api.default_hostname}"
-    "NEXT_PUBLIC_API_URL" = "https://${azurerm_linux_web_app.api.default_hostname}/api/v1"
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
   }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+  }
+
+  custom_data = base64encode(<<-EOF
+              #!/bin/bash
+              apt-get update
+              apt-get install -y apt-transport-https ca-certificates curl software-properties-common git
+              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+              add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+              apt-get update
+              apt-get install -y docker-ce docker-compose-plugin
+              systemctl enable docker
+              systemctl start docker
+              mkdir -p /app
+              chown -R ubuntu:ubuntu /app
+              EOF
+  )
 }
