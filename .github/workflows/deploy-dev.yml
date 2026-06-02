@@ -6,55 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
-env:
-  TF_WORKING_DIR: 'infra/terraform'
-
 jobs:
-  terraform:
-    name: 'Terraform Apply'
-    runs-on: ubuntu-latest
-    environment: dev
-    outputs:
-      vm_public_ip: ${{ steps.apply.outputs.vm_public_ip }}
-      ssh_private_key: ${{ steps.apply.outputs.ssh_private_key }}
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init
-        
-      - name: Terraform Apply
-        id: apply
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: "a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40"
-        run: |
-          terraform apply -auto-approve
-          echo "vm_public_ip=$(terraform output -raw vm_public_ip)" >> "$GITHUB_OUTPUT"
-          
-          # Capture multi-line SSH Private Key output safely
-          echo "ssh_private_key<<EOF" >> "$GITHUB_OUTPUT"
-          terraform output -raw ssh_private_key >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
   deploy:
     name: 'Deploy Apps'
-    needs: terraform
     runs-on: ubuntu-latest
     environment: dev
     steps:
@@ -85,18 +41,18 @@ jobs:
       - name: Copy files to VM
         uses: appleboy/scp-action@master
         with:
-          host: ${{ needs.terraform.outputs.vm_public_ip }}
+          host: ${{ secrets.DEV_VM_IP }}
           username: ubuntu
-          key: ${{ needs.terraform.outputs.ssh_private_key }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy.tar.gz"
           target: "/home/ubuntu/app"
 
       - name: Deploy and start application on VM
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ needs.terraform.outputs.vm_public_ip }}
+          host: ${{ secrets.DEV_VM_IP }}
           username: ubuntu
-          key: ${{ needs.terraform.outputs.ssh_private_key }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Create target folder and extract
             mkdir -p /home/ubuntu/app
