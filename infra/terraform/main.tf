@@ -7,7 +7,7 @@ resource "azurerm_resource_group" "rg" {
 
 # Key Vault
 resource "azurerm_key_vault" "kv" {
-  name                = "${var.app_name}-kv-${var.environment}"
+  name                = "${var.app_name}-kv-${var.environment}-2"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
@@ -18,7 +18,7 @@ resource "azurerm_key_vault" "kv" {
     object_id = data.azurerm_client_config.current.object_id
 
     secret_permissions = [
-      "Get", "List", "Set", "Delete"
+      "Get", "List", "Set", "Delete", "Purge"
     ]
   }
 }
