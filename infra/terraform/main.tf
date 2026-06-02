@@ -1,5 +1,11 @@
 data "azurerm_client_config" "current" {}
 
+locals {
+  postgres_admin_password = var.postgres_admin_password != "" ? var.postgres_admin_password : "SecureAdminPassword123!"
+  jwt_access_secret       = var.jwt_access_secret != "" ? var.jwt_access_secret : "dev-access-secret-min-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  jwt_refresh_secret      = var.jwt_refresh_secret != "" ? var.jwt_refresh_secret : "dev-refresh-secret-min-64-chars-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = "${var.app_name}-rg-${var.environment}"
   location = var.location
@@ -25,13 +31,13 @@ resource "azurerm_key_vault" "kv" {
 
 resource "azurerm_key_vault_secret" "jwt_access_secret" {
   name         = "jwt-access-secret"
-  value        = var.jwt_access_secret
+  value        = local.jwt_access_secret
   key_vault_id = azurerm_key_vault.kv.id
 }
 
 resource "azurerm_key_vault_secret" "jwt_refresh_secret" {
   name         = "jwt-refresh-secret"
-  value        = var.jwt_refresh_secret
+  value        = local.jwt_refresh_secret
   key_vault_id = azurerm_key_vault.kv.id
 }
 
@@ -42,7 +48,7 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   location               = azurerm_resource_group.rg.location
   version                = "16"
   administrator_login    = "leaderprism"
-  administrator_password = var.postgres_admin_password
+  administrator_password = local.postgres_admin_password
   storage_mb             = 32768
   sku_name               = "B_Standard_B1ms"
   backup_retention_days  = 7
@@ -101,7 +107,7 @@ resource "azurerm_linux_web_app" "api" {
   app_settings = {
     "NODE_ENV"                        = "production"
     "PORT"                            = "3001"
-    "DATABASE_URL"                    = "postgresql://leaderprism:${var.postgres_admin_password}@${azurerm_postgresql_flexible_server.postgres.name}.postgres.database.azure.com/leaderprism?sslmode=require"
+    "DATABASE_URL"                    = "postgresql://leaderprism:${local.postgres_admin_password}@${azurerm_postgresql_flexible_server.postgres.name}.postgres.database.azure.com/leaderprism?sslmode=require"
     "REDIS_URL"                       = "redis://${azurerm_redis_cache.redis.hostname}:${azurerm_redis_cache.redis.ssl_port},password=${azurerm_redis_cache.redis.primary_access_key},ssl=True,abortConnect=False"
     "AZURE_STORAGE_CONNECTION_STRING" = azurerm_storage_account.storage.primary_connection_string
     "AZURE_KEY_VAULT_URI"             = azurerm_key_vault.kv.vault_uri
