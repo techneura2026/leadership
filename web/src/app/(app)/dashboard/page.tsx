@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useApi } from '@/hooks/useApi';
 import { Badge } from '@/components/ui/Badge';
-import { PageSpinner } from '@/components/ui/Spinner';
+import { PageSpinner, Spinner } from '@/components/ui/Spinner';
+import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
 import { useAuthStore } from '@/store/auth.store';
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { AssessmentDto, AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 
 interface DashboardMetrics {
@@ -15,6 +16,11 @@ interface DashboardMetrics {
   pendingResponses: number;
   reportsGenerated: number;
   recentAssessments: AssessmentDto[];
+}
+
+interface RadarAggregate {
+  competencyRadar: RadarAxis[];
+  personalityRadar: RadarAxis[];
 }
 
 const TYPE_LABELS: Record<AssessmentType, string> = {
@@ -31,24 +37,82 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
   [AssessmentStatus.ARCHIVED]: 'neutral',
 };
 
-export default function DashboardPage() {
+// ── Shared Radar View ────────────────────────────────────────────────────────
+
+function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+      <h2 className="text-lg font-semibold text-gray-900 mb-6">{title}</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {radarData.competencyRadar && radarData.competencyRadar.length >= 3 ? (
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 text-center mb-4">Competency Profile</h3>
+            <div className="flex justify-center">
+              <RadarChart axes={radarData.competencyRadar} size={280} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center bg-gray-50 rounded-xl h-64 text-sm text-gray-400">
+            Not enough competency data
+          </div>
+        )}
+
+        {radarData.personalityRadar && radarData.personalityRadar.length >= 3 ? (
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 text-center mb-4">Personality Profile</h3>
+            <div className="flex justify-center">
+              <RadarChart axes={radarData.personalityRadar} size={280} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center bg-gray-50 rounded-xl h-64 text-sm text-gray-400">
+            Not enough personality data
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── User Dashboard ────────────────────────────────────────────────────────────
+
+function UserDashboard() {
+  const { data: radarData, isLoading } = useApi<RadarAggregate>('/analytics/radar/me');
+
+  if (isLoading) return <PageSpinner />;
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">My Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Your aggregated assessment insights</p>
+      </div>
+
+      {radarData ? (
+        <RadarViews radarData={radarData} title="My Aggregate Profile" />
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
+          Complete some assessments to see your aggregate charts here.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Admin Dashboard ───────────────────────────────────────────────────────────
+
+function AdminDashboard() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-
-  const isAdmin = user?.role === UserRole.ORG_ADMIN || user?.role === UserRole.HR_MANAGER;
-
-  // Only fetch analytics for roles that have access; skip for participants/managers
-  const { data: metrics, isLoading, error } = useApi<DashboardMetrics>(
-    isAdmin ? '/analytics/dashboard' : null,
+  const { data: metrics, isLoading: loadingMetrics } = useApi<DashboardMetrics>('/analytics/dashboard');
+  const { data: orgRadarData, isLoading: loadingOrgRadar } = useApi<RadarAggregate>('/analytics/radar/org');
+  
+  const [lookupUserId, setLookupUserId] = useState('');
+  const [activeLookupId, setActiveLookupId] = useState('');
+  const { data: userRadarData, isLoading: loadingUserRadar } = useApi<RadarAggregate>(
+    activeLookupId ? `/analytics/radar/user/${activeLookupId}` : null
   );
 
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      router.replace('/my-assessments');
-    }
-  }, [isLoading, isAdmin, router]);
-
-  if (isLoading || !isAdmin) return <PageSpinner />;
+  if (loadingMetrics || loadingOrgRadar) return <PageSpinner />;
 
   const stats = [
     {
@@ -104,7 +168,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Welcome back — here's what's happening</p>
+          <p className="text-sm text-gray-500 mt-0.5">Organisation Analytics & Overview</p>
         </div>
         <button
           onClick={() => router.push('/assessments/new')}
@@ -117,13 +181,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4">
-          Failed to load dashboard metrics.
-        </div>
-      )}
-
-      {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-5">
@@ -136,7 +193,37 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent Assessments */}
+      {orgRadarData && (
+        <RadarViews radarData={orgRadarData} title="Organisation Aggregate Charts" />
+      )}
+
+      {/* User specific radar charts lookup */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Participant Analysis</h2>
+        <div className="flex gap-3 mb-6 max-w-md">
+          <input
+            type="text"
+            placeholder="Enter Participant ID (UUID)"
+            value={lookupUserId}
+            onChange={(e) => setLookupUserId(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={() => setActiveLookupId(lookupUserId)}
+            className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+          >
+            View Charts
+          </button>
+        </div>
+        
+        {loadingUserRadar && <Spinner className="mx-auto" />}
+        {!loadingUserRadar && userRadarData && activeLookupId && (
+          <div className="pt-4 border-t border-gray-100">
+            <RadarViews radarData={userRadarData} title={`Charts for ${activeLookupId}`} />
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Recent Assessments</h2>
@@ -183,4 +270,18 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+
+  if (!user) return <PageSpinner />;
+
+  const isAdmin = user.role === UserRole.ORG_ADMIN || user.role === UserRole.HR_MANAGER;
+
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
+  
+  return <UserDashboard />;
 }

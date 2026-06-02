@@ -160,8 +160,29 @@ function CompetencyResultsView({
     );
   }
 
+  const radarAxes: RadarAxis[] = profile.map(domain => ({
+    key: domain.domainId,
+    label: domain.domainName,
+    value: domain.averageSelfRating !== null ? Math.round((domain.averageSelfRating / 4) * 100) : 0,
+  }));
+
   return (
     <div className="space-y-6">
+      {radarAxes.length >= 3 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Competency Profile Radar</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Average self-ratings across domains</p>
+            </div>
+            <Badge variant="success">Completed</Badge>
+          </div>
+          <div className="flex justify-center">
+            <RadarChart axes={radarAxes} size={320} />
+          </div>
+        </div>
+      )}
+
       {profile.map((domain) => (
         <div key={domain.domainId} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">

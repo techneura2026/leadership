@@ -11,6 +11,7 @@ import { CompetencyAssessment } from '../assessment/uc2-competency/entities/comp
 import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-score.entity';
 import { Competency } from '../assessment/items/entities/competency.entity';
 import { RoleProfile } from '../assessment/uc4-readiness/entities/role-profile.entity';
+import { PersonalityScore } from '../assessment/uc3-personality/entities/personality-score.entity';
 
 export interface OrgDashboardData {
   activeAssessments: number;
@@ -28,6 +29,11 @@ export interface HeatmapEntry {
   averageScore: number;
   participantCount: number;
   scoreRange: { min: number; max: number };
+}
+
+export interface RadarAggregate {
+  competencyRadar: Array<{ key: string; label: string; value: number }>;
+  personalityRadar: Array<{ key: string; label: string; value: number }>;
 }
 
 export interface SuccessionOverview {
@@ -66,6 +72,8 @@ export class AnalyticsService {
     private readonly competencyRepo: Repository<Competency>,
     @InjectRepository(RoleProfile)
     private readonly roleProfileRepo: Repository<RoleProfile>,
+    @InjectRepository(PersonalityScore)
+    private readonly personalityScoreRepo: Repository<PersonalityScore>,
   ) {}
 
   /**
@@ -257,5 +265,89 @@ export class AnalyticsService {
       byRating,
       byRole,
     };
+  }
+
+  /**
+   * Returns aggregate radar chart data for a specific user.
+   */
+  async getUserAggregateRadar(userId: string): Promise<RadarAggregate> {
+    const competencyData = await this.competencyRatingRepo
+      .createQueryBuilder('cr')
+      .innerJoin('cr.competencyAssessment', 'ca')
+      .innerJoin('ca.participant', 'p')
+      .innerJoin('cr.competency', 'comp')
+      .innerJoin('comp.domain', 'domain')
+      .where('p.user_id = :userId', { userId })
+      .select('domain.id', 'domainId')
+      .addSelect('domain.name', 'domainName')
+      .addSelect('AVG(cr.level_rated)', 'averageScore')
+      .groupBy('domain.id')
+      .addGroupBy('domain.name')
+      .getRawMany();
+
+    const competencyRadar = competencyData.map((r) => ({
+      key: r.domainId,
+      label: r.domainName,
+      value: Math.round((parseFloat(r.averageScore) / 4) * 100),
+    }));
+
+    const personalityData = await this.personalityScoreRepo
+      .createQueryBuilder('ps')
+      .innerJoin('ps.participant', 'p')
+      .where('p.user_id = :userId', { userId })
+      .select('ps.factor', 'factor')
+      .addSelect('AVG(ps.percentile)', 'averagePercentile')
+      .groupBy('ps.factor')
+      .getRawMany();
+
+    const personalityRadar = personalityData.map((r) => ({
+      key: r.factor,
+      label: r.factor.replace('_', ' '), // e.g. 'emotional_stability' -> 'emotional stability'
+      value: Math.round(parseFloat(r.averagePercentile)),
+    }));
+
+    return { competencyRadar, personalityRadar };
+  }
+
+  /**
+   * Returns aggregate radar chart data for an organisation.
+   */
+  async getOrgAggregateRadar(orgId: string): Promise<RadarAggregate> {
+    const competencyData = await this.competencyRatingRepo
+      .createQueryBuilder('cr')
+      .innerJoin('cr.competencyAssessment', 'ca')
+      .innerJoin('ca.assessment', 'a')
+      .innerJoin('cr.competency', 'comp')
+      .innerJoin('comp.domain', 'domain')
+      .where('a.organisation_id = :orgId', { orgId })
+      .select('domain.id', 'domainId')
+      .addSelect('domain.name', 'domainName')
+      .addSelect('AVG(cr.level_rated)', 'averageScore')
+      .groupBy('domain.id')
+      .addGroupBy('domain.name')
+      .getRawMany();
+
+    const competencyRadar = competencyData.map((r) => ({
+      key: r.domainId,
+      label: r.domainName,
+      value: Math.round((parseFloat(r.averageScore) / 4) * 100),
+    }));
+
+    const personalityData = await this.personalityScoreRepo
+      .createQueryBuilder('ps')
+      .innerJoin('ps.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .select('ps.factor', 'factor')
+      .addSelect('AVG(ps.percentile)', 'averagePercentile')
+      .groupBy('ps.factor')
+      .getRawMany();
+
+    const personalityRadar = personalityData.map((r) => ({
+      key: r.factor,
+      label: r.factor.replace('_', ' '),
+      value: Math.round(parseFloat(r.averagePercentile)),
+    }));
+
+    return { competencyRadar, personalityRadar };
   }
 }
