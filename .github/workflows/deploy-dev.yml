@@ -19,11 +19,6 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v4
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -35,6 +30,10 @@ jobs:
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: "a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40"
           TF_VAR_postgres_admin_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
           TF_VAR_jwt_access_secret: ${{ secrets.JWT_ACCESS_SECRET }}
           TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET }}
@@ -68,7 +67,7 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
 
       - name: Deploy API
         uses: azure/webapps-deploy@v3
