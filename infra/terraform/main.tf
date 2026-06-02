@@ -126,7 +126,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   name                = "${var.app_name}-vm-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  size                = "Standard_B2s" # 2 vCPU, 4GB RAM - Cheap & solid for dev
+  size                = "Standard_B2ms" # 2 vCPU, 8GB RAM - Cheap & solid for dev with good availability
   admin_username      = "ubuntu"
   network_interface_ids = [
     azurerm_network_interface.nic.id,
