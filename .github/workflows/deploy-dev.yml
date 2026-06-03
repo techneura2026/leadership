@@ -86,7 +86,7 @@ jobs:
             npm ci --omit=dev
             
             # Run database seeds
-            npm run seed -w api
+            node api/dist/api/src/database/seeds/run-seeds.js
             
             # Start NestJS API and NextJS Web Frontend using PM2
             pm2 delete all || true
