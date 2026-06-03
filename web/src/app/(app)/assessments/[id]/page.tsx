@@ -99,7 +99,7 @@ function OverviewTab({
                 {assessment.assessmentType === AssessmentType.FEEDBACK_360
                   ? '360° Feedback'
                   : assessment.assessmentType.charAt(0).toUpperCase() +
-                    assessment.assessmentType.slice(1)}
+                  assessment.assessmentType.slice(1)}
               </Badge>
               <Badge variant={STATUS_VARIANT[assessment.status] ?? 'neutral'}>
                 {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
@@ -336,15 +336,15 @@ function ParticipantsTab({
                         p.status === 'completed'
                           ? 'success'
                           : p.status === 'in_progress'
-                          ? 'warning'
-                          : 'neutral'
+                            ? 'warning'
+                            : 'neutral'
                       }
                     >
                       {p.status === 'completed'
                         ? 'Completed'
                         : p.status === 'in_progress'
-                        ? 'In Progress'
-                        : 'Invited'}
+                          ? 'In Progress'
+                          : 'Invited'}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -578,10 +578,10 @@ function ReportsTab({
                             report.status === 'ready'
                               ? 'success'
                               : report.status === 'failed'
-                              ? 'error'
-                              : report.status === 'processing'
-                              ? 'warning'
-                              : 'neutral'
+                                ? 'error'
+                                : report.status === 'processing'
+                                  ? 'warning'
+                                  : 'neutral'
                           }
                         >
                           {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
@@ -705,7 +705,7 @@ function ParticipantRadarCard({
         </div>
       ) : (
         <>
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-6 px-2 sm:px-4 [&_svg]:overflow-visible">
             <RadarChart axes={axes} size={200} />
           </div>
 
@@ -758,7 +758,7 @@ function PersonalityResultsTab({
       )}
 
       {participants.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {completed.map((p) => (
             <ParticipantRadarCard key={p.id} participant={p} assessmentId={assessmentId} />
           ))}

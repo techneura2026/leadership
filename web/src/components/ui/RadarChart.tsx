@@ -33,6 +33,23 @@ function polygonPoints(cx: number, cy: number, r: number, n: number, startAngle 
   }).join(' ');
 }
 
+// Helper to wrap long SVG text into multiple lines
+function splitText(text: string, maxLen = 14): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = words[0] || '';
+  for (let i = 1; i < words.length; i++) {
+    if (current.length + words[i].length + 1 <= maxLen) {
+      current += ' ' + words[i];
+    } else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
   const n = axes.length;
   if (n < 3) return null;
@@ -55,7 +72,7 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      width={size*2}
+      width={size * 2}
       height={size}
       className={className}
       aria-label="Big Five personality radar chart"
@@ -128,6 +145,8 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
         if (normAngle > 20 && normAngle <= 160) textAnchor = 'start';
         if (normAngle > 200 && normAngle <= 340) textAnchor = 'end';
 
+        const lines = splitText(axis.label);
+
         return (
           <text
             key={i}
@@ -139,7 +158,15 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
             fontWeight={500}
             fill={COLORS.label}
           >
-            {axis.label}
+            {lines.map((line, idx) => (
+              <tspan
+                key={idx}
+                x={p.x}
+                dy={idx === 0 ? `${-(lines.length - 1) * 0.6}em` : '1.2em'}
+              >
+                {line}
+              </tspan>
+            ))}
           </text>
         );
       })}

@@ -43,16 +43,16 @@ function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: st
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 mb-8 hover:shadow-md transition-shadow">
       <h2 className="text-xl font-bold text-gray-900 mb-8">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 overflow-hidden">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 sm:gap-14">
         {radarData.competencyRadar && radarData.competencyRadar.length >= 3 ? (
           <div className="flex flex-col items-center">
             <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">COMPETENCY PROFILE</h3>
-            <div className="w-full max-w-[320px] aspect-square flex justify-center items-center">
-              <RadarChart axes={radarData.competencyRadar} size={320} />
+            <div className="w-full flex justify-center items-center px-2 sm:px-8 py-4 [&_svg]:overflow-visible">
+              <RadarChart axes={radarData.competencyRadar} size={280} />
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
+          <div className="flex items-center justify-center w-full bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
             Not enough competency data
           </div>
         )}
@@ -60,12 +60,12 @@ function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: st
         {radarData.personalityRadar && radarData.personalityRadar.length >= 3 ? (
           <div className="flex flex-col items-center">
             <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">PERSONALITY PROFILE</h3>
-            <div className="w-full max-w-[320px] aspect-square flex justify-center items-center">
-              <RadarChart axes={radarData.personalityRadar} size={320} />
+            <div className="w-full flex justify-center items-center px-2 sm:px-8 py-4 [&_svg]:overflow-visible">
+              <RadarChart axes={radarData.personalityRadar} size={280} />
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
+          <div className="flex items-center justify-center w-full bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
             Not enough personality data
           </div>
         )}
@@ -105,7 +105,7 @@ function AdminDashboard() {
   const router = useRouter();
   const { data: metrics, isLoading: loadingMetrics } = useApi<DashboardMetrics>('/analytics/dashboard');
   const { data: orgRadarData, isLoading: loadingOrgRadar } = useApi<RadarAggregate>('/analytics/radar/org');
-  
+
   const [lookupUserId, setLookupUserId] = useState('');
   const [activeLookupId, setActiveLookupId] = useState('');
   const { data: userRadarData, isLoading: loadingUserRadar } = useApi<RadarAggregate>(
@@ -211,7 +211,7 @@ function AdminDashboard() {
             View Charts
           </button>
         </div>
-        
+
         {loadingUserRadar && <Spinner className="mx-auto my-10" />}
         {!loadingUserRadar && userRadarData && activeLookupId && (
           <div className="pt-8 border-t border-gray-100">
@@ -278,7 +278,6 @@ export default function DashboardPage() {
   if (isAdmin) {
     return <AdminDashboard />;
   }
-  
+
   return <UserDashboard />;
 }
-

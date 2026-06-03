@@ -83,8 +83,9 @@ function PersonalityResultsView({
           </div>
           <Badge variant="success">Completed</Badge>
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-8">
-          <div className="shrink-0"><RadarChart axes={radarAxes} size={280} /></div>
+        <div className="flex flex-col items-center gap-8">
+          <div className="shrink-0 sm:px-4 [&_svg]:overflow-visible">
+            <RadarChart axes={radarAxes} size={280} /></div>
           <div className="flex-1 space-y-2.5 w-full">
             {radarAxes.map((axis) => (
               <div key={axis.key} className="flex items-center gap-3">
@@ -177,7 +178,7 @@ function CompetencyResultsView({
             </div>
             <Badge variant="success">Completed</Badge>
           </div>
-          <div className="flex justify-center">
+          <div className="flex justify-center sm:px-6 py-2 [&_svg]:overflow-visible">
             <RadarChart axes={radarAxes} size={320} />
           </div>
         </div>
@@ -294,8 +295,8 @@ export default function AssessmentResultsPage() {
 
       {(assessment.assessmentType === AssessmentType.COMPETENCY ||
         assessment.assessmentType === AssessmentType.FEEDBACK_360) && (
-        <CompetencyResultsView assessmentId={assessmentId} participantId={myRecord.id} />
-      )}
+          <CompetencyResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+        )}
 
       {assessment.assessmentType === AssessmentType.PERSONALITY && (
         <PersonalityResultsView
