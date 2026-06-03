@@ -90,7 +90,7 @@ function OverviewTab({
   return (
     <div className="space-y-6">
       {/* Assessment details */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{assessment.title}</h2>
@@ -120,7 +120,7 @@ function OverviewTab({
               <button
                 onClick={sendReminders}
                 disabled={sendingReminders || assessment.status !== AssessmentStatus.ACTIVE}
-                className="text-sm font-medium border border-blue-300 text-blue-600 hover:bg-blue-50 rounded-lg px-4 py-2 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {sendingReminders ? <Spinner size="sm" /> : null}
                 Send Reminders
@@ -129,14 +129,14 @@ function OverviewTab({
             {assessment.status === AssessmentStatus.ACTIVE && (
               <button
                 onClick={() => setShowCloseConfirm(true)}
-                className="text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50 rounded-lg px-4 py-2 transition-colors"
+                className="text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 rounded-lg px-4 py-2.5 transition-colors"
               >
                 Close Assessment
               </button>
             )}
             <button
               onClick={onGoToReports}
-              className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 transition-colors"
+              className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2.5 transition-colors shadow-sm"
             >
               Generate Reports
             </button>
@@ -145,7 +145,7 @@ function OverviewTab({
       </div>
 
       {/* Response rate */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Response Rate</h3>
         <div className="flex items-center gap-4 mb-4">
           <div className="flex-1">
@@ -265,33 +265,33 @@ function ParticipantsTab({
         </h3>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+          className="text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
         >
           + Add Participant
         </button>
       </div>
 
       {showAdd && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col sm:flex-row gap-3">
           <input
             type="email"
             placeholder="participant@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
             onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
           />
           <button
             onClick={addParticipant}
             disabled={adding || !email.trim()}
-            className="bg-blue-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="bg-blue-600 text-white text-sm font-medium rounded-lg px-6 py-2.5 hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
           >
             {adding && <Spinner size="sm" className="border-white border-t-transparent" />}
             Add
           </button>
           <button
             onClick={() => setShowAdd(false)}
-            className="text-gray-500 hover:text-gray-900 text-sm px-2"
+            className="text-gray-500 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200 transition-colors rounded-lg text-sm px-4 py-2.5"
           >
             Cancel
           </button>
@@ -402,7 +402,7 @@ function NominationsTab({
         <button
           onClick={approveAll}
           disabled={approving}
-          className="text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 transition-colors disabled:opacity-50 flex items-center gap-2"
+          className="text-sm font-medium bg-green-600 hover:bg-green-700 text-white shadow-sm rounded-lg px-4 py-2 transition-colors disabled:opacity-50 flex items-center gap-2"
         >
           {approving && <Spinner size="sm" className="border-white border-t-transparent" />}
           Approve All Nominations
@@ -414,7 +414,7 @@ function NominationsTab({
           const pNominations = getNominationsForParticipant(p.userId);
           const isOpen = expanded === p.id;
           return (
-            <div key={p.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div key={p.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:border-gray-300 transition-colors">
               <button
                 onClick={() => setExpanded(isOpen ? null : p.id)}
                 className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
@@ -672,14 +672,12 @@ function ParticipantRadarCard({
 
   if (participant.status !== 'completed') {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-semibold text-gray-900">
-            {participant.user?.firstName} {participant.user?.lastName}
-          </p>
-          <Badge variant="neutral">Not completed</Badge>
-        </div>
-        <p className="text-xs text-gray-400">Results will appear once the participant submits.</p>
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center min-h-[420px] hover:border-gray-300 transition-colors">
+        <Badge variant="neutral" className="mb-4">Pending</Badge>
+        <p className="text-sm font-semibold text-gray-900">
+          {participant.user?.firstName} {participant.user?.lastName}
+        </p>
+        <p className="text-xs text-gray-500 mt-1.5 max-w-[200px]">Results will appear once the participant submits.</p>
       </div>
     );
   }
@@ -690,38 +688,41 @@ function ParticipantRadarCard({
   });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm font-semibold text-gray-900">
-          {participant.user?.firstName} {participant.user?.lastName}
-        </p>
-        <Badge variant="success">Completed</Badge>
+    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col min-h-[420px]">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">
+            {participant.user?.firstName} {participant.user?.lastName}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">Completed</p>
+        </div>
+        <Badge variant="success" className="shadow-sm">View</Badge>
       </div>
 
       {!scores ? (
-        <div className="flex justify-center py-6">
+        <div className="flex justify-center py-6 flex-1 items-center">
           <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-6">
             <RadarChart axes={axes} size={200} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3 mt-auto">
             {ADMIN_FACTOR_ORDER.map((key) => {
               const score = scores.find((s) => s.factor === key);
               if (!score) return null;
               return (
-                <div key={key} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 w-28 shrink-0">{ADMIN_FACTOR_LABELS[key]}</span>
-                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div key={key} className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-gray-700 w-32 shrink-0 truncate">{ADMIN_FACTOR_LABELS[key]}</span>
+                  <div className="flex-1 h-1.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
                     <div
-                      className="h-full bg-blue-500 rounded-full"
+                      className="h-full bg-blue-500 rounded-full transition-all"
                       style={{ width: `${Math.round(score.percentile)}%` }}
                     />
                   </div>
-                  <Badge variant={tScoreBandVariant(score.tScore)} className="text-xs">
+                  <Badge variant={tScoreBandVariant(score.tScore)} className="px-1.5 min-w-[2.5rem] text-center justify-center">
                     {Math.round(score.percentile)}th
                   </Badge>
                 </div>

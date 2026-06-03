@@ -24,30 +24,54 @@ interface WizardState {
   participantIds: string[];
 }
 
+const TypeIcon360 = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+  </svg>
+);
+const TypeIconCompetency = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+  </svg>
+);
+const TypeIconPersonality = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+  </svg>
+);
+const TypeIconReadiness = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+  </svg>
+);
+
+const TYPE_ICONS: Record<string, () => React.JSX.Element> = {
+  [AssessmentType.FEEDBACK_360]: TypeIcon360,
+  [AssessmentType.COMPETENCY]: TypeIconCompetency,
+  [AssessmentType.PERSONALITY]: TypeIconPersonality,
+  [AssessmentType.READINESS]: TypeIconReadiness,
+};
+
 const TYPE_OPTIONS = [
   {
     type: AssessmentType.FEEDBACK_360,
     label: '360° Feedback',
     description: 'Gather multi-rater feedback from supervisors, peers and direct reports.',
-    icon: '🔄',
   },
   {
     type: AssessmentType.COMPETENCY,
     label: 'Competency Assessment',
     description: 'Evaluate proficiency levels across defined competency frameworks.',
-    icon: '📊',
   },
   {
     type: AssessmentType.PERSONALITY,
     label: 'Personality Assessment',
     description: 'Measure personality traits using validated psychometric questionnaires.',
-    icon: '🧠',
   },
   {
     type: AssessmentType.READINESS,
     label: 'Readiness Assessment',
     description: 'Assess readiness for leadership roles using SJT and learning agility.',
-    icon: '🎯',
   },
 ];
 
@@ -62,47 +86,73 @@ const STEPS = [
 // ── Stepper ────────────────────────────────────────────────────────────────────
 function Stepper({ current }: { current: number }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8 overflow-x-auto">
-      {STEPS.map((step, idx) => (
-        <div key={step.n} className="flex items-center">
-          <div className="flex flex-col items-center gap-1.5">
-            <div
-              className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all',
-                current > step.n
-                  ? 'bg-blue-600 border-blue-600 text-white'
-                  : current === step.n
-                  ? 'bg-blue-50 border-blue-600 text-blue-600'
-                  : 'bg-white border-gray-300 text-gray-400',
-              )}
-            >
-              {current > step.n ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                step.n
-              )}
+    <div className="mb-8">
+      {/* Desktop stepper */}
+      <div className="hidden sm:flex items-center justify-between w-full mx-auto relative z-10 max-w-lg">
+        {STEPS.map((step, idx) => (
+          <div key={step.n} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center gap-2 shrink-0">
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300',
+                  current > step.n
+                    ? 'bg-blue-600 text-white'
+                    : current === step.n
+                    ? 'bg-blue-600 text-white shadow-md ring-4 ring-blue-50'
+                    : 'bg-gray-100 text-gray-400',
+                )}
+              >
+                {current > step.n ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  step.n
+                )}
+              </div>
+              <span
+                className={cn(
+                  'text-xs font-medium whitespace-nowrap absolute mt-10 transition-colors duration-300',
+                  current === step.n
+                    ? 'text-gray-900 font-semibold'
+                    : current > step.n
+                    ? 'text-gray-600'
+                    : 'text-gray-400',
+                )}
+              >
+                {step.label}
+              </span>
             </div>
-            <span
-              className={cn(
-                'text-xs font-medium hidden sm:block',
-                current === step.n ? 'text-blue-600' : 'text-gray-400',
-              )}
-            >
-              {step.label}
-            </span>
+            {idx < STEPS.length - 1 && (
+              <div
+                className={cn(
+                  'flex-1 h-[2px] mx-4 rounded-full transition-all duration-300',
+                  current > step.n ? 'bg-blue-600' : 'bg-gray-100',
+                )}
+              />
+            )}
           </div>
-          {idx < STEPS.length - 1 && (
+        ))}
+      </div>
+      <div className="hidden sm:block h-6" /> {/* spacer for absolute labels */}
+      {/* Mobile stepper */}
+      <div className="flex sm:hidden flex-col items-center gap-3">
+        <div className="flex items-center gap-2 w-full max-w-xs">
+          {STEPS.map((step) => (
             <div
+              key={step.n}
               className={cn(
-                'w-12 sm:w-20 h-0.5 mx-1 transition-all',
-                current > step.n ? 'bg-blue-600' : 'bg-gray-200',
+                'flex-1 h-1.5 rounded-full transition-all duration-300',
+                current >= step.n ? 'bg-blue-600' : 'bg-gray-100',
               )}
             />
-          )}
+          ))}
         </div>
-      ))}
+        <p className="text-xs font-medium text-gray-500">
+          Step {current} of {STEPS.length}
+          <span className="text-gray-900 ml-1.5 font-semibold">{STEPS[current - 1].label}</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -131,7 +181,12 @@ function StepType({
                 : 'border-gray-200 bg-white hover:border-blue-300',
             )}
           >
-            <div className="text-2xl mb-2">{opt.icon}</div>
+            <div className={cn(
+              'w-10 h-10 rounded-lg flex items-center justify-center mb-3',
+              selected === opt.type ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500',
+            )}>
+              {TYPE_ICONS[opt.type]()}
+            </div>
             <h3 className="text-sm font-semibold text-gray-900">{opt.label}</h3>
             <p className="text-xs text-gray-500 mt-1 leading-relaxed">{opt.description}</p>
           </button>
@@ -173,29 +228,49 @@ function StepDetails({
             value={title}
             onChange={(e) => onChange('title', e.target.value)}
             placeholder="e.g. Mid-Year 360 Feedback 2025"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => onChange('startDate', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors group-hover:text-blue-500">
+                <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2} />
+                  <line x1="16" y1="2" x2="16" y2="6" strokeWidth={2} />
+                  <line x1="8" y1="2" x2="8" y2="6" strokeWidth={2} />
+                  <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
+                </svg>
+              </div>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => onChange('startDate', e.target.value)}
+                className="w-full pl-10 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer appearance-none"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => onChange('endDate', e.target.value)}
-              min={startDate}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors group-hover:text-blue-500">
+                <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2} />
+                  <line x1="16" y1="2" x2="16" y2="6" strokeWidth={2} />
+                  <line x1="8" y1="2" x2="8" y2="6" strokeWidth={2} />
+                  <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
+                </svg>
+              </div>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => onChange('endDate', e.target.value)}
+                min={startDate}
+                className="w-full pl-10 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer appearance-none"
+              />
+            </div>
           </div>
         </div>
 
@@ -357,7 +432,7 @@ function StepParticipants({
         placeholder="Search by name or email…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700 mb-4"
       />
 
       {isLoading && (

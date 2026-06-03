@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { UserRole } from '@leaderprism/shared';
@@ -61,7 +62,7 @@ function Field({
 }
 
 const inputCls =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow';
+  'w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700';
 
 // ── Password strength ──────────────────────────────────────────────────────────
 
@@ -216,19 +217,13 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
           )}
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 ">
           <Field label="Role" required>
-            <select
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className={inputCls}
-            >
-              {ROLE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              onChange={setRole}
+              options={[...ROLE_OPTIONS]}
+            />
           </Field>
           <Field label="Job title">
             <input
@@ -340,19 +335,12 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
         </div>
 
         <Field label="Role" required>
-          <select
+          <Select
             value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className={inputCls}
+            onChange={(v) => setRole(v as UserRole)}
+            options={isAdminUser ? [{ value: UserRole.ORG_ADMIN, label: 'Org Admin' }] : [...ROLE_OPTIONS]}
             disabled={isAdminUser}
-          >
-            {isAdminUser && <option value={UserRole.ORG_ADMIN}>Org Admin</option>}
-            {ROLE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          />
           {isAdminUser && (
             <p className="text-xs text-gray-400 mt-1">Org Admin role cannot be changed here.</p>
           )}
@@ -527,7 +515,7 @@ export default function UsersSettingsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
           />
         </div>
 
@@ -538,11 +526,10 @@ export default function UsersSettingsPage() {
               <button
                 key={tab.key}
                 onClick={() => setRoleFilter(tab.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                  roleFilter === tab.key
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${roleFilter === tab.key
                     ? 'bg-white text-blue-600 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 {tab.label}
                 {count > 0 && (

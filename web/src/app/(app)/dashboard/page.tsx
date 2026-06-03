@@ -41,31 +41,31 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
 
 function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 mb-8 hover:shadow-md transition-shadow">
+      <h2 className="text-xl font-bold text-gray-900 mb-8">{title}</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 overflow-hidden">
         {radarData.competencyRadar && radarData.competencyRadar.length >= 3 ? (
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 text-center mb-4">Competency Profile</h3>
-            <div className="flex justify-center">
-              <RadarChart axes={radarData.competencyRadar} size={280} />
+          <div className="flex flex-col items-center">
+            <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">COMPETENCY PROFILE</h3>
+            <div className="w-full max-w-[320px] aspect-square flex justify-center items-center">
+              <RadarChart axes={radarData.competencyRadar} size={320} />
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center bg-gray-50 rounded-xl h-64 text-sm text-gray-400">
+          <div className="flex items-center justify-center bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
             Not enough competency data
           </div>
         )}
 
         {radarData.personalityRadar && radarData.personalityRadar.length >= 3 ? (
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 text-center mb-4">Personality Profile</h3>
-            <div className="flex justify-center">
-              <RadarChart axes={radarData.personalityRadar} size={280} />
+          <div className="flex flex-col items-center">
+            <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">PERSONALITY PROFILE</h3>
+            <div className="w-full max-w-[320px] aspect-square flex justify-center items-center">
+              <RadarChart axes={radarData.personalityRadar} size={320} />
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center bg-gray-50 rounded-xl h-64 text-sm text-gray-400">
+          <div className="flex items-center justify-center bg-gray-50 rounded-2xl h-72 border border-gray-100 text-sm text-gray-400 font-medium">
             Not enough personality data
           </div>
         )}
@@ -82,16 +82,16 @@ function UserDashboard() {
   if (isLoading) return <PageSpinner />;
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">My Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Your aggregated assessment insights</p>
+    <div className="max-w-5xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
+        <p className="text-base text-gray-500 mt-1">Your aggregated assessment insights</p>
       </div>
 
       {radarData ? (
         <RadarViews radarData={radarData} title="My Aggregate Profile" />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
+        <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-500 shadow-sm">
           Complete some assessments to see your aggregate charts here.
         </div>
       )}
@@ -119,76 +119,72 @@ function AdminDashboard() {
       label: 'Active Assessments',
       value: metrics?.activeAssessments ?? 0,
       icon: (
-        <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      color: 'bg-blue-50',
+      color: 'bg-blue-50 text-blue-600',
     },
     {
       label: 'Total Participants',
       value: metrics?.totalParticipants ?? 0,
       icon: (
-        <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
-      color: 'bg-green-50',
+      color: 'bg-green-50 text-green-600',
     },
     {
       label: 'Pending Responses',
       value: metrics?.pendingResponses ?? 0,
       icon: (
-        <svg className="w-5 h-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      color: 'bg-yellow-50',
+      color: 'bg-yellow-50 text-yellow-600',
     },
     {
       label: 'Reports Generated',
       value: metrics?.reportsGenerated ?? 0,
       icon: (
-        <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
-      color: 'bg-purple-50',
+      color: 'bg-purple-50 text-purple-600',
     },
   ];
 
   const recentAssessments = metrics?.recentAssessments ?? [];
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Organisation Analytics & Overview</p>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-base text-gray-500 mt-1">Organisation Analytics & Overview</p>
         </div>
         <button
           onClick={() => router.push('/assessments/new')}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2.5 transition-colors flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-5 py-3 transition-colors flex items-center gap-2 shadow-sm"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           New Assessment
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className={`w-9 h-9 ${s.color} rounded-lg flex items-center justify-center mb-3`}>
+          <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md hover:-translate-y-1 transition-all">
+            <div className={`w-12 h-12 ${s.color} rounded-xl flex items-center justify-center mb-4`}>
               {s.icon}
             </div>
-            <p className="text-3xl font-bold text-gray-900">{s.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+            <p className="text-4xl font-extrabold text-gray-900 tracking-tight">{s.value}</p>
+            <p className="text-sm font-medium text-gray-500 mt-2">{s.label}</p>
           </div>
         ))}
       </div>
@@ -198,65 +194,65 @@ function AdminDashboard() {
       )}
 
       {/* User specific radar charts lookup */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Participant Analysis</h2>
-        <div className="flex gap-3 mb-6 max-w-md">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 mb-10 hover:shadow-md transition-shadow">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Participant Analysis</h2>
+        <div className="flex gap-4 mb-8 max-w-lg">
           <input
             type="text"
             placeholder="Enter Participant ID (UUID)"
             value={lookupUserId}
             onChange={(e) => setLookupUserId(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
           <button
             onClick={() => setActiveLookupId(lookupUserId)}
-            className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors"
+            className="px-6 py-3 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95"
           >
             View Charts
           </button>
         </div>
         
-        {loadingUserRadar && <Spinner className="mx-auto" />}
+        {loadingUserRadar && <Spinner className="mx-auto my-10" />}
         {!loadingUserRadar && userRadarData && activeLookupId && (
-          <div className="pt-4 border-t border-gray-100">
+          <div className="pt-8 border-t border-gray-100">
             <RadarViews radarData={userRadarData} title={`Charts for ${activeLookupId}`} />
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Recent Assessments</h2>
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+          <h2 className="text-lg font-bold text-gray-900">Recent Assessments</h2>
           <button
             onClick={() => router.push('/assessments')}
-            className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            className="text-sm text-blue-600 hover:text-blue-800 font-semibold transition-colors"
           >
             View all →
           </button>
         </div>
 
         {recentAssessments.length === 0 ? (
-          <div className="px-5 py-12 text-center">
-            <p className="text-sm text-gray-500 mb-3">No assessments yet.</p>
+          <div className="px-6 py-16 text-center">
+            <p className="text-base text-gray-500 mb-4">No assessments yet.</p>
             <button
               onClick={() => router.push('/assessments/new')}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
             >
               Create your first assessment →
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-100">
             {recentAssessments.map((a) => (
               <div
                 key={a.id}
-                className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
                 onClick={() => router.push(`/assessments/${a.id}`)}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{a.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {format(new Date(a.createdAt), 'dd MMM yyyy')} ·{' '}
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
+                  <p className="text-sm text-gray-500">
+                    {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>{' '}
                     {TYPE_LABELS[a.assessmentType]}
                   </p>
                 </div>
@@ -285,3 +281,4 @@ export default function DashboardPage() {
   
   return <UserDashboard />;
 }
+

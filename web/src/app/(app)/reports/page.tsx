@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
 import type { AssessmentDto, ReportDto } from '@leaderprism/shared';
 import { AssessmentStatus } from '@leaderprism/shared';
@@ -76,18 +77,16 @@ export default function ReportsPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Assessment</label>
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-64"
-          value={selectedAssessment}
-          onChange={(e) => setSelectedAssessment(e.target.value)}
-        >
-          <option value="">All assessments</option>
-          {(assessments ?? []).map((a) => (
-            <option key={a.id} value={a.id}>{a.title}</option>
-          ))}
-        </select>
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-4">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by Assessment</label>
+        <div className="w-full sm:max-w-sm">
+          <Select
+            value={selectedAssessment}
+            onChange={setSelectedAssessment}
+            options={[{ value: '', label: 'All assessments' }, ...(assessments ?? []).map(a => ({ value: a.id, label: a.title }))]}
+            placeholder="All assessments"
+          />
+        </div>
       </div>
 
       {/* Generate section — only when an assessment is selected */}

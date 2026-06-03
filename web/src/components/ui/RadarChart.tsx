@@ -55,7 +55,7 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
   return (
     <svg
       viewBox={`0 0 ${size} ${size}`}
-      width={size}
+      width={size*2}
       height={size}
       className={className}
       aria-label="Big Five personality radar chart"
