@@ -20,6 +20,7 @@ export interface OrgDashboardData {
   pendingResponses: number;
   assessmentsByType: Record<string, number>;
   assessmentsByStatus: Record<string, number>;
+  recentAssessments: Assessment[];
 }
 
 export interface HeatmapEntry {
@@ -133,6 +134,12 @@ export class AnalyticsService {
       byStatusRaw.map((r) => [r.status, parseInt(r.count, 10)]),
     );
 
+    const recentAssessments = await this.assessmentRepo.find({
+      where: { organisationId: orgId },
+      order: { createdAt: 'DESC' },
+      take: 5,
+    });
+
     return {
       activeAssessments,
       totalParticipants,
@@ -140,6 +147,7 @@ export class AnalyticsService {
       pendingResponses,
       assessmentsByType,
       assessmentsByStatus,
+      recentAssessments,
     };
   }
 
