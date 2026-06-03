@@ -9,13 +9,31 @@ echo ============================================================
 echo.
 echo [1/7] Cleaning up local ports: 3000 (Web), 3001 (API), 5432 (Postgres), 6379 (Redis)...
 powershell -NoProfile -Command ^
-  "foreach ($port in @(3000, 3001, 5432, 6379)) {" ^
+  "$ports = @(3000, 3001, 5432, 6379);" ^
+  "if (Get-Command docker -ErrorAction SilentlyContinue) {" ^
+  "  $containers = docker ps --format '{{.ID}} {{.Ports}}';" ^
+  "  if ($LASTEXITCODE -eq 0) {" ^
+  "    foreach ($line in $containers) {" ^
+  "      if ($line -match '^(\S+)\s+(.*)$') {" ^
+  "        $id = $Matches[1];" ^
+  "        $portsInfo = $Matches[2];" ^
+  "        foreach ($port in $ports) {" ^
+  "          if ($portsInfo -match ('(?::|\b)' + $port + '\b')) {" ^
+  "            Write-Host ('Stopping Docker container {0} blocking port {1}...' -f $id, $port) -ForegroundColor Yellow;" ^
+  "            docker stop $id | Out-Null;" ^
+  "          }" ^
+  "        }" ^
+  "      }" ^
+  "    }" ^
+  "  }" ^
+  "}" ^
+  "foreach ($port in $ports) {" ^
   "  $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue;" ^
   "  if ($conn) {" ^
   "    $pids = $conn.OwningProcess | Select-Object -Unique;" ^
   "    foreach ($pid in $pids) {" ^
   "      if ($pid -and $pid -ne 0 -and $pid -ne 4) {" ^
-  "        Write-Host \"Killing process $pid on port $port...\" -ForegroundColor Yellow;" ^
+  "        Write-Host ('Killing process {0} on port {1}...' -f $pid, $port) -ForegroundColor Yellow;" ^
   "        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue;" ^
   "      }" ^
   "    }" ^
