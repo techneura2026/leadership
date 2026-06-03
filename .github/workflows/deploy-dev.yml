@@ -39,7 +39,7 @@ jobs:
       - name: Create package tarball
         run: |
           # Create a deployment package excluding unneeded source files and large dev node_modules
-          tar -czf deploy.tar.gz api/dist web/.next web/public shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql api/Dockerfile web/Dockerfile Caddyfile
+          tar -czf deploy.tar.gz api/dist web/.next shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql api/Dockerfile web/Dockerfile Caddyfile
 
       - name: Copy files to VM
         uses: appleboy/scp-action@master

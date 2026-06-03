@@ -7,6 +7,5 @@ COPY web/package*.json ./web/
 RUN npm ci --omit=dev
 COPY shared/dist ./shared/dist
 COPY web/.next ./web/.next
-COPY web/public ./web/public
 EXPOSE 3000
 CMD ["npm", "run", "start", "-w", "web"]
