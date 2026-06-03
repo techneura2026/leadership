@@ -162,6 +162,11 @@ resource "azurerm_linux_virtual_machine" "vm" {
               mkdir -p /app
               chown -R ubuntu:ubuntu /app
               usermod -aG docker ubuntu
+              
+              # Install Node.js 20 & PM2
+              curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+              apt-get install -y nodejs
+              npm install -g pm2
               EOF
   )
 }
