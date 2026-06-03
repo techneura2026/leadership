@@ -6,8 +6,7 @@ COPY shared/package*.json ./shared/
 COPY web/package*.json ./web/
 RUN npm ci --omit=dev
 COPY shared/dist ./shared/dist
-COPY api/dist ./api/dist
-COPY api/src/database/init.sql ./api/src/database/init.sql
-COPY api/src/database/seeds ./api/src/database/seeds
-EXPOSE 3001
-CMD ["node", "api/dist/api/src/main.js"]
+COPY web/.next ./web/.next
+COPY web/public ./web/public
+EXPOSE 3000
+CMD ["npm", "run", "start", "-w", "web"]

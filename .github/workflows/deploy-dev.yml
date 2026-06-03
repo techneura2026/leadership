@@ -31,12 +31,15 @@ jobs:
           npm run build -w api
 
       - name: Build web
+        env:
+          NEXT_PUBLIC_API_URL: https://leaderprism-dev-app.centralus.cloudapp.azure.com/api/v1
+          INTERNAL_API_URL: http://api:3001
         run: npm run build -w web
 
       - name: Create package tarball
         run: |
           # Create a deployment package excluding unneeded source files and large dev node_modules
-          tar -czf deploy.tar.gz api/dist web/.next shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql
+          tar -czf deploy.tar.gz api/dist web/.next web/public shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql api/Dockerfile web/Dockerfile Caddyfile
 
       - name: Copy files to VM
         uses: appleboy/scp-action@master
@@ -62,8 +65,8 @@ jobs:
             
             # Write environment variables
             cat <<EOT > .env
-            DATABASE_URL=postgresql://leaderprism:leaderprism_dev@localhost:5432/leaderprism?sslmode=disable
-            REDIS_URL=redis://localhost:6379
+            DATABASE_URL=postgresql://leaderprism:leaderprism_dev@db:5432/leaderprism?sslmode=disable
+            REDIS_URL=redis://redis:6379
             JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
             JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
             JWT_ACCESS_EXPIRY=15m
@@ -71,28 +74,27 @@ jobs:
             BCRYPT_ROUNDS=10
             PORT=3001
             NODE_ENV=production
+            FQDN=leaderprism-dev-app.centralus.cloudapp.azure.com
             EOT
             
-            # Start database and redis in Docker
-            docker compose up -d
+            # Stop existing PM2 processes if any
+            pm2 delete all || true
+            pm2 save || true
+            
+            # Start everything via Docker Compose
+            docker compose up --build -d
             
             # Wait for DB to be healthy
             echo "Waiting for database to be ready..."
-            until docker exec leaderprism_db pg_isready -U leaderprism; do
+            until docker compose exec -T db pg_isready -U leaderprism; do
               sleep 1
             done
             
-            # Install production dependencies on the host VM
-            npm ci --omit=dev
+            # Wait for API to be up before running migrations (it usually connects to DB)
+            sleep 5
             
             # Run database migrations
-            npx typeorm migration:run -d api/dist/api/src/database/data-source.js
+            docker compose exec -T api npx typeorm migration:run -d api/dist/api/src/database/data-source.js
 
             # Run database seeds
-            node api/dist/api/src/database/seeds/run-seeds.js
-            
-            # Start NestJS API and NextJS Web Frontend using PM2
-            pm2 delete all || true
-            pm2 start api/dist/api/src/main.js --name "api" --update-env
-            pm2 start npm --name "web" -- run start -w web
-            pm2 save
+            docker compose exec -T api node api/dist/api/src/database/seeds/run-seeds.js

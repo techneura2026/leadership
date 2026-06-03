@@ -1,0 +1,11 @@
+{$FQDN} {
+    handle /api/* {
+        reverse_proxy api:3001
+    }
+    handle /api/docs* {
+        reverse_proxy api:3001
+    }
+    handle /* {
+        reverse_proxy web:3000
+    }
+}

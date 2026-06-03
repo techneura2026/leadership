@@ -1135,7 +1135,62 @@ Use Azure App Service **deployment slots** for zero-downtime releases:
 - Consent: explicit consent captured at registration and rater entry
 - Anonymity guarantee: rater minimum threshold enforced at DB and API layers
 
-### 8.4 Assessment Anonymity Safeguards
+### 8.4 Migration to Docker, HTTPS, and Azure Domain
+
+The goal is to replace the current PM2-based deployment on the VM with a fully containerized Docker approach, provision an Azure-assigned domain name, configure HTTPS, and update hardcoded localhost routing to use `.env` variables.
+
+## User Review Required
+
+- **Azure Domain Name**: I will configure Terraform to request a domain name label on the Public IP, specifically `leaderprism-dev-app`. This will result in an FQDN like `leaderprism-dev-app.<region>.cloudapp.azure.com` (e.g. `leaderprism-dev-app.centralus.cloudapp.azure.com`).
+- **HTTPS via Caddy**: I will use Caddy as a reverse proxy in Docker to automatically handle Let's Encrypt SSL certificates and route traffic to the Web and API containers. 
+
+## Open Questions
+- Is `leaderprism-dev-app` acceptable for the domain name label, or do you have a specific label in mind?
+
+## Proposed Changes
+
+### Infrastructure (Terraform)
+#### [MODIFY] `infra/terraform/main.tf`
+- Add `domain_name_label = "leaderprism-dev-app"` to the `azurerm_public_ip` resource to generate a Microsoft-provided FQDN.
+- Expose the generated FQDN as a Terraform output.
+
+### Application (Environment Variables)
+#### [MODIFY] `web/src/lib/api.ts` & `web/src/app/rater/[token]/page.tsx`
+- Ensure routes use `process.env.NEXT_PUBLIC_API_URL` instead of hardcoded `localhost:3001`. (Already mostly implemented, but I'll review to ensure no hardcoded IP is left).
+#### [MODIFY] `api/src/main.ts`
+- Ensure CORS uses `process.env.WEB_URL` rather than hardcoded IP.
+#### [MODIFY] `.github/workflows/deploy-dev.yml`
+- Export `NEXT_PUBLIC_API_URL` and `INTERNAL_API_URL` before running `npm run build -w web` so Next.js statically builds with the new HTTPS FQDN.
+
+### Dockerization
+#### [NEW] `api/Dockerfile`
+- Create a Dockerfile that copies `dist`, `package.json`, runs `npm ci --omit=dev`, and starts the NestJS API via `node`.
+#### [NEW] `web/Dockerfile`
+- Create a Dockerfile that copies `.next`, `package.json`, runs `npm ci --omit=dev`, and starts the Next.js server.
+#### [NEW] `Caddyfile`
+- Configure reverse proxy mapping:
+  - `/*` -> `web:3000`
+  - `/api/*` -> `api:3001`
+#### [MODIFY] `docker-compose.yml`
+- Add `api` service (builds `./api`).
+- Add `web` service (builds `./web`).
+- Add `caddy` service (mounts `Caddyfile` and ports 80/443).
+
+### CI/CD Workflow
+#### [MODIFY] `.github/workflows/deploy-dev.yml`
+- Remove PM2 usage and host-level Node.js `npm ci`.
+- Build the Next.js app with `NEXT_PUBLIC_API_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com/api/v1`.
+- Include `Dockerfile`s and `Caddyfile` in `deploy.tar.gz`.
+- Start services via `docker compose up --build -d` on the VM.
+
+## Verification Plan
+1. **Terraform Apply**: Run Terraform to get the FQDN.
+2. **Push Code**: Commit the changes to trigger the GitHub Actions deployment.
+3. **Check CI/CD Logs**: Ensure containers are built and started successfully.
+4. **HTTPS Validation**: Access `https://leaderprism-dev-app.<region>.cloudapp.azure.com` and ensure it serves the Web UI over HTTPS without certificate warnings.
+5. **API Validation**: Log in to ensure the Web container can successfully communicate with the API container over the new URLs.
+
+### 8.5 Assessment Anonymity Safeguards
 - Rater group size < 3: results suppressed or merged (configurable per assessment)
 - Comments: shuffled, stripped of ordering metadata
 - Perspective groups: supervisor responses always shown separately (only 1 expected)
