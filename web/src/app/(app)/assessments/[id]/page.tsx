@@ -73,7 +73,7 @@ function OverviewTab({
   async function closeAssessment() {
     setClosing(true);
     try {
-      await api.patch(`/assessments/${assessment.id}`, { status: AssessmentStatus.CLOSED });
+      await api.post(`/assessments/${assessment.id}/close`);
       setShowCloseConfirm(false);
       window.location.reload();
     } catch {
@@ -493,11 +493,20 @@ function NominationsTab({
 }
 
 // ── Reports Tab ────────────────────────────────────────────────────────────────
+const ASSESSMENT_REPORT_TYPE: Record<AssessmentType, string> = {
+  [AssessmentType.FEEDBACK_360]: 'individual_360',
+  [AssessmentType.COMPETENCY]: 'competency',
+  [AssessmentType.PERSONALITY]: 'personality',
+  [AssessmentType.READINESS]: 'readiness',
+};
+
 function ReportsTab({
   assessmentId,
+  assessmentType,
   participants,
 }: {
   assessmentId: string;
+  assessmentType: AssessmentType;
   participants: Participant[];
 }) {
   const { data: reports, mutate } = useApi<ReportDto[]>(`/reports?assessmentId=${assessmentId}`);
@@ -509,11 +518,12 @@ function ReportsTab({
       await api.post('/reports/generate', {
         assessmentId,
         participantId,
-        reportType: 'individual_360',
+        reportType: ASSESSMENT_REPORT_TYPE[assessmentType] ?? 'individual_360',
+        language: 'en',
       });
       mutate();
-    } catch {
-      alert('Failed to generate report.');
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? 'Failed to generate report.');
     } finally {
       setGenerating(null);
     }
@@ -565,7 +575,7 @@ function ReportsTab({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {participants.map((p) => {
-                const report = getReportForParticipant(p.userId);
+                const report = getReportForParticipant(p.id);
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
@@ -605,11 +615,11 @@ function ReportsTab({
                         </button>
                       ) : (
                         <button
-                          onClick={() => generateReport(p.userId)}
-                          disabled={generating === p.userId || report?.status === 'processing'}
+                          onClick={() => generateReport(p.id)}
+                          disabled={generating === p.id || report?.status === 'processing'}
                           className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ml-auto"
                         >
-                          {generating === p.userId && <Spinner size="sm" />}
+                          {generating === p.id && <Spinner size="sm" />}
                           Generate
                         </button>
                       )}
@@ -855,7 +865,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {activeTab === 'reports' && (
-        <ReportsTab assessmentId={id} participants={participants ?? []} />
+        <ReportsTab assessmentId={id} assessmentType={assessment.assessmentType} participants={participants ?? []} />
       )}
     </div>
   );

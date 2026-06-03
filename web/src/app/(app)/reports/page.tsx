@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
 import type { AssessmentDto, ReportDto } from '@leaderprism/shared';
-import { AssessmentStatus } from '@leaderprism/shared';
+import { AssessmentStatus, AssessmentType } from '@leaderprism/shared';
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'info' | 'neutral' | 'error'> = {
   ready: 'success', processing: 'warning', pending: 'neutral', failed: 'error',
@@ -26,7 +26,7 @@ export default function ReportsPage() {
   const [selectedAssessment, setSelectedAssessment] = useState('');
   const [generating, setGenerating] = useState<string | null>(null);
 
-  const { data: assessmentsResult } = useApi<{ data: AssessmentDto[] }>('/assessments?status=closed');
+  const { data: assessmentsResult } = useApi<{ data: AssessmentDto[] }>('/assessments');
   const assessments = assessmentsResult?.data;
   const { data: reports, mutate, isLoading } = useApi<ReportDto[]>(
     selectedAssessment ? `/reports?assessmentId=${selectedAssessment}` : '/reports',
@@ -40,10 +40,10 @@ export default function ReportsPage() {
   async function generateReport(participantId: string) {
     if (!selectedAssessment || !selectedAsmt) return;
     const typeMap: Record<string, string> = {
-      '360_feedback': 'individual_360',
-      competency: 'competency',
-      personality: 'personality',
-      readiness: 'readiness',
+      [AssessmentType.FEEDBACK_360]: 'individual_360',
+      [AssessmentType.COMPETENCY]: 'competency',
+      [AssessmentType.PERSONALITY]: 'personality',
+      [AssessmentType.READINESS]: 'readiness',
     };
     const reportType = typeMap[selectedAsmt.assessmentType] ?? 'individual_360';
     setGenerating(participantId);
@@ -52,6 +52,8 @@ export default function ReportsPage() {
         assessmentId: selectedAssessment, participantId, reportType, language: 'en',
       });
       mutate();
+    } catch (err: any) {
+      alert(err?.response?.data?.error?.message ?? 'Failed to generate report.');
     } finally {
       setGenerating(null);
     }
@@ -97,10 +99,10 @@ export default function ReportsPage() {
           </div>
           <div className="divide-y divide-gray-50">
             {(participants ?? []).map((p: any) => {
-              const existing = (reports ?? []).find((r: any) => r.participantId === p.userId);
+              const existing = (reports ?? []).find((r: any) => r.participantId === p.id);
               return (
-                <div key={p.userId} className="px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm font-medium">{p.firstName} {p.lastName}</span>
+                <div key={p.id} className="px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm font-medium">{p.user?.firstName ?? p.firstName} {p.user?.lastName ?? p.lastName}</span>
                   <div className="flex items-center gap-2">
                     {existing && (
                       <Badge variant={STATUS_VARIANT[existing.status]}>{existing.status}</Badge>
@@ -114,11 +116,11 @@ export default function ReportsPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => generateReport(p.userId)}
-                        disabled={generating === p.userId || existing?.status === 'processing'}
+                        onClick={() => generateReport(p.id)}
+                        disabled={generating === p.id || existing?.status === 'processing'}
                         className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
                       >
-                        {generating === p.userId ? 'Queuing…' : existing?.status === 'processing' ? 'Processing…' : 'Generate'}
+                        {generating === p.id ? 'Queuing…' : existing?.status === 'processing' ? 'Processing…' : 'Generate'}
                       </button>
                     )}
                   </div>
