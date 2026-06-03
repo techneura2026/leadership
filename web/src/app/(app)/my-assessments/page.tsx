@@ -90,30 +90,48 @@ function AssessmentCard({
     return 'primary';
   }
 
+  const statusConfig = {
+    completed: { label: 'Completed', color: 'text-green-600', bg: 'bg-green-50' },
+    in_progress: { label: 'In Progress', color: 'text-amber-600', bg: 'bg-amber-50' },
+    not_started: { label: 'Not Started', color: 'text-slate-500', bg: 'bg-slate-50' },
+  };
+  const cfg = statusConfig[status] ?? statusConfig.not_started;
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition-shadow">
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.color}`}>
+              {status === 'completed' && (
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {status === 'in_progress' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              )}
+              {cfg.label}
+            </span>
             <Badge variant="info">{TYPE_LABELS[assessment.assessmentType]}</Badge>
-            {status === 'completed' && <Badge variant="success">Completed</Badge>}
-            {status === 'in_progress' && <Badge variant="warning">In Progress</Badge>}
-            {status === 'not_started' && <Badge variant="neutral">Not Started</Badge>}
           </div>
 
           <h3 className="text-base font-semibold text-gray-900 truncate">{assessment.title}</h3>
 
-          <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-            {assessment.endDate && (
-              <p>Due: {format(new Date(assessment.endDate), 'dd MMM yyyy')}</p>
-            )}
-          </div>
+          {assessment.endDate && (
+            <p className="mt-1.5 text-xs text-gray-400 flex items-center gap-1">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+              Due {format(new Date(assessment.endDate), 'dd MMM yyyy')}
+            </p>
+          )}
 
           {status === 'in_progress' && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-gray-400 mb-1.5">
                 <span>Progress</span>
-                <span>{completion}%</span>
+                <span className="font-semibold text-blue-600">{completion}%</span>
               </div>
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
@@ -131,8 +149,8 @@ function AssessmentCard({
             disabled={status === 'completed' && !resultsEnabled}
             className={
               getCtaVariant() === 'primary'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-5 py-2.5 transition-colors disabled:opacity-50 whitespace-nowrap'
-                : 'border border-gray-300 text-gray-700 text-sm font-medium rounded-lg px-5 py-2.5 hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl px-5 py-2.5 transition-all disabled:opacity-50 whitespace-nowrap'
+                : 'border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl px-5 py-2.5 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 whitespace-nowrap'
             }
           >
             {getCtaLabel()}

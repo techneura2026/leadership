@@ -44,57 +44,99 @@ function LoginForm() {
 
   return (
     <>
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">Sign in to your account</h2>
+      <div className="mb-7">
+        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Welcome back</h2>
+        <p className="text-sm text-gray-500 mt-1">Sign in to your LeaderPrism account</p>
+      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+            Email address
+          </label>
           <input
             type="email"
             autoComplete="email"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="you@company.com"
+            className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             {...register('email')}
           />
-          {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
+          {errors.email && (
+            <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
+              <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              {errors.email.message}
+            </p>
+          )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+            Password
+          </label>
           <input
             type="password"
             autoComplete="current-password"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="••••••••"
+            className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             {...register('password')}
           />
-          {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
+          {errors.password && (
+            <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
+              <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+              </svg>
+              {errors.password.message}
+            </p>
+          )}
         </div>
 
         {serverError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{serverError}</p>
+          <div className="flex items-start gap-2.5 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3 border border-red-100">
+            <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10" />
+              <path strokeLinecap="round" d="M12 8v4M12 16h.01" />
+            </svg>
+            <span>{serverError}</span>
+          </div>
         )}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-3 text-sm transition-all mt-2"
         >
-          {isSubmitting ? 'Signing in…' : 'Sign in'}
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Signing in…
+            </span>
+          ) : (
+            'Sign in'
+          )}
         </button>
       </form>
 
-      <p className="text-sm text-gray-500 text-center mt-6">
-        New to LeaderPrism?{' '}
-        <Link href="/register" className="text-blue-600 hover:underline font-medium">
-          Create an account
-        </Link>
-      </p>
+      <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+        <p className="text-sm text-gray-500">
+          New to LeaderPrism?{' '}
+          <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
+            Create an account
+          </Link>
+        </p>
+      </div>
     </>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="h-64 flex items-center justify-center"><div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
+    <Suspense fallback={
+      <div className="h-64 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
       <LoginForm />
     </Suspense>
   );
