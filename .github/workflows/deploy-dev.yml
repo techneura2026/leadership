@@ -85,6 +85,9 @@ jobs:
             # Install production dependencies on the host VM
             npm ci --omit=dev
             
+            # Run database migrations
+            npx typeorm migration:run -d api/dist/api/src/database/data-source.js
+
             # Run database seeds
             node api/dist/api/src/database/seeds/run-seeds.js
             
