@@ -161,6 +161,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
               systemctl start docker
               mkdir -p /app
               chown -R ubuntu:ubuntu /app
+              usermod -aG docker ubuntu
               EOF
   )
 }
