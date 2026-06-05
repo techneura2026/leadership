@@ -4,6 +4,7 @@
   "sourceRoot": "src",
   "entryFile": "api/src/main",
   "compilerOptions": {
+    "assets": [{ "include": "reporting/templates/**/*", "watchAssets": true }],
     "deleteOutDir": true
   }
 }

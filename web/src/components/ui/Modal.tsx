@@ -13,6 +13,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const mouseDownOnOverlay = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -33,8 +34,12 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        mouseDownOnOverlay.current = e.target === overlayRef.current;
+      }}
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (mouseDownOnOverlay.current && e.target === overlayRef.current) onClose();
+        mouseDownOnOverlay.current = false;
       }}
     >
       <div

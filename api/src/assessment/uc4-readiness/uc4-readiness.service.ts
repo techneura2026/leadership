@@ -266,6 +266,11 @@ export class Uc4ReadinessService {
       roleProfileId,
     );
 
+    // Mark participant as completed so the frontend shows the correct status
+    participant.status = 'completed';
+    participant.completedAt = new Date();
+    await this.participantRepo.save(participant);
+
     this.logger.log(
       `Computed readiness for participant ${participantId}: rating=${score.readinessRating} composite=${score.compositeScore}`,
     );
@@ -294,21 +299,10 @@ export class Uc4ReadinessService {
   }> {
     const qb = this.readinessScoreRepo
       .createQueryBuilder('rs')
-      .innerJoin('rs.participant', 'p')
-      .innerJoin('p.user', 'u')
+      .leftJoinAndSelect('rs.participant', 'p')
+      .leftJoinAndSelect('p.user', 'u')
       .innerJoin('p.assessment', 'a')
-      .where('a.organisation_id = :orgId', { orgId })
-      .select([
-        'rs.id',
-        'rs.participantId',
-        'rs.roleProfileId',
-        'rs.readinessRating',
-        'rs.compositeScore',
-        'rs.gridPerformance',
-        'rs.gridPotential',
-        'u.firstName',
-        'u.lastName',
-      ]);
+      .where('a.organisation_id = :orgId', { orgId });
 
     if (assessmentId) {
       qb.andWhere('rs.assessment_id = :assessmentId', { assessmentId });
@@ -362,7 +356,7 @@ export class Uc4ReadinessService {
       roleProfileId: role.roleProfileId,
       roleTitle: role.roleTitle,
       candidates: role.candidates.map((c) => {
-        const user = (c.participant as any)?.user;
+        const user = c.participant?.user;
         return {
           participantId: c.participantId,
           name: user ? `${user.firstName} ${user.lastName}` : 'Unknown',

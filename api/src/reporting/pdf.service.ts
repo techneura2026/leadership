@@ -68,10 +68,18 @@ Handlebars.registerHelper('readinessNarrative', (rating: string, name: string) =
 
 const REPORTS_DIR = path.resolve(process.cwd(), 'reports');
 
+function resolveTemplatesDir(): string {
+  // In compiled output __dirname = dist/reporting; templates are copied there by nest-cli assets.
+  // Fallback to src/ so dev and pre-rebuild prod builds still work.
+  const distPath = path.resolve(__dirname, 'templates');
+  if (fs.existsSync(distPath)) return distPath;
+  return path.resolve(process.cwd(), 'src', 'reporting', 'templates');
+}
+
 @Injectable()
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
-  private readonly templatesDir = path.resolve(__dirname, 'templates');
+  private readonly templatesDir = resolveTemplatesDir();
 
   constructor() {
     // Ensure reports output directory exists

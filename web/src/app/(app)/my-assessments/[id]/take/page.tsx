@@ -274,17 +274,14 @@ function PersonalityTaker({
       });
       setResponses(resps);
 
-      const sortedItems = [...progress.items].sort((a, b) => a.displayOrder - b.displayOrder);
-      const firstUnanswered = sortedItems.findIndex((item) => !item.answered);
+      const firstUnanswered = progress.items.findIndex((item) => !item.answered);
       if (firstUnanswered !== -1) {
         setCurrentIdx(firstUnanswered);
       }
     }
   }, [progress]);
 
-  const items = progress?.items
-    ? [...progress.items].sort((a, b) => a.displayOrder - b.displayOrder)
-    : [];
+  const items = progress?.items ?? [];
   const total = items.length;
   const current = items[currentIdx];
   const answered = Object.keys(responses).length;
@@ -442,8 +439,7 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
       });
       setSjtResponses(resps);
 
-      const sortedSjt = [...sjtProg.items].sort((a, b) => a.displayOrder - b.displayOrder);
-      const firstUnanswered = sortedSjt.findIndex((item) => !item.answered);
+      const firstUnanswered = sjtProg.items.findIndex((item) => !item.answered);
       if (firstUnanswered !== -1) {
         setSjtIdx(firstUnanswered);
       }
@@ -462,8 +458,8 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
     }
   }, [laProg]);
 
-  const sjtItems = sjtProg?.items ? [...sjtProg.items].sort((a, b) => a.displayOrder - b.displayOrder) : [];
-  const laItems = laProg?.items ? [...laProg.items].sort((a, b) => a.displayOrder - b.displayOrder) : [];
+  const sjtItems = sjtProg?.items ?? [];
+  const laItems = laProg?.items ?? [];
 
   useEffect(() => {
     if (sjtProg && laProg) {
