@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { UserRole } from '@leaderprism/shared';
-import type { UserDto } from '@leaderprism/shared';
+import type { UserDto, DepartmentDto } from '@leaderprism/shared';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -64,50 +64,37 @@ function Field({
 const inputCls =
   'w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700';
 
-// ── Password strength ──────────────────────────────────────────────────────────
-
-function passwordStrength(pw: string): { score: number; label: string; colour: string } {
-  if (!pw) return { score: 0, label: '', colour: '' };
-  let score = 0;
-  if (pw.length >= 8) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[a-z]/.test(pw)) score++;
-  if (/\d/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
-  if (score <= 2) return { score, label: 'Weak', colour: 'bg-red-400' };
-  if (score === 3) return { score, label: 'Fair', colour: 'bg-yellow-400' };
-  if (score === 4) return { score, label: 'Good', colour: 'bg-blue-400' };
-  return { score, label: 'Strong', colour: 'bg-green-500' };
-}
-
 // ── Add User Modal ─────────────────────────────────────────────────────────────
 
 interface AddUserModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (fullName: string) => void;
 }
 
 function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
   const [role, setRole] = useState<string>(UserRole.PARTICIPANT);
+  const [departmentId, setDepartmentId] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const pwStrength = passwordStrength(password);
+  const { data: departments } = useApi<DepartmentDto[]>(open ? '/organisations/me/departments' : null);
+
+  const deptOptions = [
+    { value: '', label: 'No department' },
+    ...(departments ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name })),
+  ];
 
   function reset() {
     setFirstName('');
     setLastName('');
     setEmail('');
-    setPassword('');
-    setShowPw(false);
     setRole(UserRole.PARTICIPANT);
+    setDepartmentId('');
     setJobTitle('');
     setError('');
     setLoading(false);
@@ -120,7 +107,7 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
 
   async function handleSubmit() {
     setError('');
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -130,12 +117,13 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim().toLowerCase(),
-        password,
         role,
+        ...(departmentId ? { departmentId } : {}),
         ...(jobTitle.trim() ? { jobTitle: jobTitle.trim() } : {}),
       });
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
       reset();
-      onCreated();
+      onCreated(fullName);
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
       setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to create user. Please try again.'));
@@ -177,47 +165,7 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
           />
         </Field>
 
-        <Field label="Password" required>
-          <div className="relative">
-            <input
-              type={showPw ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputCls + ' pr-10'}
-              placeholder="Min. 8 chars, upper, lower, digit"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPw((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              tabIndex={-1}
-            >
-              {showPw ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              )}
-            </button>
-          </div>
-          {password && (
-            <div className="mt-1.5 flex items-center gap-2">
-              <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${pwStrength.colour}`}
-                  style={{ width: `${(pwStrength.score / 5) * 100}%` }}
-                />
-              </div>
-              <span className="text-xs text-gray-500 w-10">{pwStrength.label}</span>
-            </div>
-          )}
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3 ">
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Role" required>
             <Select
               value={role}
@@ -225,15 +173,23 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
               options={[...ROLE_OPTIONS]}
             />
           </Field>
-          <Field label="Job title">
-            <input
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              className={inputCls}
-              placeholder="e.g. Senior Manager"
+          <Field label="Department">
+            <Select
+              value={departmentId}
+              onChange={setDepartmentId}
+              options={deptOptions}
             />
           </Field>
         </div>
+
+        <Field label="Job title">
+          <input
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            className={inputCls}
+            placeholder="e.g. Senior Manager"
+          />
+        </Field>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
@@ -386,10 +342,10 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
 interface DeactivateModalProps {
   user: UserDto | null;
   onClose: () => void;
-  onDeactivated: () => void;
+  onDone: () => void;
 }
 
-function DeactivateModal({ user, onClose, onDeactivated }: DeactivateModalProps) {
+function DeactivateModal({ user, onClose, onDone }: DeactivateModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -399,7 +355,7 @@ function DeactivateModal({ user, onClose, onDeactivated }: DeactivateModalProps)
     setError('');
     try {
       await api.delete(`/users/${user.id}`);
-      onDeactivated();
+      onDone();
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
       setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to deactivate user.'));
@@ -423,10 +379,7 @@ function DeactivateModal({ user, onClose, onDeactivated }: DeactivateModalProps)
           </div>
         )}
         <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
             Cancel
           </button>
           <button
@@ -442,6 +395,110 @@ function DeactivateModal({ user, onClose, onDeactivated }: DeactivateModalProps)
   );
 }
 
+// ── Reactivate Confirm Modal ───────────────────────────────────────────────────
+
+function ReactivateModal({ user, onClose, onDone }: DeactivateModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleReactivate() {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.patch(`/users/${user.id}`, { isActive: true });
+      onDone();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to reactivate user.'));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal open={!!user} onClose={onClose} title="Reactivate User">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Reactivate{' '}
+          <span className="font-semibold text-gray-900">
+            {user?.firstName} {user?.lastName}
+          </span>
+          ? They will be able to log in and participate in assessments again.
+        </p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleReactivate}
+            disabled={loading}
+            className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Reactivating…' : 'Reactivate'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Delete Confirm Modal ───────────────────────────────────────────────────────
+
+function DeleteUserModal({ user, onClose, onDone }: DeactivateModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleDelete() {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.delete(`/users/${user.id}/permanent`);
+      onDone();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to delete user.'));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal open={!!user} onClose={onClose} title="Delete User">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Permanently delete{' '}
+          <span className="font-semibold text-gray-900">
+            {user?.firstName} {user?.lastName}
+          </span>
+          ? This cannot be undone — all their data will be removed.
+        </p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="flex-1 bg-red-700 text-white rounded-lg py-2 text-sm hover:bg-red-800 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Deleting…' : 'Delete Permanently'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function UsersSettingsPage() {
@@ -450,9 +507,18 @@ export default function UsersSettingsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserDto | null>(null);
   const [deactivateUser, setDeactivateUser] = useState<UserDto | null>(null);
+  const [reactivateUser, setReactivateUser] = useState<UserDto | null>(null);
+  const [deleteUser, setDeleteUser] = useState<UserDto | null>(null);
+  const [successMsg, setSuccessMsg] = useState('');
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<FilterRole>('all');
+
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(''), 5000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
 
   const { data: users, mutate, isLoading } = useApi<UserDto[]>('/users');
 
@@ -481,6 +547,21 @@ export default function UsersSettingsPage() {
 
   return (
     <div>
+      {/* Success banner */}
+      {successMsg && (
+        <div className="mb-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+          <svg className="w-4 h-4 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-600 hover:text-green-800">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -606,23 +687,47 @@ export default function UsersSettingsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setEditUser(u)}
-                          className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                          title="Edit user"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
+                        {!isSelf && !isAdmin && (
+                          <button
+                            onClick={() => setEditUser(u)}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Edit user"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        )}
                         {!isSelf && !isAdmin && u.isActive && (
                           <button
                             onClick={() => setDeactivateUser(u)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
                             title="Deactivate user"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                          </button>
+                        )}
+                        {!isSelf && !isAdmin && !u.isActive && (
+                          <button
+                            onClick={() => setReactivateUser(u)}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Reactivate user"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
+                        {!isSelf && !isAdmin && (
+                          <button
+                            onClick={() => setDeleteUser(u)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete user"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                           </button>
                         )}
@@ -647,9 +752,10 @@ export default function UsersSettingsPage() {
       <AddUserModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onCreated={() => {
+        onCreated={(fullName) => {
           setAddOpen(false);
           mutate();
+          setSuccessMsg(`${fullName} was added successfully. Temporary password: 12345678`);
         }}
       />
 
@@ -665,10 +771,19 @@ export default function UsersSettingsPage() {
       <DeactivateModal
         user={deactivateUser}
         onClose={() => setDeactivateUser(null)}
-        onDeactivated={() => {
-          setDeactivateUser(null);
-          mutate();
-        }}
+        onDone={() => { setDeactivateUser(null); mutate(); }}
+      />
+
+      <ReactivateModal
+        user={reactivateUser}
+        onClose={() => setReactivateUser(null)}
+        onDone={() => { setReactivateUser(null); mutate(); }}
+      />
+
+      <DeleteUserModal
+        user={deleteUser}
+        onClose={() => setDeleteUser(null)}
+        onDone={() => { setDeleteUser(null); mutate(); }}
       />
     </div>
   );

@@ -5,7 +5,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -18,14 +17,12 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'SecurePass1!' })
+  @ApiPropertyOptional({ example: '12345678', description: 'Defaults to 12345678 when omitted' })
+  @IsOptional()
   @IsString()
   @MinLength(8)
   @MaxLength(72)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-  })
-  password: string;
+  password?: string;
 
   @ApiProperty({ example: 'Kavinda' })
   @IsString()

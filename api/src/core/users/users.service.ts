@@ -24,7 +24,7 @@ export class UsersService {
 
   async findById(id: string, organisationId: string): Promise<User> {
     const user = await this.userRepo.findOne({
-      where: { id, organisationId, isActive: true },
+      where: { id, organisationId },
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -125,8 +125,13 @@ export class UsersService {
 
   async findAll(organisationId: string): Promise<User[]> {
     return this.userRepo.find({
-      where: { organisationId, isActive: true },
-      order: { firstName: 'ASC', lastName: 'ASC' },
+      where: { organisationId },
+      order: { isActive: 'DESC', firstName: 'ASC', lastName: 'ASC' },
     });
+  }
+
+  async hardDelete(id: string, organisationId: string): Promise<void> {
+    const result = await this.userRepo.delete({ id, organisationId });
+    if (!result.affected) throw new NotFoundException('User not found');
   }
 }
