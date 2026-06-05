@@ -1,7 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
+  Param,
   Patch,
   Post,
   UseGuards,
@@ -45,7 +49,29 @@ class CreateDepartmentDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
+  description?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
   parentId?: string;
+}
+
+class UpdateDepartmentDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  name?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  isActive?: boolean;
 }
 
 @ApiTags('organisations')
@@ -78,7 +104,26 @@ export class OrganisationsController {
   @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
   @ApiOperation({ summary: 'Create a department' })
   createDepartment(@CurrentOrgId() orgId: string, @Body() dto: CreateDepartmentDto) {
-    return this.orgsService.createDepartment(orgId, dto.name, dto.parentId);
+    return this.orgsService.createDepartment(orgId, dto.name, dto.description, dto.parentId);
+  }
+
+  @Patch('me/departments/:id')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @ApiOperation({ summary: 'Update a department' })
+  updateDepartment(
+    @CurrentOrgId() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateDepartmentDto,
+  ) {
+    return this.orgsService.updateDepartment(orgId, id, dto);
+  }
+
+  @Delete('me/departments/:id')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a department' })
+  deleteDepartment(@CurrentOrgId() orgId: string, @Param('id') id: string) {
+    return this.orgsService.deleteDepartment(orgId, id);
   }
 
   @Get('me/users')

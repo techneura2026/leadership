@@ -26,6 +26,12 @@ export class Department {
   @Column({ length: 255 })
   name: string;
 
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Column({ name: 'is_active', default: true })
+  isActive: boolean;
+
   @Column({ name: 'parent_id', nullable: true, type: 'uuid' })
   parentId: string | null;
 

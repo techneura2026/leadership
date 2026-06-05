@@ -55,9 +55,26 @@ export class OrganisationsService {
     return this.deptRepo.find({ where: { organisationId }, order: { name: 'ASC' } });
   }
 
-  async createDepartment(organisationId: string, name: string, parentId?: string): Promise<Department> {
-    const dept = this.deptRepo.create({ organisationId, name, parentId: parentId ?? null });
+  async createDepartment(organisationId: string, name: string, description?: string, parentId?: string): Promise<Department> {
+    const dept = this.deptRepo.create({ organisationId, name, description: description ?? null, parentId: parentId ?? null });
     return this.deptRepo.save(dept);
+  }
+
+  async updateDepartment(
+    organisationId: string,
+    id: string,
+    data: { name?: string; description?: string | null; isActive?: boolean },
+  ): Promise<Department> {
+    const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
+    if (!dept) throw new NotFoundException('Department not found');
+    Object.assign(dept, data);
+    return this.deptRepo.save(dept);
+  }
+
+  async deleteDepartment(organisationId: string, id: string): Promise<void> {
+    const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
+    if (!dept) throw new NotFoundException('Department not found');
+    await this.deptRepo.remove(dept);
   }
 
   async getUsers(organisationId: string) {

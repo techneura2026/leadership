@@ -37,7 +37,10 @@ export interface DepartmentDto {
   id: string;
   organisationId: string;
   name: string;
+  description: string | null;
+  isActive: boolean;
   parentId: string | null;
+  createdAt: string;
 }
 
 // ── User ─────────────────────────────────────────────────────

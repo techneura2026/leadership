@@ -80,11 +80,16 @@ export function Sidebar() {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-slate-900 shrink-0">
+    <aside className="hidden md:flex flex-col w-64 shrink-0" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
       {/* Brand header */}
-      <div className="h-14 px-5 flex items-center gap-3 shrink-0 border-b border-white/[0.06]">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
+      <div
+        className="h-14 px-5 flex items-center gap-3 shrink-0"
+        style={{ borderBottom: '1px solid var(--sidebar-border)' }}
+      >
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #1248a0 100%)' }}
+        >
           <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
             <path d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
@@ -93,7 +98,7 @@ export function Sidebar() {
           <p className="text-sm font-semibold text-white truncate leading-none">
             {org?.name ?? 'LeaderPrism'}
           </p>
-          <p className="text-[11px] text-slate-500 capitalize mt-1 leading-none font-medium">
+          <p className="text-[11px] capitalize mt-1 leading-none font-medium" style={{ color: 'var(--sidebar-text)' }}>
             {org?.plan ?? 'professional'} plan
           </p>
         </div>
@@ -110,10 +115,9 @@ export function Sidebar() {
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all duration-150 font-medium',
-                isActive
-                  ? 'text-white'
-                  : 'text-slate-400 hover:text-white',
+                isActive ? 'text-white' : '',
               )}
+              style={isActive ? undefined : { color: 'var(--sidebar-text)' }}
             >
               <NavIcon href={item.href} />
               <span className="truncate">{item.label}</span>
@@ -123,14 +127,19 @@ export function Sidebar() {
       </nav>
 
       {/* Divider */}
-      <div className="mx-4 border-t border-white/[0.06]" />
+      <div className="mx-4" style={{ borderTop: '1px solid var(--sidebar-border)' }} />
 
       {/* User card */}
       <div className="px-4 py-4">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-white/[0.05] transition-colors">
+        <div
+          className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors"
+          style={{ cursor: 'default' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--sidebar-item-hover)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'; }}
+        >
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #4f46e5 100%)' }}
           >
             {initials}
           </div>
@@ -138,7 +147,7 @@ export function Sidebar() {
             <p className="text-sm font-medium text-white truncate leading-none">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-[11px] text-slate-500 capitalize mt-1 leading-none">
+            <p className="text-[11px] capitalize mt-1 leading-none" style={{ color: 'var(--sidebar-text)' }}>
               {user?.role?.replace(/_/g, ' ')}
             </p>
           </div>
