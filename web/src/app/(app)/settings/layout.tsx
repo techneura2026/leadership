@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const SETTINGS_TABS = [
   { href: '/settings/organisation', label: 'Organisation' },
   { href: '/settings/users', label: 'Users' },
+  { href: '/settings/departments', label: 'Departments' },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

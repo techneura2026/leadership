@@ -34,7 +34,7 @@ export class UsersController {
     return this.usersService.create({
       organisationId: orgId,
       email: dto.email,
-      password: dto.password,
+      password: dto.password ?? '12345678',
       firstName: dto.firstName,
       lastName: dto.lastName,
       role: dto.role as UserRole,
@@ -74,5 +74,13 @@ export class UsersController {
   @ApiOperation({ summary: 'Deactivate a user (soft delete)' })
   async deactivate(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.update(id, orgId, { isActive: false });
+  }
+
+  @Delete(':id/permanent')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(UserRole.ORG_ADMIN)
+  @ApiOperation({ summary: 'Permanently delete a user' })
+  async hardDelete(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.hardDelete(id, orgId);
   }
 }
