@@ -1,7 +1,4 @@
 {$FQDN} {
-    handle /api/chat {
-        reverse_proxy web:3000
-    }
     handle /api/* {
         reverse_proxy api:3001
     }
