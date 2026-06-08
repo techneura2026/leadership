@@ -42,7 +42,7 @@ jobs:
           tar -czf deploy.tar.gz api/dist web/.next shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql api/Dockerfile web/Dockerfile Caddyfile
 
       - name: Copy files to VM
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.DEV_VM_IP }}
           username: ubuntu
@@ -51,7 +51,7 @@ jobs:
           target: "/home/ubuntu/app"
 
       - name: Deploy and start application on VM
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEV_VM_IP }}
           username: ubuntu
