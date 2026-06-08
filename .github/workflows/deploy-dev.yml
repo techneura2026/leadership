@@ -75,6 +75,7 @@ jobs:
             PORT=3001
             NODE_ENV=production
             FQDN=leaderprism-dev-app.centralus.cloudapp.azure.com
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             EOT
             
             # Stop existing PM2 processes if any
