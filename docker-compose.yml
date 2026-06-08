@@ -52,6 +52,7 @@ services:
     environment:
       - INTERNAL_API_URL=http://api:3001
       - NEXT_PUBLIC_API_URL=https://${FQDN}/api/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - api
 
