@@ -63,6 +63,12 @@ export class RaterNomination {
   @JoinColumn({ name: 'approved_by' })
   approver: User | null;
 
+  @Column({ name: 'overall_rating', type: 'smallint', nullable: true })
+  overallRating: number | null;
+
+  @Column({ name: 'development_comment', type: 'text', nullable: true })
+  developmentComment: string | null;
+
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
   completedAt: Date | null;
 

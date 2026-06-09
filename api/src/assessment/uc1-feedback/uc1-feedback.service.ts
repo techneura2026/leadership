@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { RaterRelationship } from '@leaderprism/shared';
 import { RaterNomination } from './entities/rater-nomination.entity';
 import { RaterResponse } from './entities/rater-response.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
+import { Competency } from '../items/entities/competency.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,6 +28,18 @@ interface CompetencyScoreDto {
   competencyId: string;
   score: number;
   openText?: string;
+}
+
+export interface CompetencyCluster {
+  id: string;
+  name: string;
+  description?: string;
+  behaviours: Array<{ id: string; statement: string; displayOrder: number }>;
+}
+
+interface BehaviourRating {
+  behaviourId: string;
+  score: number;
 }
 
 export interface AggregatedScore {
@@ -53,6 +66,8 @@ export class Uc1FeedbackService {
     private readonly assessmentRepo: Repository<Assessment>,
     @InjectRepository(AssessmentParticipant)
     private readonly participantRepo: Repository<AssessmentParticipant>,
+    @InjectRepository(Competency)
+    private readonly competencyRepo: Repository<Competency>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -103,6 +118,9 @@ export class Uc1FeedbackService {
 
     const created: RaterNomination[] = [];
 
+    const tokenExpires = new Date();
+    tokenExpires.setDate(tokenExpires.getDate() + 14);
+
     for (const rater of raters) {
       const email = rater.raterEmail.toLowerCase();
 
@@ -118,12 +136,27 @@ export class Uc1FeedbackService {
         raterName: rater.raterName ?? null,
         relationship: rater.relationship,
         token: uuidv4(),
-        status: 'pending',
+        status: 'approved',
+        tokenExpires,
       });
 
       const saved = await this.nominationRepo.save(nomination);
       created.push(saved);
       existingEmails.add(email);
+
+      const raterUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/rater/${saved.token}`;
+      try {
+        await this.notificationsService.sendRaterInvitation(
+          saved.raterEmail,
+          saved.raterName ?? 'Colleague',
+          assessment.title,
+          raterUrl,
+          'Your responses are completely anonymous (minimum 3 per rater group required).',
+          { orgId },
+        );
+      } catch (err: any) {
+        this.logger.warn(`Failed to send rater invitation to ${saved.raterEmail}: ${err?.message}`);
+      }
     }
 
     this.logger.log(
@@ -180,6 +213,8 @@ export class Uc1FeedbackService {
     nominationId: string;
     assessmentTitle: string;
     participantName: string;
+    completionMinutes: number;
+    language: string;
     relationship: RaterRelationship;
     tokenExpires: Date | null;
   }> {
@@ -213,13 +248,124 @@ export class Uc1FeedbackService {
       ? `${user.firstName} ${user.lastName}`
       : 'the participant';
 
+    const competencyCount = ((nomination.assessment?.config as any)?.competencyIds as string[] | undefined)?.length ?? 5;
+
     return {
       nominationId: nomination.id,
       assessmentTitle: nomination.assessment?.title ?? '',
       participantName,
+      completionMinutes: Math.max(5, competencyCount * 3),
+      language: 'en',
       relationship: nomination.relationship as RaterRelationship,
       tokenExpires: nomination.tokenExpires,
     };
+  }
+
+  async getRaterCompetencies(token: string): Promise<CompetencyCluster[]> {
+    const nomination = await this.nominationRepo.findOne({
+      where: { token },
+      relations: ['assessment'],
+    });
+
+    if (!nomination) throw new NotFoundException('Invalid rater token');
+    if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
+    if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
+      throw new ForbiddenException('Rater token has expired');
+    }
+
+    const competencyIds = (nomination.assessment?.config as any)?.competencyIds as string[] | undefined;
+    const orgId = nomination.assessment?.organisationId;
+
+    let competencies: Competency[];
+    if (competencyIds?.length) {
+      competencies = await this.competencyRepo.find({
+        where: { id: In(competencyIds) },
+        relations: ['behaviours'],
+        order: { displayOrder: 'ASC' },
+      });
+      const orderMap = new Map(competencyIds.map((id, i) => [id, i]));
+      competencies.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+    } else {
+      competencies = await this.competencyRepo.find({
+        where: [
+          { organisationId: orgId, isActive: true },
+          { organisationId: IsNull(), isActive: true },
+        ],
+        relations: ['behaviours'],
+        order: { displayOrder: 'ASC' },
+      });
+    }
+
+    return competencies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description ?? undefined,
+      behaviours: (c.behaviours ?? [])
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((b) => ({ id: b.id, statement: b.statement, displayOrder: b.displayOrder })),
+    }));
+  }
+
+  async saveRaterBehaviourResponses(
+    token: string,
+    competencyId: string,
+    ratings: BehaviourRating[],
+    comment: string,
+  ): Promise<void> {
+    const nomination = await this.nominationRepo.findOne({ where: { token } });
+    if (!nomination) throw new NotFoundException('Invalid rater token');
+    if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
+    if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
+      throw new ForbiddenException('Rater token has expired');
+    }
+
+    const avgScore =
+      ratings.length > 0
+        ? Math.round((ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length) * 100) / 100
+        : null;
+
+    const existing = await this.responseRepo.findOne({
+      where: { nominationId: nomination.id, competencyId },
+    });
+
+    if (existing) {
+      existing.score = avgScore;
+      existing.behaviourScores = ratings;
+      existing.openText = comment || null;
+      await this.responseRepo.save(existing);
+    } else {
+      await this.responseRepo.save(
+        this.responseRepo.create({
+          nominationId: nomination.id,
+          competencyId,
+          score: avgScore,
+          behaviourScores: ratings,
+          openText: comment || null,
+        }),
+      );
+    }
+  }
+
+  async submitRaterOverall(
+    token: string,
+    overallRating: number,
+    developmentComment: string | undefined,
+  ): Promise<{ nominationId: string }> {
+    const nomination = await this.nominationRepo.findOne({ where: { token } });
+    if (!nomination) throw new NotFoundException('Invalid rater token');
+    if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
+    if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
+      throw new ForbiddenException('Rater token has expired');
+    }
+
+    nomination.overallRating = overallRating;
+    nomination.developmentComment = developmentComment ?? null;
+    nomination.status = 'completed';
+    nomination.completedAt = new Date();
+    await this.nominationRepo.save(nomination);
+
+    this.logger.log(`Rater overall submitted for nomination ${nomination.id}`);
+    return { nominationId: nomination.id };
   }
 
   async submitRaterResponse(
@@ -401,6 +547,34 @@ export class Uc1FeedbackService {
       where: { assessmentId, participantId, status: 'completed' },
       relations: ['responses'],
     });
+  }
+
+  async saveParticipantResponses(
+    assessmentId: string,
+    participantId: string,
+    orgId: string,
+    responses: Record<string, any>,
+  ): Promise<void> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) {
+      throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+
+    const participant = await this.participantRepo.findOne({
+      where: { id: participantId, assessmentId },
+    });
+    if (!participant) {
+      throw new NotFoundException(`Participant ${participantId} not found`);
+    }
+
+    participant.responses = responses;
+    participant.status = 'completed';
+    participant.completedAt = new Date();
+    await this.participantRepo.save(participant);
+
+    this.logger.log(`Saved feedback responses for participant ${participantId} in assessment ${assessmentId}`);
   }
 
   async sendReminders(assessmentId: string, orgId: string): Promise<{ sent: number }> {

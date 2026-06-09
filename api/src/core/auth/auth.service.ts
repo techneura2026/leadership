@@ -75,7 +75,7 @@ export class AuthService {
   async refresh(
     refreshToken: string,
     req: { ip?: string; headers: Record<string, string | string[] | undefined> },
-  ): Promise<Pick<AuthResponseDto, 'accessToken'> & { refreshToken: string }> {
+  ): Promise<AuthResponseDto & { refreshToken: string }> {
     const session = await this.usersService.findSessionByToken(refreshToken);
     if (!session) {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -105,7 +105,38 @@ export class AuthService {
     });
 
     const accessToken = this.signAccessToken(user);
-    return { accessToken, refreshToken: newRefreshToken };
+    const org = await this.orgsService.findById(user.organisationId);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: {
+        id: user.id,
+        organisationId: user.organisationId,
+        departmentId: user.departmentId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        jobTitle: user.jobTitle,
+        avatarUrl: user.avatarUrl,
+        languagePref: user.languagePref,
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt.toISOString(),
+      },
+      organisation: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logoUrl: org.logoUrl,
+        primaryColour: org.primaryColour,
+        plan: org.plan,
+        trialEndsAt: org.trialEndsAt?.toISOString() ?? null,
+        isActive: org.isActive,
+        createdAt: org.createdAt.toISOString(),
+      },
+    } as AuthResponseDto & { refreshToken: string };
   }
 
   async getMe(userId: string): Promise<{ user: UserDto; organisation: OrganisationDto }> {

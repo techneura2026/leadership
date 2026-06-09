@@ -33,6 +33,8 @@ export interface AssessmentChatbotProps {
   context?: string;
   /** Called when the user clicks "Add to form" on a generated question set */
   onInsertQuestions?: (questions: GeneratedQuestion[]) => void;
+  /** Optional quick-prompt chips shown before the first message. Falls back to the default 360° prompts. */
+  quickPrompts?: string[];
 }
 
 // ── Quick-prompt chips ─────────────────────────────────────────────────────────
@@ -44,7 +46,8 @@ const QUICK_PROMPTS = [
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export function AssessmentChatbot({ context, onInsertQuestions }: AssessmentChatbotProps) {
+export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: AssessmentChatbotProps) {
+  const activePrompts = quickPrompts ?? QUICK_PROMPTS;
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -274,7 +277,7 @@ export function AssessmentChatbot({ context, onInsertQuestions }: AssessmentChat
           {/* Quick prompts — shown only when there's just the initial message */}
           {messages.length === 1 && !isLoading && (
             <div className="px-4 pb-2 flex flex-wrap gap-1.5 shrink-0">
-              {QUICK_PROMPTS.map((prompt) => (
+              {activePrompts.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => send(prompt)}

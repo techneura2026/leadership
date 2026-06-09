@@ -62,7 +62,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-6">
-          © {new Date().getFullYear()} TechNeura Consulting · All rights reserved
+          © 2026 TechNeura Labs · All rights reserved
         </p>
       </div>
     </div>

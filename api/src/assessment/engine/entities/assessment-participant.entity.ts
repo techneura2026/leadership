@@ -40,6 +40,9 @@ export class AssessmentParticipant {
   @Column({ length: 50, default: 'invited' })
   status: string; // invited | in_progress | completed | withdrawn
 
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  responses: Record<string, any> | null;
+
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
   completedAt: Date | null;
 
