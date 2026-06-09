@@ -37,6 +37,9 @@ export class RaterResponse {
   @Column({ name: 'open_text', type: 'text', nullable: true })
   openText: string | null;
 
+  @Column({ name: 'behaviour_scores', type: 'jsonb', nullable: true })
+  behaviourScores: Array<{ behaviourId: string; score: number }> | null;
+
   @CreateDateColumn({ name: 'responded_at' })
   respondedAt: Date;
 }

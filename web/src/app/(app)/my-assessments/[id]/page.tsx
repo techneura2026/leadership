@@ -103,10 +103,21 @@ export default function AssessmentDetailPage() {
   const isInProgress = participantStatus === 'in_progress';
   const canViewResults = isCompleted && assessment.assessmentType === AssessmentType.PERSONALITY;
 
+  const isFutureStart = (() => {
+    if (!assessment.startDate) return false;
+    const start = new Date(assessment.startDate);
+    start.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return start > today;
+  })();
+
   function getCtaLabel() {
     if (canViewResults) return 'View My Results';
     if (isCompleted) return 'Assessment Completed';
     if (isInProgress) return 'Continue Assessment';
+    if (isFutureStart && assessment?.startDate)
+      return `Available from ${format(new Date(assessment.startDate), 'dd MMM yyyy')}`;
     return meta.participantAction;
   }
 
@@ -145,6 +156,11 @@ export default function AssessmentDetailPage() {
               {!isCompleted && !isInProgress && <Badge variant="neutral">Not Started</Badge>}
             </div>
             <h1 className="text-xl font-semibold text-gray-900">{assessment.title}</h1>
+            {isFutureStart && assessment.startDate && (
+              <p className="text-sm text-orange-500 mt-1 font-medium">
+                Opens: {format(new Date(assessment.startDate), 'dd MMM yyyy')}
+              </p>
+            )}
             {assessment.endDate && (
               <p className="text-sm text-gray-500 mt-1">
                 Due: {format(new Date(assessment.endDate), 'dd MMM yyyy')}
@@ -165,7 +181,7 @@ export default function AssessmentDetailPage() {
       {/* CTA */}
       <button
         onClick={handleCta}
-        disabled={isCompleted && !canViewResults}
+        disabled={(isCompleted && !canViewResults) || isFutureStart}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl py-3.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {getCtaLabel()}

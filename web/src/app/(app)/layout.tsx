@@ -18,22 +18,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // On mount, try to restore session via refresh cookie
+    // On mount, restore session via refresh cookie — single request returns token + user + org
     api
-      .post<{ data: { accessToken: string } }>('/auth/refresh')
-      .then(async (res) => {
-        const token = res.data.data.accessToken;
-        useAuthStore.getState().setAccessToken(token);
-
-        try {
-          // Re-fetch user info with the new token
-          const resMe = await api.post<{ data: { user: UserDto; organisation: OrganisationDto } }>('/auth/me');
-          const { user, organisation } = resMe.data.data;
-          useAuthStore.getState().setAuth(token, user, organisation);
-          setHydrated();
-        } catch (err) {
-          router.replace('/login');
-        }
+      .post<{ data: { accessToken: string; user: UserDto; organisation: OrganisationDto } }>('/auth/refresh')
+      .then((res) => {
+        const { accessToken: token, user, organisation } = res.data.data;
+        useAuthStore.getState().setAuth(token, user, organisation);
+        setHydrated();
       })
       .catch(() => {
         router.replace('/login');

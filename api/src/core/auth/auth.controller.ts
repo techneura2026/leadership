@@ -79,7 +79,7 @@ export class AuthController {
     try {
       const result = await this.authService.refresh(token, req as any);
       setRefreshCookie(res, result.refreshToken);
-      return { accessToken: result.accessToken };
+      return { accessToken: result.accessToken, user: result.user, organisation: result.organisation };
     } catch (err) {
       clearRefreshCookie(res);
       throw err;

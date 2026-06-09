@@ -14,6 +14,8 @@ import type { AssessmentConfig, PlanLimits } from '@leaderprism/shared';
 import { Assessment } from './entities/assessment.entity';
 import { AssessmentParticipant } from './entities/assessment-participant.entity';
 import { Organisation } from '../../core/organisations/entities/organisation.entity';
+import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entity';
+import { User } from '../../core/users/entities/user.entity';
 
 // Plan limits map
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -116,6 +118,10 @@ export class EngineService {
     private readonly participantRepo: Repository<AssessmentParticipant>,
     @InjectRepository(Organisation)
     private readonly orgRepo: Repository<Organisation>,
+    @InjectRepository(RaterNomination)
+    private readonly nominationRepo: Repository<RaterNomination>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
@@ -272,7 +278,7 @@ export class EngineService {
   async addParticipant(
     assessmentId: string,
     orgId: string,
-    userId: string,
+    emailOrUserId: string,
   ): Promise<AssessmentParticipant> {
     const assessment = await this.findOne(assessmentId, orgId);
 
@@ -280,12 +286,24 @@ export class EngineService {
       throw new BadRequestException('Cannot add participants to a closed or archived assessment');
     }
 
+    // Resolve to a userId — accept either a plain UUID or an email address
+    let userId: string = emailOrUserId;
+    if (emailOrUserId.includes('@')) {
+      const user = await this.userRepo.findOne({
+        where: { email: emailOrUserId.toLowerCase(), organisationId: orgId },
+      });
+      if (!user) {
+        throw new NotFoundException(`No user found with email ${emailOrUserId} in this organisation`);
+      }
+      userId = user.id;
+    }
+
     // Check for existing participant
     const existing = await this.participantRepo.findOne({
       where: { assessmentId, userId },
     });
     if (existing) {
-      throw new BadRequestException(`User ${userId} is already a participant in this assessment`);
+      throw new BadRequestException(`User is already a participant in this assessment`);
     }
 
     // Plan limits check (only checked during addParticipant for active/non-draft assessments)
@@ -340,14 +358,25 @@ export class EngineService {
   async findMine(
     userId: string,
     orgId: string,
-  ): Promise<Array<Assessment & { participantStatus: string; completionPercentage: number }>> {
+    userEmail: string,
+  ): Promise<
+    Array<
+      Assessment & {
+        participantStatus: string;
+        completionPercentage: number;
+        isRater?: boolean;
+        raterToken?: string;
+        nominationStatus?: string;
+      }
+    >
+  > {
     const participations = await this.participantRepo.find({
       where: { userId },
       relations: ['assessment'],
       order: { createdAt: 'DESC' },
     });
 
-    return participations
+    const participantItems = participations
       .filter(
         (p) =>
           p.assessment &&
@@ -359,5 +388,36 @@ export class EngineService {
         participantStatus: p.status as any,
         completionPercentage: p.status === 'completed' ? 100 : p.status === 'in_progress' ? 50 : 0,
       }));
+
+    // Also return 360 feedback assessments where user is a nominated rater
+    const nominations = await this.nominationRepo.find({
+      where: { raterEmail: userEmail.toLowerCase() },
+      relations: ['assessment'],
+      order: { createdAt: 'DESC' },
+    });
+
+    const participantAssessmentIds = new Set(participantItems.map((a) => a.id));
+
+    const raterItems = nominations
+      .filter(
+        (n) =>
+          n.assessment &&
+          n.assessment.organisationId === orgId &&
+          n.assessment.status === AssessmentStatus.ACTIVE &&
+          n.status !== 'declined' &&
+          n.status !== 'pending' &&
+          // skip if user is already listed as a regular participant for same assessment
+          !participantAssessmentIds.has(n.assessmentId),
+      )
+      .map((n) => ({
+        ...n.assessment,
+        participantStatus: n.status === 'completed' ? 'completed' : ('not_started' as any),
+        completionPercentage: n.status === 'completed' ? 100 : 0,
+        isRater: true,
+        raterToken: n.token,
+        nominationStatus: n.status,
+      }));
+
+    return [...participantItems, ...raterItems];
   }
 }

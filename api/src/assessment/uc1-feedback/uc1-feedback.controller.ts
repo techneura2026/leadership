@@ -72,6 +72,23 @@ export class Uc1FeedbackController {
     return this.uc1Service.get360Scores(assessmentId, participantId, req.user.orgId);
   }
 
+  @Post('assessments/:id/360/participant-responses/:participantId')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Submit custom question responses for a 360 feedback assessment' })
+  saveParticipantResponses(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) assessmentId: string,
+    @Param('participantId', ParseUUIDPipe) participantId: string,
+    @Body() body: { responses: Record<string, any> },
+  ) {
+    return this.uc1Service.saveParticipantResponses(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      body.responses,
+    );
+  }
+
   @Post('assessments/:id/360/reminders')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Send reminders to incomplete raters' })
@@ -87,26 +104,37 @@ export class Uc1FeedbackController {
     return this.uc1Service.getRaterLanding(token);
   }
 
+  @Get('rater/:token/competencies')
+  @ApiOperation({ summary: 'Get competency clusters with behaviours for this rater token' })
+  getRaterCompetencies(@Param('token') token: string) {
+    return this.uc1Service.getRaterCompetencies(token);
+  }
+
   @Post('rater/:token/responses')
-  @ApiOperation({ summary: 'Submit rater responses' })
-  submitRaterResponse(
+  @ApiOperation({ summary: 'Save per-competency behaviour ratings (auto-save, idempotent)' })
+  saveRaterBehaviourResponses(
     @Param('token') token: string,
     @Body()
     body: {
-      competencyScores: Array<{
-        competencyId: string;
-        score: number;
-        openText?: string;
-      }>;
-      overallScore: number;
-      openComments: string[];
+      competencyId: string;
+      ratings: Array<{ behaviourId: string; score: number }>;
+      comment: string;
     },
   ) {
-    return this.uc1Service.submitRaterResponse(
+    return this.uc1Service.saveRaterBehaviourResponses(
       token,
-      body.competencyScores,
-      body.overallScore,
-      body.openComments,
+      body.competencyId,
+      body.ratings,
+      body.comment,
     );
+  }
+
+  @Post('rater/:token/overall')
+  @ApiOperation({ summary: 'Submit overall rating and mark feedback as complete' })
+  submitRaterOverall(
+    @Param('token') token: string,
+    @Body() body: { overallRating: number; developmentComment?: string },
+  ) {
+    return this.uc1Service.submitRaterOverall(token, body.overallRating, body.developmentComment);
   }
 }

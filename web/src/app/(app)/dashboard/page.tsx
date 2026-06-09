@@ -2,26 +2,93 @@
 
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { useApi } from '@/hooks/useApi';
 import { Badge } from '@/components/ui/Badge';
-import { PageSpinner, Spinner } from '@/components/ui/Spinner';
 import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
 import { useAuthStore } from '@/store/auth.store';
-import { useState } from 'react';
-import { AssessmentDto, AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from 'recharts';
+import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 
-interface DashboardMetrics {
-  activeAssessments: number;
-  totalParticipants: number;
-  pendingResponses: number;
-  reportsGenerated: number;
-  recentAssessments: AssessmentDto[];
-}
+// ── Mock Data ─────────────────────────────────────────────────────────────────
 
-interface RadarAggregate {
-  competencyRadar: RadarAxis[];
-  personalityRadar: RadarAxis[];
-}
+const MOCK_METRICS = {
+  activeAssessments: 12,
+  totalParticipants: 87,
+  pendingResponses: 23,
+  reportsGenerated: 45,
+  recentAssessments: [
+    { id: '1', title: 'Q2 Leadership 360 Review', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-28T09:00:00Z' },
+    { id: '2', title: 'Senior Manager Competency Assessment', assessmentType: AssessmentType.COMPETENCY, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-22T11:30:00Z' },
+    { id: '3', title: 'Personality Profiling – Cohort A', assessmentType: AssessmentType.PERSONALITY, status: AssessmentStatus.CLOSED, createdAt: '2026-05-10T08:15:00Z' },
+    { id: '4', title: 'Leadership Readiness – Batch 2026', assessmentType: AssessmentType.READINESS, status: AssessmentStatus.ACTIVE, createdAt: '2026-04-30T14:00:00Z' },
+    { id: '5', title: 'Mid-Year 360 Feedback', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.DRAFT, createdAt: '2026-04-18T10:45:00Z' },
+  ],
+};
+
+const MOCK_ORG_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
+  competencyRadar: [
+    { key: 'leadership', label: 'Leadership', value: 74 },
+    { key: 'communication', label: 'Communication', value: 81 },
+    { key: 'strategic', label: 'Strategic Thinking', value: 65 },
+    { key: 'teamBuilding', label: 'Team Building', value: 78 },
+    { key: 'innovation', label: 'Innovation', value: 59 },
+    { key: 'decision', label: 'Decision Making', value: 72 },
+  ],
+  personalityRadar: [
+    { key: 'openness', label: 'Openness', value: 68 },
+    { key: 'conscientiousness', label: 'Conscientiousness', value: 77 },
+    { key: 'extraversion', label: 'Extraversion', value: 62 },
+    { key: 'agreeableness', label: 'Agreeableness', value: 83 },
+    { key: 'neuroticism', label: 'Neuroticism', value: 42 },
+  ],
+};
+
+const MOCK_USER_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
+  competencyRadar: [
+    { key: 'leadership', label: 'Leadership', value: 80 },
+    { key: 'communication', label: 'Communication', value: 73 },
+    { key: 'strategic', label: 'Strategic Thinking', value: 88 },
+    { key: 'teamBuilding', label: 'Team Building', value: 65 },
+    { key: 'innovation', label: 'Innovation', value: 70 },
+    { key: 'decision', label: 'Decision Making', value: 85 },
+  ],
+  personalityRadar: [
+    { key: 'openness', label: 'Openness', value: 72 },
+    { key: 'conscientiousness', label: 'Conscientiousness', value: 85 },
+    { key: 'extraversion', label: 'Extraversion', value: 55 },
+    { key: 'agreeableness', label: 'Agreeableness', value: 79 },
+    { key: 'neuroticism', label: 'Neuroticism', value: 35 },
+  ],
+};
+
+const MOCK_MONTHLY_ACTIVITY = [
+  { month: 'Jan', completed: 8, launched: 11 },
+  { month: 'Feb', completed: 14, launched: 17 },
+  { month: 'Mar', completed: 19, launched: 22 },
+  { month: 'Apr', completed: 12, launched: 15 },
+  { month: 'May', completed: 24, launched: 28 },
+  { month: 'Jun', completed: 18, launched: 21 },
+];
+
+const MOCK_PARTICIPANT_TREND = [
+  { month: 'Jan', participants: 42 },
+  { month: 'Feb', participants: 55 },
+  { month: 'Mar', participants: 63 },
+  { month: 'Apr', participants: 71 },
+  { month: 'May', participants: 80 },
+  { month: 'Jun', participants: 87 },
+];
+
+// ── Label Maps ────────────────────────────────────────────────────────────────
 
 const TYPE_LABELS: Record<AssessmentType, string> = {
   [AssessmentType.FEEDBACK_360]: '360°',
@@ -39,12 +106,18 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
 
 // ── Shared Radar View ────────────────────────────────────────────────────────
 
-function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: string }) {
+function RadarViews({
+  radarData,
+  title,
+}: {
+  radarData: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] };
+  title: string;
+}) {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 mb-8 hover:shadow-md transition-shadow">
       <h2 className="text-xl font-bold text-gray-900 mb-8">{title}</h2>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-10 sm:gap-14">
-        {radarData.competencyRadar && radarData.competencyRadar.length >= 3 ? (
+        {radarData.competencyRadar.length >= 3 ? (
           <div className="flex flex-col items-center">
             <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">COMPETENCY PROFILE</h3>
             <div className="w-full flex justify-center items-center px-2 sm:px-8 py-4 [&_svg]:overflow-visible">
@@ -57,7 +130,7 @@ function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: st
           </div>
         )}
 
-        {radarData.personalityRadar && radarData.personalityRadar.length >= 3 ? (
+        {radarData.personalityRadar.length >= 3 ? (
           <div className="flex flex-col items-center">
             <h3 className="text-sm font-semibold text-gray-700 mb-6 tracking-wide">PERSONALITY PROFILE</h3>
             <div className="w-full flex justify-center items-center px-2 sm:px-8 py-4 [&_svg]:overflow-visible">
@@ -74,27 +147,84 @@ function RadarViews({ radarData, title }: { radarData: RadarAggregate; title: st
   );
 }
 
+// ── Activity Charts ───────────────────────────────────────────────────────────
+
+function ActivityCharts() {
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+      {/* Monthly Completions */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Monthly Assessment Activity</h2>
+        <p className="text-sm text-gray-500 mb-6">Launched vs. completed assessments</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={MOCK_MONTHLY_ACTIVITY} barGap={4} barCategoryGap="30%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
+              cursor={{ fill: '#f9fafb' }}
+            />
+            <Bar dataKey="launched" name="Launched" fill="#bfdbfe" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="completed" name="Completed" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex gap-5 mt-4">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="inline-block w-3 h-3 rounded-sm bg-blue-200" /> Launched
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="inline-block w-3 h-3 rounded-sm bg-blue-500" /> Completed
+          </span>
+        </div>
+      </div>
+
+      {/* Participant Growth */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Participant Growth</h2>
+        <p className="text-sm text-gray-500 mb-6">Total participants over the past 6 months</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={MOCK_PARTICIPANT_TREND}>
+            <defs>
+              <linearGradient id="participantGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#a855f7" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
+            <Tooltip
+              contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
+              cursor={{ stroke: '#e9d5ff' }}
+            />
+            <Area
+              type="monotone"
+              dataKey="participants"
+              name="Participants"
+              stroke="#a855f7"
+              strokeWidth={2.5}
+              fill="url(#participantGradient)"
+              dot={{ r: 4, fill: '#a855f7', stroke: 'white', strokeWidth: 2 }}
+              activeDot={{ r: 6 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 // ── User Dashboard ────────────────────────────────────────────────────────────
 
 function UserDashboard() {
-  const { data: radarData, isLoading } = useApi<RadarAggregate>('/analytics/radar/me');
-
-  if (isLoading) return <PageSpinner />;
-
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
         <p className="text-base text-gray-500 mt-1">Your aggregated assessment insights</p>
       </div>
-
-      {radarData ? (
-        <RadarViews radarData={radarData} title="My Aggregate Profile" />
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-500 shadow-sm">
-          Complete some assessments to see your aggregate charts here.
-        </div>
-      )}
+      <RadarViews radarData={MOCK_USER_RADAR} title="My Aggregate Profile" />
     </div>
   );
 }
@@ -103,21 +233,11 @@ function UserDashboard() {
 
 function AdminDashboard() {
   const router = useRouter();
-  const { data: metrics, isLoading: loadingMetrics } = useApi<DashboardMetrics>('/analytics/dashboard');
-  const { data: orgRadarData, isLoading: loadingOrgRadar } = useApi<RadarAggregate>('/analytics/radar/org');
-
-  const [lookupUserId, setLookupUserId] = useState('');
-  const [activeLookupId, setActiveLookupId] = useState('');
-  const { data: userRadarData, isLoading: loadingUserRadar } = useApi<RadarAggregate>(
-    activeLookupId ? `/analytics/radar/user/${activeLookupId}` : null
-  );
-
-  if (loadingMetrics || loadingOrgRadar) return <PageSpinner />;
 
   const stats = [
     {
       label: 'Active Assessments',
-      value: metrics?.activeAssessments ?? 0,
+      value: MOCK_METRICS.activeAssessments,
       icon: (
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -128,7 +248,7 @@ function AdminDashboard() {
     },
     {
       label: 'Total Participants',
-      value: metrics?.totalParticipants ?? 0,
+      value: MOCK_METRICS.totalParticipants,
       icon: (
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -139,7 +259,7 @@ function AdminDashboard() {
     },
     {
       label: 'Pending Responses',
-      value: metrics?.pendingResponses ?? 0,
+      value: MOCK_METRICS.pendingResponses,
       icon: (
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -150,7 +270,7 @@ function AdminDashboard() {
     },
     {
       label: 'Reports Generated',
-      value: metrics?.reportsGenerated ?? 0,
+      value: MOCK_METRICS.reportsGenerated,
       icon: (
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -160,8 +280,6 @@ function AdminDashboard() {
       glow: 'rgba(168,85,247,0.22)',
     },
   ];
-
-  const recentAssessments = metrics?.recentAssessments ?? [];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -181,9 +299,10 @@ function AdminDashboard() {
         </button>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
+          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <div className="flex items-start justify-between mb-5">
               <div
                 className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
@@ -198,37 +317,13 @@ function AdminDashboard() {
         ))}
       </div>
 
-      {orgRadarData && (
-        <RadarViews radarData={orgRadarData} title="Organisation Aggregate Charts" />
-      )}
+      {/* Activity Charts */}
+      <ActivityCharts />
 
-      {/* User specific radar charts lookup */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 mb-10 hover:shadow-md transition-shadow">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Participant Analysis</h2>
-        <div className="flex gap-4 mb-8 max-w-lg">
-          <input
-            type="text"
-            placeholder="Enter Participant ID (UUID)"
-            value={lookupUserId}
-            onChange={(e) => setLookupUserId(e.target.value)}
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-          />
-          <button
-            onClick={() => setActiveLookupId(lookupUserId)}
-            className="px-6 py-3 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-all hover:shadow-lg active:scale-95"
-          >
-            View Charts
-          </button>
-        </div>
+      {/* Org Radar Charts */}
+      <RadarViews radarData={MOCK_ORG_RADAR} title="Organisation Aggregate Charts" />
 
-        {loadingUserRadar && <Spinner className="mx-auto my-10" />}
-        {!loadingUserRadar && userRadarData && activeLookupId && (
-          <div className="pt-8 border-t border-gray-100">
-            <RadarViews radarData={userRadarData} title={`Charts for ${activeLookupId}`} />
-          </div>
-        )}
-      </div>
-
+      {/* Recent Assessments */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-lg font-bold text-gray-900">Recent Assessments</h2>
@@ -240,53 +335,45 @@ function AdminDashboard() {
           </button>
         </div>
 
-        {recentAssessments.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <p className="text-base text-gray-500 mb-4">No assessments yet.</p>
-            <button
-              onClick={() => router.push('/assessments/new')}
-              className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
+        <div className="divide-y divide-gray-100">
+          {MOCK_METRICS.recentAssessments.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+              onClick={() => router.push(`/assessments/${a.id}`)}
             >
-              Create your first assessment →
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {recentAssessments.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => router.push(`/assessments/${a.id}`)}
-              >
-                <div className="flex-1 min-w-0 pr-4">
-                  <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
-                  <p className="text-sm text-gray-500">
-                    {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>{' '}
-                    {TYPE_LABELS[a.assessmentType]}
-                  </p>
-                </div>
-                <Badge variant={STATUS_VARIANT[a.status]}>
-                  {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-                </Badge>
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
+                <p className="text-sm text-gray-500">
+                  {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>
+                  {TYPE_LABELS[a.assessmentType]}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
+              <Badge variant={STATUS_VARIANT[a.status]}>
+                {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+              </Badge>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
 
-  if (!user) return <PageSpinner />;
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const isAdmin = user.role === UserRole.ORG_ADMIN || user.role === UserRole.HR_MANAGER;
 
-  if (isAdmin) {
-    return <AdminDashboard />;
-  }
-
-  return <UserDashboard />;
+  return isAdmin ? <AdminDashboard /> : <UserDashboard />;
 }

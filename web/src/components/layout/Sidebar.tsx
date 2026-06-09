@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
@@ -77,8 +78,6 @@ export function Sidebar() {
     (item) => !item.roles || (user && item.roles.includes(user.role)),
   );
 
-  const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
-
   return (
     <aside className="hidden md:flex flex-col w-64 shrink-0" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
       {/* Brand header */}
@@ -126,32 +125,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Divider */}
-      <div className="mx-4" style={{ borderTop: '1px solid var(--sidebar-border)' }} />
-
-      {/* User card */}
-      <div className="px-4 py-4">
-        <div
-          className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors"
-          style={{ cursor: 'default' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'var(--sidebar-item-hover)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'; }}
-        >
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #4f46e5 100%)' }}
-          >
-            {initials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-white truncate leading-none">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-[11px] capitalize mt-1 leading-none" style={{ color: 'var(--sidebar-text)' }}>
-              {user?.role?.replace(/_/g, ' ')}
-            </p>
-          </div>
-        </div>
+      {/* Powered by */}
+      <div className="px-4 pb-4 flex items-center justify-center gap-2">
+        <span className="text-[10px] font-medium" style={{ color: 'var(--sidebar-text)' }}>Powered by</span>
+        <Image
+          src="/logo-techneura.png"
+          alt="TechNeura Labs"
+          width={56}
+          height={14}
+          className="object-contain opacity-70"
+          style={{ filter: 'brightness(0) invert(1)' }}
+        />
       </div>
     </aside>
   );

@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { useApi } from '@/hooks/useApi';
 import { Badge } from '@/components/ui/Badge';
-import { PageSpinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AssessmentDto, AssessmentStatus, AssessmentType } from '@leaderprism/shared';
 
@@ -25,14 +23,58 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
   [AssessmentStatus.ARCHIVED]: 'neutral',
 };
 
+const MOCK_ASSESSMENTS: AssessmentDto[] = [
+  {
+    id: '1',
+    organisationId: 'org-demo',
+    title: 'Annual Leadership 360° Review 2025',
+    assessmentType: AssessmentType.FEEDBACK_360,
+    status: AssessmentStatus.ACTIVE,
+    config: {},
+    startDate: '2025-05-01T00:00:00.000Z',
+    endDate: '2025-07-31T00:00:00.000Z',
+    createdAt: '2025-04-15T00:00:00.000Z',
+  },
+  {
+    id: '2',
+    organisationId: 'org-demo',
+    title: 'Q2 Leadership Competency Assessment',
+    assessmentType: AssessmentType.COMPETENCY,
+    status: AssessmentStatus.DRAFT,
+    config: {},
+    startDate: '2025-06-01T00:00:00.000Z',
+    endDate: '2025-08-31T00:00:00.000Z',
+    createdAt: '2025-05-20T00:00:00.000Z',
+  },
+  {
+    id: '3',
+    organisationId: 'org-demo',
+    title: 'Big Five Personality Profiling — Cohort 2025',
+    assessmentType: AssessmentType.PERSONALITY,
+    status: AssessmentStatus.CLOSED,
+    config: {},
+    startDate: '2025-03-01T00:00:00.000Z',
+    endDate: '2025-04-30T00:00:00.000Z',
+    createdAt: '2025-02-15T00:00:00.000Z',
+  },
+  {
+    id: '4',
+    organisationId: 'org-demo',
+    title: 'Leadership Readiness Assessment Q3 2025',
+    assessmentType: AssessmentType.READINESS,
+    status: AssessmentStatus.ACTIVE,
+    config: {},
+    startDate: '2025-06-15T00:00:00.000Z',
+    endDate: '2025-09-30T00:00:00.000Z',
+    createdAt: '2025-06-01T00:00:00.000Z',
+  },
+];
+
 export default function AssessmentsPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterTab>('all');
-  const { data: assessmentsResult, error, isLoading } = useApi<{ data: AssessmentDto[] }>('/assessments');
-  const assessments = assessmentsResult?.data;
 
-  const filtered =
-    assessments?.filter((a) => filter === 'all' || a.status === filter) ?? [];
+  const filtered = MOCK_ASSESSMENTS.filter((a) => filter === 'all' || a.status === filter);
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -62,8 +104,8 @@ export default function AssessmentsPage() {
       {/* Filter tabs */}
       <div className="flex items-center gap-1.5 mb-6 flex-wrap">
         {tabs.map((tab) => {
-          const count = tab.key !== 'all' && assessments
-            ? assessments.filter((a) => a.status === tab.key).length
+          const count = tab.key !== 'all'
+            ? MOCK_ASSESSMENTS.filter((a) => a.status === tab.key).length
             : null;
           return (
             <button
@@ -88,15 +130,7 @@ export default function AssessmentsPage() {
         })}
       </div>
 
-      {isLoading && <PageSpinner />}
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-          Failed to load assessments. Please try again.
-        </div>
-      )}
-
-      {!isLoading && !error && filtered.length === 0 && (
+      {filtered.length === 0 && (
         <EmptyState
           title="No assessments found"
           description={
@@ -109,7 +143,7 @@ export default function AssessmentsPage() {
         />
       )}
 
-      {!isLoading && filtered.length > 0 && (
+      {filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((assessment) => (
             <AssessmentCard
@@ -124,12 +158,6 @@ export default function AssessmentsPage() {
   );
 }
 
-const TYPE_GRADIENTS: Record<AssessmentType, string> = {
-  [AssessmentType.FEEDBACK_360]: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-  [AssessmentType.COMPETENCY]: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
-  [AssessmentType.PERSONALITY]: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-  [AssessmentType.READINESS]: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-};
 
 function AssessmentCard({
   assessment,
@@ -144,12 +172,6 @@ function AssessmentCard({
       onClick={onView}
     >
       <div className="flex items-start justify-between gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white text-xs font-bold"
-          style={{ background: TYPE_GRADIENTS[assessment.assessmentType] }}
-        >
-          {TYPE_LABELS[assessment.assessmentType].slice(0, 2)}
-        </div>
         <Badge variant={STATUS_VARIANT[assessment.status]}>
           {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
         </Badge>

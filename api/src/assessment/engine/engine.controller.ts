@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -47,7 +48,7 @@ export class EngineController {
   @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
   @ApiOperation({ summary: 'Get active assessments the current user is a participant in' })
   findMine(@Request() req: any) {
-    return this.engineService.findMine(req.user.sub, req.user.orgId);
+    return this.engineService.findMine(req.user.sub, req.user.orgId, req.user.email);
   }
 
   @Get(':id')
@@ -78,13 +79,17 @@ export class EngineController {
   }
 
   @Post(':id/participants')
-  @ApiOperation({ summary: 'Add a participant to an assessment' })
+  @ApiOperation({ summary: 'Add a participant to an assessment (accepts email or userId)' })
   addParticipant(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('userId') userId: string,
+    @Body() body: { email?: string; userId?: string },
   ) {
-    return this.engineService.addParticipant(id, req.user.orgId, userId);
+    const emailOrUserId = body.email ?? body.userId;
+    if (!emailOrUserId) {
+      throw new BadRequestException('email or userId is required');
+    }
+    return this.engineService.addParticipant(id, req.user.orgId, emailOrUserId);
   }
 
   @Get(':id/participants')
