@@ -820,6 +820,8 @@ function StepParticipants360({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [raterSearches, setRaterSearches] = useState<Record<string, string>>({});
   const [raterRelationships, setRaterRelationships] = useState<Record<string, RaterRelationship>>({});
+  const [relationshipMenuOpen, setRelationshipMenuOpen] = useState<Record<string, boolean>>({});
+  const relationshipMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const selectedIds = participants360.map((p) => p.userId);
 
@@ -855,6 +857,29 @@ function StepParticipants360({
     DIRECT_REPORT: 'bg-orange-100 text-orange-700',
   };
 
+  const RELATIONSHIP_OPTIONS: Array<{ value: RaterRelationship; label: string }> = [
+    { value: 'SUPERVISOR', label: 'Supervisor' },
+    { value: 'PEER', label: 'Peer' },
+    { value: 'DIRECT_REPORT', label: 'Direct Report' },
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      const openParticipantId = Object.keys(relationshipMenuOpen).find((id) => relationshipMenuOpen[id]);
+
+      if (!openParticipantId) return;
+
+      const menuWrapper = relationshipMenuRefs.current[openParticipantId];
+      if (menuWrapper && !menuWrapper.contains(target)) {
+        setRelationshipMenuOpen((prev) => ({ ...prev, [openParticipantId]: false }));
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [relationshipMenuOpen]);
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Participants & Feedback Givers</h2>
@@ -876,7 +901,7 @@ function StepParticipants360({
             className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
           />
           {participantSearch && filteredForParticipant.length > 0 && (
-            <div className="absolute z-10 top-full left-0 right-0 mt-1 border border-gray-200 rounded-xl shadow-lg bg-white overflow-hidden max-h-52 overflow-y-auto">
+            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm overflow-hidden max-h-56 overflow-y-auto divide-y divide-gray-100 dark:bg-gray-800/50">
               {filteredForParticipant.slice(0, 8).map((user) => (
                 <button
                   key={user.id}
@@ -885,7 +910,7 @@ function StepParticipants360({
                     setParticipantSearch('');
                     setExpandedId(user.id);
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 text-left transition-colors border-b border-gray-100 last:border-0"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors dark:hover:bg-gray-700/50 dark:hover:text-gray-200 rounded-xl dark:bg-gray-800/50"
                 >
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
                     {user.firstName[0]}{user.lastName[0]}
@@ -899,7 +924,7 @@ function StepParticipants360({
             </div>
           )}
           {participantSearch && filteredForParticipant.length === 0 && (
-            <div className="absolute z-10 top-full left-0 right-0 mt-1 border border-gray-200 rounded-xl shadow-lg bg-white px-3 py-3">
+            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm px-3 py-3 bg-gray-50 text-center">
               <p className="text-sm text-gray-400">No matching users found.</p>
             </div>
           )}
@@ -1001,7 +1026,7 @@ function StepParticipants360({
                             className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                           {raterSearch && filteredRaters.length > 0 && (
-                            <div className="absolute z-20 top-full left-0 right-0 mt-1 border border-gray-200 rounded-lg shadow-md bg-white overflow-hidden max-h-40 overflow-y-auto">
+                            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100">
                               {filteredRaters.slice(0, 6).map((user) => (
                                 <button
                                   key={user.id}
@@ -1015,29 +1040,78 @@ function StepParticipants360({
                                     });
                                     setRaterSearches((prev) => ({ ...prev, [participant.userId]: '' }));
                                   }}
-                                  className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-blue-50 text-left border-b border-gray-100 last:border-0"
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors rounded-lg mx-1 my-1"
                                 >
-                                  <span className="text-sm text-gray-900">{user.firstName} {user.lastName}</span>
-                                  <span className="text-xs text-gray-400 truncate">{user.email}</span>
+                                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
+                                    {user.firstName[0]}{user.lastName[0]}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                                    <p className="truncate text-xs text-gray-400">{user.email}</p>
+                                  </div>
                                 </button>
                               ))}
                             </div>
                           )}
                         </div>
-                        <select
-                          value={relationship}
-                          onChange={(e) =>
-                            setRaterRelationships((prev) => ({
-                              ...prev,
-                              [participant.userId]: e.target.value as RaterRelationship,
-                            }))
-                          }
-                          className="bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700 shrink-0"
-                        >
-                          <option value="SUPERVISOR">Supervisor</option>
-                          <option value="PEER">Peer</option>
-                          <option value="DIRECT_REPORT">Direct Report</option>
-                        </select>
+                        <div className="relative shrink-0" ref={(el) => { relationshipMenuRefs.current[participant.userId] = el; }}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRelationshipMenuOpen((prev) => ({
+                                ...prev,
+                                [participant.userId]: !prev[participant.userId],
+                              }))
+                            }
+                            className="flex min-w-[142px] items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-700 shadow-sm transition-all hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                          >
+                            <span>{RELATIONSHIP_LABELS[relationship]}</span>
+                            <svg
+                              className={cn('h-4 w-4 text-gray-400 transition-transform', relationshipMenuOpen[participant.userId] && 'rotate-180')}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {relationshipMenuOpen[participant.userId] && (
+                            <div className="absolute right-0 z-30 mt-1.5 w-full min-w-[160px] overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl">
+                              {RELATIONSHIP_OPTIONS.map((option) => {
+                                const selected = relationship === option.value;
+                                return (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => {
+                                      setRaterRelationships((prev) => ({
+                                        ...prev,
+                                        [participant.userId]: option.value,
+                                      }));
+                                      setRelationshipMenuOpen((prev) => ({
+                                        ...prev,
+                                        [participant.userId]: false,
+                                      }));
+                                    }}
+                                    className={cn(
+                                      'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
+                                      selected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50',
+                                    )}
+                                  >
+                                    <span>{option.label}</span>
+                                    {selected && (
+                                      <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1130,6 +1204,21 @@ function QuestionCard({
   onUpdate: (patch: Partial<FormQuestion>) => void;
   onRemove: () => void;
 }) {
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
+  const typeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (typeMenuRef.current && !typeMenuRef.current.contains(target)) {
+        setTypeMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   function updateOption(optId: string, text: string) {
     onUpdate({ options: question.options.map((o) => (o.id === optId ? { ...o, text } : o)) });
   }
@@ -1190,15 +1279,52 @@ function QuestionCard({
             className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-800 font-medium"
           />
           <div className="flex items-center gap-3 flex-wrap">
-            <select
-              value={question.type}
-              onChange={(e) => handleTypeChange(e.target.value as QuestionType)}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-            >
-              {QUESTION_TYPE_META.map((qt) => (
-                <option key={qt.type} value={qt.type}>{qt.label}</option>
-              ))}
-            </select>
+            <div className="relative" ref={typeMenuRef}>
+              <button
+                type="button"
+                onClick={() => setTypeMenuOpen((v) => !v)}
+                className="flex min-w-[150px] items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-all hover:border-blue-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <span>{QUESTION_TYPE_META.find((qt) => qt.type === question.type)?.label}</span>
+                <svg
+                  className={cn('h-4 w-4 text-gray-400 transition-transform', typeMenuOpen && 'rotate-180')}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {typeMenuOpen && (
+                <div className="absolute left-0 right-0 z-20 mt-1.5 overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl">
+                  {QUESTION_TYPE_META.map((qt) => {
+                    const selected = question.type === qt.type;
+                    return (
+                      <button
+                        key={qt.type}
+                        type="button"
+                        onClick={() => {
+                          handleTypeChange(qt.type);
+                          setTypeMenuOpen(false);
+                        }}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
+                          selected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50',
+                        )}
+                      >
+                        <span>{qt.label}</span>
+                        {selected && (
+                          <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <label className="flex items-center gap-1.5 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -1407,6 +1533,19 @@ function StepQuestions({
   onRemove: (id: string) => void;
 }) {
   const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const addQuestionMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (addQuestionMenuRef.current && !addQuestionMenuRef.current.contains(target)) {
+        setShowTypeMenu(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div>
@@ -1433,10 +1572,10 @@ function StepQuestions({
       </div>
 
       {/* Add question button with dropdown */}
-      <div className="relative">
+      <div className="relative" ref={addQuestionMenuRef}>
         <button
           onClick={() => setShowTypeMenu((v) => !v)}
-          className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-400 rounded-xl px-4 py-3 w-full transition-all hover:bg-blue-50"
+          className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-400 rounded-xl px-4 py-3 w-full transition-all hover:bg-gray-50 "
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -1444,12 +1583,12 @@ function StepQuestions({
           Add Question
         </button>
         {showTypeMenu && (
-          <div className="absolute bottom-full mb-2 left-0 right-0 border border-gray-200 rounded-xl shadow-xl bg-white overflow-hidden z-10">
+          <div className="absolute bottom-full mb-2 left-0 right-0 border border-gray-200 rounded-xl shadow-xl bg-white overflow-hidden z-10 dark:bg-gray-800/50">
             {QUESTION_TYPE_META.map((qt) => (
               <button
                 key={qt.type}
                 onClick={() => { onAdd(qt.type); setShowTypeMenu(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-left transition-colors border-b border-gray-100 last:border-0"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-500/30 text-left transition-colors border-b border-gray-100 last:border-0  "
               >
                 <span className="text-sm text-gray-700">{qt.label}</span>
               </button>

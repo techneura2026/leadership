@@ -1,11 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { generateReportPdf } from '@/lib/reportPdf';
 import type { ReportData } from '@/lib/reportPdf';
+import {
+  Files,
+  BadgeCheck,
+  LoaderCircle,
+  TriangleAlert,
+} from 'lucide-react';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -144,6 +150,8 @@ export default function ReportsPage() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [localReports, setLocalReports] = useState<MockReport[]>(MOCK_REPORTS);
+  const [showAssessmentMenu, setShowAssessmentMenu] = useState(false);
+  const assessmentMenuRef = useRef<HTMLDivElement>(null);
 
   const participants = selectedAssessment ? (MOCK_PARTICIPANTS[selectedAssessment] ?? []) : [];
 
@@ -249,14 +257,25 @@ export default function ReportsPage() {
     { key: 'failed', label: 'Failed' },
   ];
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (assessmentMenuRef.current && !assessmentMenuRef.current.contains(event.target as Node)) {
+        setShowAssessmentMenu(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Generate and download PDF assessment reports</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Reports</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Generate and download PDF assessment reports</p>
         </div>
         {/* <button
           onClick={handleBulkGenerate}
@@ -281,43 +300,150 @@ export default function ReportsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  {[
+    {
+      label: 'Total Reports',
+      value: stats.total,
+      icon: Files,
+      color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300',
+    },
+    {
+      label: 'Ready to Download',
+      value: stats.ready,
+      icon: BadgeCheck,
+      color: 'bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-300',
+    },
+    {
+      label: 'Processing',
+      value: stats.processing,
+      icon: LoaderCircle,
+      color: 'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-600 dark:text-yellow-300',
+    },
+    {
+      label: 'Failed',
+      value: stats.failed,
+      icon: TriangleAlert,
+      color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300',
+    },
+  ].map((stat) => {
+    const Icon = stat.icon;
+
+    return (
+      <div
+        key={stat.label}
+        className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-4 flex items-center gap-3 shadow-sm"
+      >
+        <div
+          className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}
+        >
+          <Icon
+            className={`h-5 w-5 ${
+              stat.label === 'Processing' ? 'animate-spin' : ''
+            }`}
+          />
+        </div>
+
+        <div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+            {stat.value}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-slate-400">
+            {stat.label}
+          </p>
+        </div>
+      </div>
+    );
+  })}
+</div>
+      {/* <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Reports', value: stats.total, icon: '📄', color: 'bg-blue-50 text-blue-600' },
-          { label: 'Ready to Download', value: stats.ready, icon: '✅', color: 'bg-green-50 text-green-600' },
-          { label: 'Processing', value: stats.processing, icon: '⏳', color: 'bg-yellow-50 text-yellow-600' },
-          { label: 'Failed', value: stats.failed, icon: '❌', color: 'bg-red-50 text-red-600' },
+          { label: 'Total Reports', value: stats.total, icon: '📄', color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300' },
+          { label: 'Ready to Download', value: stats.ready, icon: '✅', color: 'bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-300' },
+          { label: 'Processing', value: stats.processing, icon: '⏳', color: 'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-600 dark:text-yellow-300' },
+          { label: 'Failed', value: stats.failed, icon: '❌', color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300' },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
+          <div key={stat.label} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-4 flex items-center gap-3 shadow-sm">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${stat.color}`}>
               {stat.icon}
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-xs text-gray-500">{stat.label}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stat.value}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">{stat.label}</p>
             </div>
           </div>
         ))}
-      </div>
+      </div> */}
 
       {/* Filter bar */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Assessment</label>
-        <div className="w-full sm:max-w-xs">
-          <select
-            value={selectedAssessment}
-            onChange={(e) => setSelectedAssessment(e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
+        <label className="text-sm font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap">Assessment</label>
+        <div className="relative w-full sm:max-w-xs" ref={assessmentMenuRef}>
+          <button
+            type="button"
+            onClick={() => setShowAssessmentMenu((prev) => !prev)}
+            className="flex w-full items-center justify-between rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-left text-sm text-gray-700 dark:text-slate-200 shadow-sm transition-all duration-200 hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
-            <option value="">All assessments</option>
-            {MOCK_ASSESSMENTS.map((a) => (
-              <option key={a.id} value={a.id}>{a.title}</option>
-            ))}
-          </select>
+            <span className={selectedAssessment ? 'text-gray-900 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}>
+              {selectedAssessment
+                ? (MOCK_ASSESSMENTS.find((a) => a.id === selectedAssessment)?.title ?? 'Select assessment')
+                : 'All assessments'}
+            </span>
+            <svg
+              className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showAssessmentMenu ? 'rotate-180' : ''}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+            </svg>
+          </button>
+
+          {showAssessmentMenu && (
+            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAssessment('');
+                  setShowAssessmentMenu(false);
+                }}
+                className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                <span className={!selectedAssessment ? 'font-medium text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-slate-300'}>
+                  All assessments
+                </span>
+                {!selectedAssessment && (
+                  <svg className="h-4 w-4 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3.5-3.5a1 1 0 011.414-1.414L8.5 11.586l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+              {MOCK_ASSESSMENTS.map((a) => {
+                const isSelected = selectedAssessment === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAssessment(a.id);
+                      setShowAssessmentMenu(false);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
+                  >
+                    <span className={isSelected ? 'font-medium text-gray-900 dark:text-slate-100' : 'text-gray-600 dark:text-slate-300'}>{a.title}</span>
+                    {isSelected && (
+                      <svg className="h-4 w-4 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.5 7.5a1 1 0 01-1.414 0l-3.5-3.5a1 1 0 011.414-1.414L8.5 11.586l6.793-6.793a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         {selectedAssessment && (
           <button
             onClick={() => setSelectedAssessment('')}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-gray-400 dark:text-slate-500 transition-colors hover:text-gray-600 dark:hover:text-slate-300"
           >
             Clear
           </button>
@@ -326,31 +452,31 @@ export default function ReportsPage() {
 
       {/* Generate section — only when an assessment is selected */}
       {selectedAssessment && participants.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-gray-800">Generate Reports</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Queue individual PDF reports for participants</p>
+              <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Generate Reports</h2>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Queue individual PDF reports for participants</p>
             </div>
-            <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full">
+            <span className="text-xs bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-medium px-2.5 py-1 rounded-full">
               {participants.length} participants
             </span>
           </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 dark:divide-slate-800">
             {participants.map((p) => {
               const existing = localReports.find(
                 (r) => r.participantId === p.id && r.assessmentId === selectedAssessment,
               );
               const isGenerating = generating === p.id;
               return (
-                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/70 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
                       {p.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400">{p.role}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{p.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-slate-500">{p.role}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -411,11 +537,11 @@ export default function ReportsPage() {
       )}
 
       {/* Reports table */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800">All Reports</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{filteredReports.length} report{filteredReports.length !== 1 ? 's' : ''}</p>
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100">All Reports</h2>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{filteredReports.length} report{filteredReports.length !== 1 ? 's' : ''}</p>
           </div>
 
           {/* Status tabs */}
@@ -431,12 +557,12 @@ export default function ReportsPage() {
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
                     statusFilter === tab.key
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                      : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800'
                   }`}
                 >
                   {tab.label}
                   <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${
-                    statusFilter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                    statusFilter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'
                   }`}>
                     {count}
                   </span>
@@ -460,7 +586,7 @@ export default function ReportsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
-              <thead className="text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+              <thead className="text-xs text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/70 border-b border-gray-100 dark:border-slate-800">
                 <tr>
                   <th className="text-left px-5 py-3 font-medium">Participant</th>
                   <th className="text-left px-5 py-3 font-medium">Assessment</th>
@@ -471,29 +597,29 @@ export default function ReportsPage() {
                   <th className="text-left px-5 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                 {filteredReports.map((r) => {
                   const asmt = MOCK_ASSESSMENTS.find((a) => a.id === r.assessmentId);
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/70 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
                             {r.participantName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{r.participantName}</p>
-                            <p className="text-xs text-gray-400">{r.participantRole}</p>
+                            <p className="font-medium text-gray-900 dark:text-slate-100">{r.participantName}</p>
+                            <p className="text-xs text-gray-400 dark:text-slate-500">{r.participantRole}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <p className="text-gray-600 max-w-[180px] truncate" title={asmt?.title}>
+                        <p className="text-gray-600 dark:text-slate-300 max-w-[180px] truncate" title={asmt?.title}>
                           {asmt?.title ?? '—'}
                         </p>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-full px-2.5 py-1">
                           <span>{REPORT_TYPE_ICON[r.reportType]}</span>
                           {REPORT_TYPE_LABELS[r.reportType] ?? r.reportType}
                         </span>
@@ -506,24 +632,24 @@ export default function ReportsPage() {
                           <Badge variant={STATUS_VARIANT[r.status]}>{STATUS_LABELS[r.status]}</Badge>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-gray-400 text-xs">
+                      <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500 text-xs">
                         {r.generatedAt ? format(new Date(r.generatedAt), 'dd MMM yyyy, HH:mm') : '—'}
                       </td>
                       <td className="px-5 py-3.5">
                         {r.fileSize && r.pages ? (
-                          <div className="text-xs text-gray-400 space-y-0.5">
+                          <div className="text-xs text-gray-400 dark:text-slate-500 space-y-0.5">
                             <p>{r.fileSize}</p>
                             <p>{r.pages} pages</p>
                           </div>
                         ) : (
-                          <span className="text-gray-300 text-xs">—</span>
+                          <span className="text-gray-300 dark:text-slate-600 text-xs">—</span>
                         )}
                       </td>
                       <td className="px-5 py-3.5">
                         {r.status === 'ready' ? (
                           <button
                             onClick={() => handleDownload(r)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 bg-blue-50 dark:bg-blue-950/50 hover:bg-gray-100 dark:hover:bg-blue-900/50 px-3 py-1.5 rounded-lg transition-colors"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -537,7 +663,7 @@ export default function ReportsPage() {
                                 prev.map((rep) => rep.id === r.id ? { ...rep, status: 'processing' } : rep),
                               );
                             }}
-                            className="text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                            className="text-xs font-medium text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/70 px-3 py-1.5 rounded-lg transition-colors"
                           >
                             Retry
                           </button>
@@ -555,13 +681,13 @@ export default function ReportsPage() {
       </div>
 
       {/* Info banner */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4 flex items-start gap-3">
-        <svg className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl px-5 py-4 flex items-start gap-3">
+        <svg className="w-4 h-4 text-blue-500 dark:text-blue-300 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          <p className="text-sm font-medium text-blue-800">About PDF Reports</p>
-          <p className="text-xs text-blue-600 mt-0.5">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-300">About PDF Reports</p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
             Reports are generated as multi-page PDFs and are typically ready within 30–60 seconds.
             Processing reports are automatically updated — no need to refresh the page.
             Generated reports are available for download for 90 days.

@@ -8,6 +8,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { TopCenterToast } from '@/components/ui/TopCenterToast';
 import {
   AssessmentDto,
   AssessmentStatus,
@@ -276,12 +277,17 @@ function OverviewTab({
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+    setToast({ message, type });
+  }
 
   function sendReminders() {
     setSendingReminders(true);
     setTimeout(() => {
       setSendingReminders(false);
-      alert('Reminders sent successfully.');
+      showToast('Reminders sent successfully.');
     }, 600);
   }
 
@@ -290,7 +296,7 @@ function OverviewTab({
     setTimeout(() => {
       setClosing(false);
       setShowCloseConfirm(false);
-      alert('Assessment has been closed.');
+      showToast('Assessment has been closed.');
     }, 600);
   }
 
@@ -300,6 +306,11 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
       {/* Assessment details */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -518,6 +529,11 @@ function ParticipantsTab({
   const [showAdd, setShowAdd] = useState(false);
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+    setToast({ message, type });
+  }
 
   function addParticipant() {
     if (!email.trim()) return;
@@ -526,17 +542,22 @@ function ParticipantsTab({
       setAdding(false);
       setEmail('');
       setShowAdd(false);
-      alert('Participant added.');
+      showToast('Participant added.');
     }, 500);
   }
 
   function removeParticipant(_participantId: string) {
     if (!confirm('Remove this participant?')) return;
-    alert('Participant removed.');
+    showToast('Participant removed.');
   }
 
   return (
     <div className="space-y-4">
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
       <div className="flex justify-between items-center">
         <h3 className="text-sm font-semibold text-gray-900">
           {participants.length} Participant{participants.length !== 1 ? 's' : ''}
@@ -1058,7 +1079,7 @@ export default function AssessmentDetailPage() {
           <h1 className="text-2xl font-semibold text-gray-900">{assessment.title}</h1>
           <button
             onClick={() => router.push(`/assessments/${id}/edit`)}
-            className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg px-3 py-2 transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />

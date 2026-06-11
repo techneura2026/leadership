@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
+import { TopCenterToast } from '@/components/ui/TopCenterToast';
 
 // ── Standalone page — no auth, no app shell ───────────────────────────────────
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -96,6 +97,7 @@ export default function RaterPage() {
   const [developmentComment, setDevelopmentComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Load landing info and clusters on mount
   useEffect(() => {
@@ -214,9 +216,10 @@ export default function RaterPage() {
       });
       setScreen('thankyou');
     } catch (err: unknown) {
-      alert(
-        (err as any)?.response?.data?.error?.message ?? 'Failed to submit. Please try again.',
-      );
+      setToast({
+        message: (err as any)?.response?.data?.error?.message ?? 'Failed to submit. Please try again.',
+        type: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
