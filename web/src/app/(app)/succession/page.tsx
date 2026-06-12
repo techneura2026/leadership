@@ -388,31 +388,31 @@ function StatCard({ count, label, variant, icon }: {
   icon: React.ReactNode;
 }) {
   const bg = {
-    success: 'from-green-50 to-white border-green-200',
-    warning: 'from-yellow-50 to-white border-yellow-200',
-    info:    'from-blue-50 to-white border-blue-200',
-    neutral: 'from-gray-50 to-white border-gray-200',
+    success: 'from-green-50 to-white border-green-200 dark:from-green-950/40 dark:to-slate-900 dark:border-green-800/60',
+    warning: 'from-yellow-50 to-white border-yellow-200 dark:from-yellow-950/40 dark:to-slate-900 dark:border-yellow-800/60',
+    info:    'from-blue-50 to-white border-blue-200 dark:from-blue-950/40 dark:to-slate-900 dark:border-blue-800/60',
+    neutral: 'from-gray-50 to-white border-gray-200 dark:from-slate-800 dark:to-slate-900 dark:border-slate-700',
   }[variant];
   const iconBg = {
-    success: 'bg-green-100 text-green-600',
-    warning: 'bg-yellow-100 text-yellow-600',
-    info:    'bg-blue-100 text-blue-600',
-    neutral: 'bg-gray-100 text-gray-500',
+    success: 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300',
+    warning: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/40 dark:text-yellow-300',
+    info:    'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
+    neutral: 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-300',
   }[variant];
   const textColor = {
-    success: 'text-green-700',
-    warning: 'text-yellow-700',
-    info:    'text-blue-700',
-    neutral: 'text-gray-600',
+    success: 'text-green-700 dark:text-green-300',
+    warning: 'text-yellow-700 dark:text-yellow-300',
+    info:    'text-blue-700 dark:text-blue-300',
+    neutral: 'text-gray-600 dark:text-slate-300',
   }[variant];
   return (
-    <div className={`bg-gradient-to-b ${bg} rounded-xl border p-5 flex items-center gap-4`}>
+    <div className={`bg-gradient-to-b ${bg} rounded-xl border p-5 flex items-center gap-4 shadow-sm dark:shadow-slate-950/20`}>
       <div className={`w-11 h-11 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
         {icon}
       </div>
       <div>
         <p className={`text-3xl font-bold ${textColor}`}>{count}</p>
-        <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{label}</p>
       </div>
     </div>
   );
@@ -772,7 +772,7 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
             placeholder="Search candidates..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-52"
+            className="placeholder:px-4 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-52"
           />
         </div>
       </div>

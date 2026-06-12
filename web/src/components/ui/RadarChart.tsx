@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export interface RadarAxis {
   key: string;
   label: string;
@@ -19,6 +21,12 @@ const COLORS = {
   axis: '#d1d5db',
   label: '#374151',
   ring: '#f3f4f6',
+  dark: {
+    grid: '#374151',
+    axis: '#4b5563',
+    label: '#e5e7eb',
+    ring: '#1f2937',
+  },
 };
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -54,6 +62,20 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
   const n = axes.length;
   if (n < 3) return null;
 
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const updateTheme = () => setIsDark(document.documentElement.classList.contains('dark'));
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const theme = isDark ? COLORS.dark : COLORS;
+
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size * 0.33;
@@ -82,8 +104,8 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
         <polygon
           key={fraction}
           points={polygonPoints(cx, cy, outerR * fraction, n)}
-          fill={fraction === 1 ? COLORS.ring : 'none'}
-          stroke={COLORS.grid}
+          fill={fraction === 1 ? theme.ring : 'none'}
+          stroke={theme.grid}
           strokeWidth={1}
         />
       ))}
@@ -98,7 +120,7 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
             y1={cy}
             x2={p.x}
             y2={p.y}
-            stroke={COLORS.axis}
+            stroke={theme.axis}
             strokeWidth={1}
           />
         );
@@ -156,7 +178,7 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
             dominantBaseline="middle"
             fontSize={size * 0.042}
             fontWeight={500}
-            fill={COLORS.label}
+            fill={theme.label}
           >
             {lines.map((line, idx) => (
               <tspan
@@ -180,7 +202,7 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
             x={p.x + 3}
             y={p.y}
             fontSize={size * 0.032}
-            fill="#9ca3af"
+            fill={isDark ? '#9ca3af' : '#9ca3af'}
             dominantBaseline="middle"
           >
             {Math.round(fraction * 100)}

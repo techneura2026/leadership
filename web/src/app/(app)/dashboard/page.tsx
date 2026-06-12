@@ -156,14 +156,14 @@ function ActivityCharts() {
       <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <h2 className="text-lg font-bold text-gray-900 mb-1">Monthly Assessment Activity</h2>
         <p className="text-sm text-gray-500 mb-6">Launched vs. completed assessments</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={MOCK_MONTHLY_ACTIVITY} barGap={4} barCategoryGap="30%">
+        <ResponsiveContainer width="100%" height={220} >
+          <BarChart data={MOCK_MONTHLY_ACTIVITY} barGap={4} barCategoryGap="30%"  >
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
             <Tooltip
               contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
-              cursor={{ fill: '#f9fafb' }}
+              cursor={{ fill: 'transparent' }}
             />
             <Bar dataKey="launched" name="Launched" fill="#bfdbfe" radius={[6, 6, 0, 0]} />
             <Bar dataKey="completed" name="Completed" fill="#3b82f6" radius={[6, 6, 0, 0]} />
@@ -325,7 +325,7 @@ function AdminDashboard() {
 
       {/* Recent Assessments */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 ">
           <h2 className="text-lg font-bold text-gray-900">Recent Assessments</h2>
           <button
             onClick={() => router.push('/assessments')}

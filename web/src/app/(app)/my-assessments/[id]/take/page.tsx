@@ -6,6 +6,7 @@ import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import { Spinner, PageSpinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
+import { TopCenterToast } from '@/components/ui/TopCenterToast';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { AssessmentDto, AssessmentType, CompetencyDto } from '@leaderprism/shared';
@@ -575,6 +576,7 @@ function PersonalityTaker({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
     if (progress?.items) {
@@ -621,7 +623,7 @@ function PersonalityTaker({
         router.push('/my-assessments');
       }
     } catch {
-      alert('Submission failed. Please try again.');
+      setToast({ message: 'Submission failed. Please try again.', type: 'error' });
       setSubmitting(false);
     }
   }
@@ -631,65 +633,79 @@ function PersonalityTaker({
 
   if (answered >= total && total > 0) {
     return (
-      <div className="max-w-xl mx-auto">
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <>
+        <TopCenterToast
+          message={toast?.message ?? null}
+          type={toast?.type ?? 'info'}
+          onClose={() => setToast(null)}
+        />
+        <div className="max-w-xl mx-auto">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">All {total} items answered!</h2>
+            <p className="text-sm text-gray-500 mb-6">Submit to finalise your personality assessment.</p>
+            <button
+              onClick={handleSubmit} disabled={submitting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {submitting && <Spinner size="sm" />}Submit Assessment
+            </button>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">All {total} items answered!</h2>
-          <p className="text-sm text-gray-500 mb-6">Submit to finalise your personality assessment.</p>
-          <button
-            onClick={handleSubmit} disabled={submitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {submitting && <Spinner size="sm" />}Submit Assessment
-          </button>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto">
-      <ProgressBar current={answered} total={total} label={`Question ${currentIdx + 1} of ${total}`} />
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
-        <div className="flex items-start justify-between mb-6">
-          <p className="text-base font-medium text-gray-900 leading-snug flex-1">{current?.stem}</p>
-          {saving && <Spinner size="sm" className="ml-3 shrink-0" />}
-        </div>
-        <div className="space-y-2.5">
-          {LIKERT.map((label, i) => {
-            const score = i + 1;
-            const isSelected = responses[current?.id] === score;
-            return (
-              <button
-                key={score} onClick={() => selectAndAdvance(score)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all',
-                  isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300',
-                )}
-              >
-                <div className={cn(
-                  'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0',
-                  isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300',
-                )}>
-                  {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-                <span className="text-sm text-gray-800">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
-          <button onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))} disabled={currentIdx === 0}
-            className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition-colors">← Back</button>
-          <button onClick={() => setCurrentIdx((i) => Math.min(total - 1, i + 1))} disabled={currentIdx >= total - 1}
-            className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition-colors">Skip →</button>
+    <>
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
+      <div className="max-w-xl mx-auto">
+        <ProgressBar current={answered} total={total} label={`Question ${currentIdx + 1} of ${total}`} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
+          <div className="flex items-start justify-between mb-6">
+            <p className="text-base font-medium text-gray-900 leading-snug flex-1">{current?.stem}</p>
+            {saving && <Spinner size="sm" className="ml-3 shrink-0" />}
+          </div>
+          <div className="space-y-2.5">
+            {LIKERT.map((label, i) => {
+              const score = i + 1;
+              const isSelected = responses[current?.id] === score;
+              return (
+                <button
+                  key={score} onClick={() => selectAndAdvance(score)}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all',
+                    isSelected ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300',
+                  )}
+                >
+                  <div className={cn(
+                    'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0',
+                    isSelected ? 'border-blue-600 bg-blue-600' : 'border-gray-300',
+                  )}>
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+                  <span className="text-sm text-gray-800">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
+            <button onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))} disabled={currentIdx === 0}
+              className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition-colors">← Back</button>
+            <button onClick={() => setCurrentIdx((i) => Math.min(total - 1, i + 1))} disabled={currentIdx >= total - 1}
+              className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-40 transition-colors">Skip →</button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -728,6 +744,7 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
   const [sjtResponses, setSjtResponses] = useState<Record<string, number>>({});
   const [laResponses, setLaResponses] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
     if (sjtProg?.items) {
@@ -787,7 +804,7 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
       await api.post(`/assessments/${assessmentId}/readiness/${participantId}/compute`, {});
       router.push('/my-assessments');
     } catch {
-      alert('Submission failed. Please try again.');
+      setToast({ message: 'Submission failed. Please try again.', type: 'error' });
       setSubmitting(false);
     }
   }
@@ -796,9 +813,16 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
 
   if (sjtItems.length === 0 && laItems.length === 0) {
     return (
-      <div className="max-w-xl mx-auto text-center py-12 bg-white rounded-2xl border border-gray-200">
-        <p className="text-sm text-gray-500">No readiness assessment items found.</p>
-      </div>
+      <>
+        <TopCenterToast
+          message={toast?.message ?? null}
+          type={toast?.type ?? 'info'}
+          onClose={() => setToast(null)}
+        />
+        <div className="max-w-xl mx-auto text-center py-12 bg-white rounded-2xl border border-gray-200">
+          <p className="text-sm text-gray-500">No readiness assessment items found.</p>
+        </div>
+      </>
     );
   }
 
@@ -806,34 +830,41 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
     const current = sjtItems[sjtIdx];
     if (!current) return null;
     return (
-      <div className="max-w-xl mx-auto">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 text-xs text-blue-700 font-medium mb-4">
-          Section 1 of 2 — Situational Judgement
-        </div>
-        <ProgressBar current={sjtIdx + 1} total={sjtItems.length} label={`Scenario ${sjtIdx + 1} of ${sjtItems.length}`} />
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Scenario {sjtIdx + 1}</p>
-          <p className="text-base text-gray-900 leading-relaxed mb-6">{current.stem}</p>
-          <div className="space-y-2.5">
-            {(current.options ?? []).map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => submitSjt(current.id, idx)}
-                disabled={sjtResponses[current.id] !== undefined}
-                className={cn(
-                  'w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border-2 transition-all',
-                  sjtResponses[current.id] === idx ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 disabled:opacity-60',
-                )}
-              >
-                <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">
-                  {String.fromCharCode(65 + idx)}
-                </span>
-                <span className="text-sm text-gray-800 leading-snug">{opt}</span>
-              </button>
-            ))}
+      <>
+        <TopCenterToast
+          message={toast?.message ?? null}
+          type={toast?.type ?? 'info'}
+          onClose={() => setToast(null)}
+        />
+        <div className="max-w-xl mx-auto">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2 text-xs text-blue-700 font-medium mb-4">
+            Section 1 of 2 — Situational Judgement
+          </div>
+          <ProgressBar current={sjtIdx + 1} total={sjtItems.length} label={`Scenario ${sjtIdx + 1} of ${sjtItems.length}`} />
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Scenario {sjtIdx + 1}</p>
+            <p className="text-base text-gray-900 leading-relaxed mb-6">{current.stem}</p>
+            <div className="space-y-2.5">
+              {(current.options ?? []).map((opt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => submitSjt(current.id, idx)}
+                  disabled={sjtResponses[current.id] !== undefined}
+                  className={cn(
+                    'w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border-2 transition-all',
+                    sjtResponses[current.id] === idx ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 disabled:opacity-60',
+                  )}
+                >
+                  <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 mt-0.5">
+                    {String.fromCharCode(65 + idx)}
+                  </span>
+                  <span className="text-sm text-gray-800 leading-snug">{opt}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -841,41 +872,48 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
   const allLaDone = laAnswered >= laItems.length && laItems.length > 0;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-xs text-green-700 font-medium mb-4">
-        Section 2 of 2 — Learning Agility
-      </div>
-      <ProgressBar current={laAnswered} total={laItems.length} label={`${laAnswered} of ${laItems.length} answered`} />
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-6">
-        <p className="text-sm text-gray-500">Rate each statement on a scale of 1 (Strongly Disagree) to 5 (Strongly Agree).</p>
-        {laItems.map((item) => (
-          <div key={item.id}>
-            <p className="text-sm text-gray-800 font-medium mb-2 leading-snug">{item.stem}</p>
-            <div className="flex gap-2">
-              {LA_LABELS.map((label, i) => (
-                <ScaleBtn
-                  key={i}
-                  value={i + 1}
-                  label={label}
-                  selected={laResponses[item.id] === i + 1}
-                  onClick={() => submitLa(item.id, i + 1)}
-                />
-              ))}
+    <>
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-xs text-green-700 font-medium mb-4">
+          Section 2 of 2 — Learning Agility
+        </div>
+        <ProgressBar current={laAnswered} total={laItems.length} label={`${laAnswered} of ${laItems.length} answered`} />
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-6">
+          <p className="text-sm text-gray-500">Rate each statement on a scale of 1 (Strongly Disagree) to 5 (Strongly Agree).</p>
+          {laItems.map((item) => (
+            <div key={item.id}>
+              <p className="text-sm text-gray-800 font-medium mb-2 leading-snug">{item.stem}</p>
+              <div className="flex gap-2">
+                {LA_LABELS.map((label, i) => (
+                  <ScaleBtn
+                    key={i}
+                    value={i + 1}
+                    label={label}
+                    selected={laResponses[item.id] === i + 1}
+                    onClick={() => submitLa(item.id, i + 1)}
+                  />
+                ))}
+              </div>
             </div>
+          ))}
+          <div className="pt-4 border-t border-gray-100">
+            <button
+              onClick={handleFinalSubmit}
+              disabled={!allLaDone || submitting}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {submitting && <Spinner size="sm" />}
+              {!allLaDone ? `Answer all items (${laItems.length - laAnswered} remaining)` : 'Submit Assessment'}
+            </button>
           </div>
-        ))}
-        <div className="pt-4 border-t border-gray-100">
-          <button
-            onClick={handleFinalSubmit}
-            disabled={!allLaDone || submitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-3 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {submitting && <Spinner size="sm" />}
-            {!allLaDone ? `Answer all items (${laItems.length - laAnswered} remaining)` : 'Submit Assessment'}
-          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
