@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,11 @@ interface ChatMessage {
   content: string;
   questions?: GeneratedQuestion[];
   inserted?: boolean;
+}
+
+interface AttachedPdf {
+  id: string;
+  file: File;
 }
 
 export interface AssessmentChatbotProps {
@@ -57,10 +62,12 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
     },
   ]);
   const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<AttachedPdf[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -77,26 +84,67 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  function attachmentId(file: File) {
+    return `${file.name}-${file.size}-${file.lastModified}`;
+  }
+
+  function addAttachments(files: File[]) {
+    if (files.length === 0) return;
+
+    setAttachments((prev) => {
+      const existingIds = new Set(prev.map((attachment) => attachment.id));
+      const nextAttachments = files
+        .filter((file) => file.type === 'application/pdf')
+        .map((file) => ({ id: attachmentId(file), file }))
+        .filter((attachment) => !existingIds.has(attachment.id));
+
+      return [...prev, ...nextAttachments];
+    });
+  }
+
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    addAttachments(files);
+    event.target.value = '';
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((attachment) => attachment.id !== id));
+  }
+
   async function send(text?: string) {
-    const content = (text ?? input).trim();
-    if (!content || isLoading) return;
+    const content =
+      (text ?? input).trim() ||
+      (attachments.length > 0 ? 'Please review the attached PDF documents and help me refine the assessment questions.' : '');
+    if ((!content && attachments.length === 0) || isLoading) return;
 
     const userMsg: ChatMessage = { role: 'user', content };
+    const nextMessages = [...messages, userMsg];
+
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
+      const formData = new FormData();
+      formData.append(
+        'messages',
+        JSON.stringify(
+          nextMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+        ),
+      );
+      formData.append('context', context ?? '');
+      formData.append('prompt', content);
+      attachments.forEach((attachment) => {
+        formData.append('files', attachment.file, attachment.file.name);
+      });
+
       const res = await fetch('/chat-api', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMsg].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          context: context ?? '',
-        }),
+        body: formData,
       });
 
       if (!res.ok) throw new Error('API error');
@@ -126,6 +174,12 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
     );
   }
 
+  function startQuestionRevision(questions: GeneratedQuestion[]) {
+    const questionList = questions.map((question, index) => `${index + 1}. ${question.title}`).join('\n');
+    setInput(`Please revise these questions to be clearer, more concise, and more behaviorally specific:\n${questionList}`);
+    inputRef.current?.focus();
+  }
+
   if (!mounted) return null;
 
   return createPortal(
@@ -138,7 +192,7 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
           'fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95',
           isOpen
             ? 'bg-gray-700 text-white shadow-gray-300'
-            : 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-blue-200',
+            : 'bg-gradient-to-br from-blue-600 to-blue-350 text-white shadow-blue-200',
         )}
       >
         {isOpen ? (
@@ -146,7 +200,7 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         ) : (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 20 24" stroke="currentColor" strokeWidth={1.5}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -235,18 +289,30 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
                           Added to form
                         </div>
                       ) : (
-                        <button
-                          onClick={() => {
-                            onInsertQuestions(msg.questions!);
-                            markInserted(idx);
-                          }}
-                          className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                          </svg>
-                          Add all to form
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => {
+                              onInsertQuestions(msg.questions!);
+                              markInserted(idx);
+                            }}
+                            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add all to form
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startQuestionRevision(msg.questions!)}
+                            className="w-full bg-white hover:bg-blue-50 active:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg px-3 py-2 transition-colors border border-blue-200 flex items-center justify-center gap-1.5"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.25}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.65-1.65a1.875 1.875 0 112.652 2.652L7.672 19.481a4.5 4.5 0 01-1.897 1.13L4 21l.389-1.775a4.5 4.5 0 011.13-1.897l11.343-11.343z" />
+                            </svg>
+                            Revise in chat
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -289,9 +355,56 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
             </div>
           )}
 
+          {attachments.length > 0 && (
+            <div className="px-4 pb-2 flex flex-wrap gap-2 shrink-0">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-800"
+                >
+                  <span className="max-w-[10rem] truncate">{attachment.file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(attachment.id)}
+                    disabled={isLoading}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Remove ${attachment.file.name}`}
+                  >
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Input */}
           <div className="p-3 border-t border-gray-100 shrink-0">
             <div className="flex gap-2 items-center bg-gray-50 rounded-xl border border-gray-200 px-3 py-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="w-5 h-5 text-gray-400 shrink-0 flex items-center justify-center hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Attach PDF files"
+                title="Attach PDF files"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-full h-full">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="application/pdf"
+                multiple
+                onChange={handleFileSelection}
+                disabled={isLoading}
+              />
+
               <input
                 ref={inputRef}
                 type="text"
@@ -307,9 +420,10 @@ export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: 
                 disabled={isLoading}
                 className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none disabled:opacity-50 min-w-0"
               />
+
               <button
                 onClick={() => send()}
-                disabled={!input.trim() || isLoading}
+                disabled={(!input.trim() && attachments.length === 0) || isLoading}
                 className="w-8 h-8 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-all shrink-0"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

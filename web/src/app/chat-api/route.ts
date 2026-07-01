@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import PDFParser from "pdf2json";
 
 const SYSTEM_PROMPT = `You are an expert assessment design assistant for LeaderPrism, a 360° leadership assessment platform used by HR consultancies.
 
@@ -47,14 +48,72 @@ Type-specific rules:
 - SHORT_ANSWER: options = [], tableRows = [], tableColumns = []
 - TABLE: options = [], tableRows = behavior/item labels, tableColumns = rating scale labels
 
+CRITICAL INSTRUCTION FOR UPLOADED DOCUMENTS:
+If the user uploads PDF documents or provides specific context, you MUST use that information as the primary source for your questions. 
+- Extract specific competencies, frameworks, or scenarios mentioned in the text.
+- Do not generate generic questions if source material is provided; ground every question in the provided documents.
+- If the document is a job description, build questions that test those exact responsibilities.
+- If the document is a company values sheet, align the behavioral anchors to those values. 
+
 Never omit any field. Always include all six fields on every question object.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, context } = await req.json();
+    const contentType = req.headers.get('content-type') ?? '';
 
-    const contextNote = context
-      ? `\n\nCurrent assessment context: ${context}`
+    let messages: Array<{ role: string; content: string }> = [];
+    let contextString = '';
+    let promptText = '';
+    const uploadedFiles: File[] = [];
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const messagesString = formData.get('messages') as string | null;
+      contextString = (formData.get('context') as string | null) ?? '';
+      promptText = (formData.get('prompt') as string | null) ?? '';
+      messages = messagesString ? JSON.parse(messagesString) : [];
+      uploadedFiles.push(...formData.getAll('files').filter((entry): entry is File => entry instanceof File));
+    } else {
+      const body = await req.json();
+      messages = Array.isArray(body.messages) ? body.messages : [];
+      contextString = typeof body.context === 'string' ? body.context : '';
+      promptText = typeof body.prompt === 'string' ? body.prompt : '';
+    }
+
+    if (!promptText && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      promptText = lastMessage?.content ?? '';
+    }
+
+    const pdfBlocks = await Promise.all(
+      uploadedFiles.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const text = await new Promise<string>((resolve, reject) => {
+          const pdfParser = new PDFParser(null, true);
+
+          pdfParser.on("pdfParser_dataError", (errData: any) => reject(errData?.parserError || errData));
+          pdfParser.on("pdfParser_dataReady", () => {
+            resolve(pdfParser.getRawTextContent());
+          });
+
+          pdfParser.parseBuffer(buffer);
+        });
+
+        return {
+          name: file.name,
+          text: text,
+        };
+      }),
+    );
+
+    const contextNote = contextString ? `\n\nCurrent assessment context: ${contextString}` : '';
+    const promptNote = promptText ? `\n\nLatest user prompt: ${promptText}` : '';
+    const pdfNote = pdfBlocks.length
+      ? `\n\nUploaded PDF documents:\n${pdfBlocks
+        .map((block, index) => `Document ${index + 1}: ${block.name}\n${block.text}`)
+        .join('\n\n')}`
       : '';
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -66,7 +125,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT + contextNote },
+          // { role: 'system', content: SYSTEM_PROMPT + contextNote + promptNote + pdfNote },
+            { role: 'system', content: SYSTEM_PROMPT + promptNote + pdfNote },
           ...messages,
         ],
         response_format: { type: 'json_object' },
