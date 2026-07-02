@@ -50,9 +50,15 @@ export function Select({ value, onChange, options, placeholder = 'Select…', cl
     }
   }, [open]);
 
-  // Close the dropdown on scroll or resize to prevent the portal from floating away
-  useEffect(() => {
-    const handleScrollOrResize = () => setOpen(false);
+useEffect(() => {
+    const handleScrollOrResize = (e:any) => {
+      // Prevent closing if the user is scrolling inside the dropdown itself
+      if (e.target && dropdownRef.current && dropdownRef.current.contains(e.target)) {
+        return;
+      }
+      setOpen(false);
+    };
+
     if (open) {
       window.addEventListener('resize', handleScrollOrResize);
       window.addEventListener('scroll', handleScrollOrResize, true);
@@ -69,7 +75,7 @@ export function Select({ value, onChange, options, placeholder = 'Select…', cl
   const dropdownMenu = open ? (
     <div
       ref={dropdownRef}
-      className="absolute z-[9999] mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-auto py-1.5"
+      className="absolute z-[9999] mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-scroll py-1.5"
       style={{
         top: `${dropdownStyle.top}px`,
         left: `${dropdownStyle.left}px`,

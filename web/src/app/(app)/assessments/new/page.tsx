@@ -269,7 +269,7 @@ const READINESS_DIMENSIONS = [
 type CategoryItem = { id: string; name: string; description: string; iconPath: string; color: string };
 
 const CAT_COLOR_CLASSES: Record<string, { iconBg: string; iconText: string; selectedBorder: string; selectedBg: string }> = {
-  blue:    { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-50'    },
+  blue:    { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-200'    },
   violet:  { iconBg: 'bg-violet-100',  iconText: 'text-violet-600',  selectedBorder: 'border-violet-500',  selectedBg: 'bg-violet-50'  },
   amber:   { iconBg: 'bg-amber-100',   iconText: 'text-amber-600',   selectedBorder: 'border-amber-500',   selectedBg: 'bg-amber-50'   },
   cyan:    { iconBg: 'bg-cyan-100',    iconText: 'text-cyan-600',    selectedBorder: 'border-cyan-500',    selectedBg: 'bg-cyan-50'    },
@@ -773,7 +773,7 @@ function StepCompetencyCategories({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{cat.name}</p>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-black' : 'text-gray-50'}`}>{cat.name}</p>
                     {isSelected && (
                       <span className={cn('w-5 h-5 rounded-full flex items-center justify-center shrink-0', colors.iconBg)}>
                         <svg className={cn('w-3 h-3', colors.iconText)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1825,6 +1825,7 @@ function StepReview({
                   )}
                 </div>
                 <span className="text-sm font-medium text-gray-900">{cat?.name ?? id}</span>
+
               </div>
               <span className="text-xs text-gray-500">{qCount} question{qCount !== 1 ? 's' : ''}</span>
             </div>
