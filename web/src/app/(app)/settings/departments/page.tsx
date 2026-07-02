@@ -315,11 +315,10 @@ function ToggleStatusModal({ department, onClose, onConfirmed }: ToggleStatusMod
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${
-              action === 'deactivate'
+            className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 ${action === 'deactivate'
                 ? 'bg-yellow-500 hover:bg-yellow-600'
                 : 'bg-green-600 hover:bg-green-700'
-            }`}
+              }`}
           >
             {loading && <Spinner size="sm" />}
             {action.charAt(0).toUpperCase() + action.slice(1)}
@@ -431,20 +430,20 @@ export default function DepartmentsPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <svg
+        {!search && (<svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>
+        </svg>)}
         <input
           type="text"
           placeholder="Search departments…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
+          className="placeholder:px-5  w-full !pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
         />
       </div>
 
@@ -513,11 +512,10 @@ export default function DepartmentsPage() {
                       <button
                         onClick={() => setToggleTarget(dept)}
                         title={dept.isActive ? 'Deactivate' : 'Activate'}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          dept.isActive
+                        className={`p-1.5 rounded-lg transition-colors ${dept.isActive
                             ? 'text-yellow-600 hover:bg-yellow-50'
                             : 'text-green-600 hover:bg-green-50'
-                        }`}
+                          }`}
                       >
                         {dept.isActive ? (
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

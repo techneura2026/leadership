@@ -17,6 +17,7 @@ import {
   Area,
 } from 'recharts';
 import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
+import { useEffect, useState } from 'react';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,27 @@ function RadarViews({
 // ── Activity Charts ───────────────────────────────────────────────────────────
 
 function ActivityCharts() {
+  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    // 1. Function to check current theme
+    const checkTheme = () => document.documentElement.classList.contains('dark');
+
+    // 2. Set the initial theme on load
+    setIsDark(checkTheme());
+
+    // 3. Watch the <html> tag for changes to its classes
+    const observer = new MutationObserver(() => {
+      setIsDark(checkTheme());
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    // 4. Cleanup observer on unmount
+    return () => observer.disconnect();
+  }, []);
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
       {/* Monthly Completions */}
@@ -162,19 +184,19 @@ function ActivityCharts() {
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
             <Tooltip
-              contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
+              contentStyle={{ backgroundColor: isDark ? '#1e293b': '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
               cursor={{ fill: 'transparent' }}
             />
             <Bar dataKey="launched" name="Launched" fill="#bfdbfe" radius={[6, 6, 0, 0]} />
             <Bar dataKey="completed" name="Completed" fill="#3b82f6" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-        <div className="flex gap-5 mt-4">
+        <div className="flex gap-5 mt-4 ">
           <span className="flex items-center gap-1.5 text-xs text-gray-500">
             <span className="inline-block w-3 h-3 rounded-sm bg-blue-200" /> Launched
           </span>
           <span className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="inline-block w-3 h-3 rounded-sm bg-blue-500" /> Completed
+            <span className="inline-block w-3 h-3 rounded-sm bg-blue-500" /> Completed {isDark && <span className="text-gray-400">(dark mode)</span>}
           </span>
         </div>
       </div>
@@ -195,7 +217,7 @@ function ActivityCharts() {
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
             <Tooltip
-              contentStyle={{ borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
+              contentStyle={{ backgroundColor: isDark ? '#1e293b' : '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
               cursor={{ stroke: '#e9d5ff' }}
             />
             <Area

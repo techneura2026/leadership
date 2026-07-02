@@ -49,7 +49,7 @@ const QUICK_PROMPTS = [
   'Create a TABLE question for communication skills',
   'Suggest questions for emotional intelligence',
 ];
-
+ 
 // ── Component ──────────────────────────────────────────────────────────────────
 export function AssessmentChatbot({ context, onInsertQuestions, quickPrompts }: AssessmentChatbotProps) {
   const activePrompts = quickPrompts ?? QUICK_PROMPTS;
