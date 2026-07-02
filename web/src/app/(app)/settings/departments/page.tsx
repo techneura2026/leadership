@@ -494,8 +494,8 @@ export default function DepartmentsPage() {
                   key={dept.id}
                   className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">{dept.name}</td>
-                  <td className="px-4 py-3 hidden md:table-cell max-w-xs">
+                  <td className="overflow-scroll px-4 py-3 font-medium text-gray-900 max-w-xs">{dept.name}</td>
+                  <td className="overflow-scroll text-wrap px-4 py-3 hidden md:table-cell max-w-xs">
                     <DescriptionCell text={dept.description} />
                   </td>
                   <td className="px-4 py-3">

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react'; // Import useState for mobile menu state
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -69,17 +70,15 @@ function NavIcon({ href }: { href: string }) {
   );
 }
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
-  const org = useAuthStore((s) => s.organisation);
-
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role)),
-  );
-
+// Factor out common sidebar content for reuse
+function SidebarContent({ visibleItems, pathname, org, closeMobileMenu }: {
+  visibleItems: typeof NAV_ITEMS;
+  pathname: string;
+  org: ReturnType<typeof useAuthStore>['organisation'];
+  closeMobileMenu?: () => void;
+}) {
   return (
-    <aside className="hidden md:flex flex-col w-64 shrink-0" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
+    <>
       {/* Brand header */}
       <div
         className="h-14 px-5 flex items-center gap-3 shrink-0"
@@ -117,6 +116,7 @@ export function Sidebar() {
                 isActive ? 'text-white' : '',
               )}
               style={isActive ? undefined : { color: 'var(--sidebar-text)' }}
+              onClick={closeMobileMenu} // Close mobile menu when a link is clicked
             >
               <NavIcon href={item.href} />
               <span className="truncate">{item.label}</span>
@@ -126,7 +126,7 @@ export function Sidebar() {
       </nav>
 
       {/* Powered by */}
-      <div className="px-4 pb-4 flex items-center justify-center gap-2">
+      <div className="px-4 pb-4 flex items-center justify-center gap-2 mt-auto"> {/* Added mt-auto to push to bottom */}
         <span className="text-[10px] font-medium" style={{ color: 'var(--sidebar-text)' }}>Powered by</span>
         <Image
           src="/logo-techneura.png"
@@ -137,6 +137,80 @@ export function Sidebar() {
           style={{ filter: 'brightness(0) invert(1)' }}
         />
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const org = useAuthStore((s) => s.organisation);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile menu state
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.roles || (user && item.roles.includes(user.role)),
+  );
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
+  return (
+    <>
+      {/* Mobile Top Bar with Hamburger Menu (Visible on <md) */}
+      <div className="md:hidden flex items-center justify-between h-14 px-4 shadow-sm z-30 fixed top-0 left-0 right-0" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
+          <div className="flex items-center gap-3">
+              <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
+                  style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #1248a0 100%)' }}
+              >
+                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+              </div>
+              <p className="text-sm font-semibold text-white truncate leading-none">
+                  {org?.name ?? 'LeaderPrism'}
+              </p>
+          </div>
+        <button
+          onClick={toggleMobileMenu}
+          className="p-2 -mr-2 rounded-lg"
+          style={{ color: 'var(--sidebar-text)' }}
+          aria-label="Toggle Menu"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile Sidebar (Drawer style, hidden on >=md) */}
+      {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={closeMobileMenu} />
+      )}
+      <aside
+          className={cn(
+              "fixed inset-y-0 left-0 z-50 w-64 flex flex-col -translate-x-full transition-transform duration-300 md:hidden",
+              isMobileMenuOpen ? "translate-x-0" : ""
+          )}
+          style={{ backgroundColor: 'var(--sidebar-bg)' }}
+      >
+          <SidebarContent
+              visibleItems={visibleItems}
+              pathname={pathname}
+              org={org}
+              closeMobileMenu={closeMobileMenu} // Pass down to close on link click
+          />
+      </aside>
+
+      {/* Large Screen Sidebar (Unchanged, hidden on <md) */}
+      <aside className="hidden md:flex flex-col w-64 shrink-0" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
+          <SidebarContent visibleItems={visibleItems} pathname={pathname} org={org} />
+      </aside>
+    </>
   );
 }

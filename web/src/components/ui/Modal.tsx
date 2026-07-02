@@ -33,7 +33,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed -inset-10 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm "
       onMouseDown={(e) => {
         mouseDownOnOverlay.current = e.target === overlayRef.current;
       }}
