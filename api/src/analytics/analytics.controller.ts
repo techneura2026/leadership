@@ -52,4 +52,19 @@ export class AnalyticsController {
   getUserRadar(@Param('userId') userId: string): Promise<RadarAggregate> {
     return this.analyticsService.getUserAggregateRadar(userId);
   }
+
+
+  @Get('activity/monthly')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @ApiOperation({ summary: 'Get monthly activity metrics for the organisation' })
+  getMonthlyActivity(@Request() req: any): Promise<any> {
+    return this.analyticsService.getMonthlyActivity(req.user.orgId);
+  }
+
+  @Get('activity/participants')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @ApiOperation({ summary: 'Get participant activity metrics for the organisation' })
+  getParticipantActivity(@Request() req: any): Promise<any> {
+    return this.analyticsService.getParticipantActivity(req.user.orgId);
+  }
 }

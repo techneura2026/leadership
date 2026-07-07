@@ -358,4 +358,47 @@ export class AnalyticsService {
 
     return { competencyRadar, personalityRadar };
   }
+
+
+  async getMonthlyActivity(orgId: string): Promise<any> {
+    const raw = await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
+      .select("TO_CHAR(a.created_at, 'YYYY-MM')", 'month')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .getRawMany();
+      
+      console.log("---------getMonthlyActivity-----------------");
+      console.log(raw);
+      console.log("--------------------------");
+
+    return raw.map((r) => ({
+      month: r.month,
+      count: parseInt(r.count, 10),
+    }));
+  }
+
+  async getParticipantActivity(orgId: string): Promise<any> {
+    const raw =  await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
+      .select("TO_CHAR(a.created_at, 'YYYY-MM')", 'month')
+      .addSelect('COUNT(DISTINCT a.participant_id)', 'count')
+      .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .getRawMany();
+
+      console.log("---------getParticipantActivity-----------------");
+      console.log(raw);
+      console.log("--------------------------");
+      
+    return raw.map((r) => ({
+      month: r.month,
+      count: parseInt(r.count, 10),
+    }));
+  }
 }

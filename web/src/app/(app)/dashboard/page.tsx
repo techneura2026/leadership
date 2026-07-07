@@ -18,76 +18,77 @@ import {
 } from 'recharts';
 import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
-const MOCK_METRICS = {
-  activeAssessments: 12,
-  totalParticipants: 87,
-  pendingResponses: 23,
-  reportsGenerated: 45,
-  recentAssessments: [
-    { id: '1', title: 'Q2 Leadership 360 Review', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-28T09:00:00Z' },
-    { id: '2', title: 'Senior Manager Competency Assessment', assessmentType: AssessmentType.COMPETENCY, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-22T11:30:00Z' },
-    { id: '3', title: 'Personality Profiling – Cohort A', assessmentType: AssessmentType.PERSONALITY, status: AssessmentStatus.CLOSED, createdAt: '2026-05-10T08:15:00Z' },
-    { id: '4', title: 'Leadership Readiness – Batch 2026', assessmentType: AssessmentType.READINESS, status: AssessmentStatus.ACTIVE, createdAt: '2026-04-30T14:00:00Z' },
-    { id: '5', title: 'Mid-Year 360 Feedback', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.DRAFT, createdAt: '2026-04-18T10:45:00Z' },
-  ],
-};
+// const MOCK_METRICS = {
+//   activeAssessments: 12,
+//   totalParticipants: 87,
+//   pendingResponses: 23,
+//   reportsGenerated: 45,
+//   recentAssessments: [
+//     { id: '1', title: 'Q2 Leadership 360 Review', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-28T09:00:00Z' },
+//     { id: '2', title: 'Senior Manager Competency Assessment', assessmentType: AssessmentType.COMPETENCY, status: AssessmentStatus.ACTIVE, createdAt: '2026-05-22T11:30:00Z' },
+//     { id: '3', title: 'Personality Profiling – Cohort A', assessmentType: AssessmentType.PERSONALITY, status: AssessmentStatus.CLOSED, createdAt: '2026-05-10T08:15:00Z' },
+//     { id: '4', title: 'Leadership Readiness – Batch 2026', assessmentType: AssessmentType.READINESS, status: AssessmentStatus.ACTIVE, createdAt: '2026-04-30T14:00:00Z' },
+//     { id: '5', title: 'Mid-Year 360 Feedback', assessmentType: AssessmentType.FEEDBACK_360, status: AssessmentStatus.DRAFT, createdAt: '2026-04-18T10:45:00Z' },
+//   ],
+// };
 
-const MOCK_ORG_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
-  competencyRadar: [
-    { key: 'leadership', label: 'Leadership', value: 74 },
-    { key: 'communication', label: 'Communication', value: 81 },
-    { key: 'strategic', label: 'Strategic Thinking', value: 65 },
-    { key: 'teamBuilding', label: 'Team Building', value: 78 },
-    { key: 'innovation', label: 'Innovation', value: 59 },
-    { key: 'decision', label: 'Decision Making', value: 72 },
-  ],
-  personalityRadar: [
-    { key: 'openness', label: 'Openness', value: 68 },
-    { key: 'conscientiousness', label: 'Conscientiousness', value: 77 },
-    { key: 'extraversion', label: 'Extraversion', value: 62 },
-    { key: 'agreeableness', label: 'Agreeableness', value: 83 },
-    { key: 'neuroticism', label: 'Neuroticism', value: 42 },
-  ],
-};
+// const MOCK_ORG_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
+//   competencyRadar: [
+//     { key: 'leadership', label: 'Leadership', value: 74 },
+//     { key: 'communication', label: 'Communication', value: 81 },
+//     { key: 'strategic', label: 'Strategic Thinking', value: 65 },
+//     { key: 'teamBuilding', label: 'Team Building', value: 78 },
+//     { key: 'innovation', label: 'Innovation', value: 59 },
+//     { key: 'decision', label: 'Decision Making', value: 72 },
+//   ],
+//   personalityRadar: [
+//     { key: 'openness', label: 'Openness', value: 68 },
+//     { key: 'conscientiousness', label: 'Conscientiousness', value: 77 },
+//     { key: 'extraversion', label: 'Extraversion', value: 62 },
+//     { key: 'agreeableness', label: 'Agreeableness', value: 83 },
+//     { key: 'neuroticism', label: 'Neuroticism', value: 42 },
+//   ],
+// };
 
-const MOCK_USER_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
-  competencyRadar: [
-    { key: 'leadership', label: 'Leadership', value: 80 },
-    { key: 'communication', label: 'Communication', value: 73 },
-    { key: 'strategic', label: 'Strategic Thinking', value: 88 },
-    { key: 'teamBuilding', label: 'Team Building', value: 65 },
-    { key: 'innovation', label: 'Innovation', value: 70 },
-    { key: 'decision', label: 'Decision Making', value: 85 },
-  ],
-  personalityRadar: [
-    { key: 'openness', label: 'Openness', value: 72 },
-    { key: 'conscientiousness', label: 'Conscientiousness', value: 85 },
-    { key: 'extraversion', label: 'Extraversion', value: 55 },
-    { key: 'agreeableness', label: 'Agreeableness', value: 79 },
-    { key: 'neuroticism', label: 'Neuroticism', value: 35 },
-  ],
-};
+// const MOCK_USER_RADAR: { competencyRadar: RadarAxis[]; personalityRadar: RadarAxis[] } = {
+//   competencyRadar: [
+//     { key: 'leadership', label: 'Leadership', value: 80 },
+//     { key: 'communication', label: 'Communication', value: 73 },
+//     { key: 'strategic', label: 'Strategic Thinking', value: 88 },
+//     { key: 'teamBuilding', label: 'Team Building', value: 65 },
+//     { key: 'innovation', label: 'Innovation', value: 70 },
+//     { key: 'decision', label: 'Decision Making', value: 85 },
+//   ],
+//   personalityRadar: [
+//     { key: 'openness', label: 'Openness', value: 72 },
+//     { key: 'conscientiousness', label: 'Conscientiousness', value: 85 },
+//     { key: 'extraversion', label: 'Extraversion', value: 55 },
+//     { key: 'agreeableness', label: 'Agreeableness', value: 79 },
+//     { key: 'neuroticism', label: 'Neuroticism', value: 35 },
+//   ],
+// };
 
-const MOCK_MONTHLY_ACTIVITY = [
-  { month: 'Jan', completed: 8, launched: 11 },
-  { month: 'Feb', completed: 14, launched: 17 },
-  { month: 'Mar', completed: 19, launched: 22 },
-  { month: 'Apr', completed: 12, launched: 15 },
-  { month: 'May', completed: 24, launched: 28 },
-  { month: 'Jun', completed: 18, launched: 21 },
-];
+// const MOCK_MONTHLY_ACTIVITY = [
+//   { month: 'Jan', completed: 8, launched: 11 },
+//   { month: 'Feb', completed: 14, launched: 17 },
+//   { month: 'Mar', completed: 19, launched: 22 },
+//   { month: 'Apr', completed: 12, launched: 15 },
+//   { month: 'May', completed: 24, launched: 28 },
+//   { month: 'Jun', completed: 18, launched: 21 },
+// ];
 
-const MOCK_PARTICIPANT_TREND = [
-  { month: 'Jan', participants: 42 },
-  { month: 'Feb', participants: 55 },
-  { month: 'Mar', participants: 63 },
-  { month: 'Apr', participants: 71 },
-  { month: 'May', participants: 80 },
-  { month: 'Jun', participants: 87 },
-];
+// const MOCK_PARTICIPANT_TREND = [
+//   { month: 'Jan', participants: 42 },
+//   { month: 'Feb', participants: 55 },
+//   { month: 'Mar', participants: 63 },
+//   { month: 'Apr', participants: 71 },
+//   { month: 'May', participants: 80 },
+//   { month: 'Jun', participants: 87 },
+// ];
 
 // ── Label Maps ────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,23 @@ function RadarViews({
 
 function ActivityCharts() {
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'))
+  const [MOCK_MONTHLY_ACTIVITY, setMonthlyActivity] = useState([
+    { month: 'Jan', completed: 8, launched: 11 },
+    { month: 'Feb', completed: 14, launched: 17 },
+    { month: 'Mar', completed: 19, launched: 3 },
+    { month: 'Apr', completed: 12, launched: 5 },
+    { month: 'May', completed: 24, launched: 7 },
+    { month: 'Jun', completed: 18, launched: 23 },
+  ]);
+  const [MOCK_PARTICIPANT_TREND, setParticipantTrend] = useState([
+    { month: 'Jan', participants: 42 },
+    { month: 'Feb', participants: 55 },
+    { month: 'Mar', participants: 23 },
+    { month: 'Apr', participants: 30 },
+    { month: 'May', participants: 20 },
+    { month: 'Jun', participants: 34 },
+  ]);
+
   useEffect(() => {
     // 1. Function to check current theme
     const checkTheme = () => document.documentElement.classList.contains('dark');
@@ -172,6 +190,44 @@ function ActivityCharts() {
     // 4. Cleanup observer on unmount
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    //not set..................................................................................................
+    const getMonthlyActivity = async () => {
+
+      try {
+        const res = await api.get<{ data: any }>('/analytics/activity/monthly');
+        console.log("---------fetchMonthlyActivity-----------------"); 
+        console.log(res.data.data);
+        console.log("--------------------------");
+        // setMonthlyActivity(res.data.data);
+      } catch (e) {
+        console.log("error in getMonthlyActivity ", e)
+      }
+    }
+
+    //not set.........................................................................................................
+    const getParticipantTrend = async () => {
+      try {
+
+        const res = await api.get<{ data: any }>('/analytics/activity/participants');
+        console.log("---------fetchParticipantTrend-----------------");
+        console.log(res.data.data);
+        console.log("--------------------------");
+        setParticipantTrend(res.data.data);
+      } catch (e) {
+        console.log("error in getParticipantTrend ", e)
+      }
+    }
+
+    getMonthlyActivity();
+    getParticipantTrend();
+    console.log(MOCK_MONTHLY_ACTIVITY,"MOCK_MONTHLY_ACTIVITY")
+
+  }, [])
+
+
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
       {/* Monthly Completions */}
@@ -184,7 +240,7 @@ function ActivityCharts() {
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={28} />
             <Tooltip
-              contentStyle={{ backgroundColor: isDark ? '#1e293b': '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
+              contentStyle={{ backgroundColor: isDark ? '#1e293b' : '#ffffff', borderRadius: 12, border: '1px solid #e5e7eb', fontSize: 13 }}
               cursor={{ fill: 'transparent' }}
             />
             <Bar dataKey="launched" name="Launched" fill="#bfdbfe" radius={[6, 6, 0, 0]} />
@@ -240,6 +296,24 @@ function ActivityCharts() {
 // ── User Dashboard ────────────────────────────────────────────────────────────
 
 function UserDashboard() {
+  const [MOCK_USER_RADAR, setMockUserRadar] = useState({ competencyRadar: [], personalityRadar: [] });
+
+  useEffect(() => {
+    const getUsesrRadar = async () => {
+      try {
+        const res = await api.get<{ data: any }>('/analytics/radar/user');
+        console.log("---------fetchUserRadar-----------------");
+        console.log(res.data.data);
+        console.log("--------------------------");
+        setMockUserRadar(res.data.data);
+      } catch (e) {
+        console.log(e)
+        setMockUserRadar({ competencyRadar: [], personalityRadar: [] });
+      }
+    }
+    getUsesrRadar()
+  }, [])
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-8">
@@ -254,6 +328,42 @@ function UserDashboard() {
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
+  const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: 10, totalParticipants: 10, pendingResponses: 10, reportsGenerated: 10, recentAssessments: [] });
+  const [MOCK_ORG_RADAR, setOrgRadar] = useState({ competencyRadar: [], personalityRadar:  [] });
+
+  useEffect(() => {
+    const getDashboardMetrics = async () => {
+      try {
+        const res = await api.get<{ data: any }>('/analytics/dashboard');
+        console.log("---------fetchDashboardMetrics-----------------");
+        console.log(res.data.data);
+        console.log("--------------------------");
+        // setMonthlyActivity(res.data.data);
+      } catch (e) {
+        console.error("Error fetching dashboard metrics:", e);
+        // setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
+      }
+    }
+
+    const getFetchOrgRadar = async () => {
+      try {
+        const res = await api.get<{ data: any }>('/analytics/radar/org');
+        console.log("---------fetchOrgRadar-----------------");
+        console.log(res.data.data);
+        console.log("--------------------------");
+        setOrgRadar(res.data.data);
+      }
+      catch (e) {
+        console.error("Error fetching organization radar data:", e);
+        setOrgRadar({ competencyRadar: [], personalityRadar: [] });
+      }
+    }
+
+    getDashboardMetrics();
+    getFetchOrgRadar();
+  }, []);
+
+
   const router = useRouter();
 
   const stats = [
@@ -358,7 +468,7 @@ function AdminDashboard() {
         </div>
 
         <div className="divide-y divide-gray-100">
-          {MOCK_METRICS.recentAssessments.map((a) => (
+          {MOCK_METRICS.recentAssessments.map((a: any) => (
             <div
               key={a.id}
               className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -368,10 +478,10 @@ function AdminDashboard() {
                 <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
                 <p className="text-sm text-gray-500">
                   {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>
-                  {TYPE_LABELS[a.assessmentType]}
+                  {TYPE_LABELS[a.assessmentType as AssessmentType]}
                 </p>
               </div>
-              <Badge variant={STATUS_VARIANT[a.status]}>
+              <Badge variant={STATUS_VARIANT[a.status as AssessmentStatus]}>
                 {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
               </Badge>
             </div>
