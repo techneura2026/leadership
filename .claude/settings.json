@@ -4,7 +4,11 @@
       "Bash(New-Item -ItemType Directory -Force -Path \"c:\\\\Work\\\\leader\\\\web\\\\src\\\\app\\\\\\(app\\)\\\\my-assessments\\\\[id]\\\\results\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Work\\\\leader\\\\web\\\\e2e\" -Recurse)",
       "Bash(Select-Object FullName)",
-      "Bash(test\")"
+      "Bash(test\")",
+      "Bash(terraform fmt *)",
+      "Bash(terraform validate *)",
+      "Bash(terraform plan *)",
+      "Bash(terraform apply *)"
     ],
     "additionalDirectories": [
       "c:\\Work\\leader\\web\\src\\app\\(app)\\my-assessments\\[id]"
