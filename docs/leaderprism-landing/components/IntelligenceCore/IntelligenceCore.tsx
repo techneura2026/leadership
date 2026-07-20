@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import "./IntelligenceCore.css";
 
 const BoltIcon = () => (
@@ -250,6 +250,143 @@ const capabilities = [
 export default function IntelligenceCore() {
   const diagramRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sectionRef = useRef<HTMLElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: 0.5, y: 0.5 });
+
+  // 3D Particle system
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let w = 0, h = 0;
+
+    const resize = () => {
+      w = canvas!.width = canvas!.offsetWidth;
+      h = canvas!.height = canvas!.offsetHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Create 3D particles
+    const count = 100;
+    const particles: any[] = [];
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: (Math.random() - 0.5) * 2,
+        y: (Math.random() - 0.5) * 2,
+        z: Math.random() * 3 + 0.5,
+        size: Math.random() * 2 + 0.5,
+        speed: Math.random() * 0.002 + 0.001,
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: Math.random() * 0.02 + 0.01,
+        color: [
+          [173, 198, 255],
+          [137, 206, 255],
+          [192, 193, 255],
+          [100, 140, 255],
+        ][Math.floor(Math.random() * 4)],
+      });
+    }
+
+    let time = 0;
+
+    const draw = () => {
+      time++;
+      ctx!.clearRect(0, 0, w, h);
+
+      const mx = (mouseRef.current.x - 0.5) * 2;
+      const my = (mouseRef.current.y - 0.5) * 2;
+
+      // Sort by z for depth
+      particles.sort((a, b) => a.z - b.z);
+
+      for (const p of particles) {
+        p.pulse += p.pulseSpeed;
+        const pulseFactor = 0.6 + 0.4 * Math.sin(p.pulse);
+
+        // Slow drift
+        p.x += Math.sin(time * p.speed + p.z) * 0.002;
+        p.y += Math.cos(time * p.speed + p.z) * 0.002;
+
+        // 3D perspective projection
+        const perspective = 800 / (800 + p.z * 500);
+        const px = (p.x * perspective + mx * 0.08 * p.z) * w / 2 + w / 2;
+        const py = (p.y * perspective + my * 0.08 * p.z) * h / 2 + h / 2;
+        const size = p.size * perspective * pulseFactor;
+
+        // Fade based on depth
+        const depthAlpha = Math.max(0.15, 0.5 - p.z * 0.12);
+
+        // Glow
+        ctx!.beginPath();
+        ctx!.arc(px, py, size, 0, Math.PI * 2);
+        const grad = ctx!.createRadialGradient(px, py, 0, px, py, size * 3);
+        const [r, g, b] = p.color;
+        grad.addColorStop(0, `rgba(${r},${g},${b},${depthAlpha * 0.8})`);
+        grad.addColorStop(0.3, `rgba(${r},${g},${b},${depthAlpha * 0.3})`);
+        grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx!.fillStyle = grad;
+        ctx!.fill();
+
+        // Bright core
+        ctx!.beginPath();
+        ctx!.arc(px, py, size * 0.4, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(${r},${g},${b},${depthAlpha * 0.9})`;
+        ctx!.fill();
+
+        // Draw connections between nearby particles
+        for (const other of particles) {
+          if (other === p) continue;
+          const otherPerspective = 800 / (800 + other.z * 500);
+          const ox = (other.x * otherPerspective + mx * 0.08 * other.z) * w / 2 + w / 2;
+          const oy = (other.y * otherPerspective + my * 0.08 * other.z) * h / 2 + h / 2;
+          const dx = px - ox;
+          const dy = py - oy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 100) {
+            const alpha = (1 - dist / 100) * 0.08 * depthAlpha;
+            ctx!.beginPath();
+            ctx!.moveTo(px, py);
+            const [r2, g2, b2] = other.color;
+            ctx!.strokeStyle = `rgba(${Math.floor((r + r2) / 2)},${Math.floor((g + g2) / 2)},${Math.floor((b + b2) / 2)},${alpha})`;
+            ctx!.lineWidth = 0.5;
+            ctx!.lineTo(ox, oy);
+            ctx!.stroke();
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  // Mouse tracking for 3D parallax
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const handleMouse = (e: MouseEvent) => {
+      const rect = section!.getBoundingClientRect();
+      mouseRef.current = {
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height,
+      };
+    };
+
+    section.addEventListener("mousemove", handleMouse, { passive: true });
+    return () => section.removeEventListener("mousemove", handleMouse);
+  }, []);
 
   const handleCardMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -307,11 +444,19 @@ export default function IntelligenceCore() {
     <section
       className="intelligence-core"
       id="intelligence-core"
+      ref={sectionRef}
     >
+      {/* 3D Canvas particle background */}
+      <canvas className="ic-bg-canvas" ref={canvasRef} aria-hidden="true" />
+
       {/* Deep background layers */}
       <div className="ic-bg-layer ic-bg-nebula" aria-hidden="true" />
       <div className="ic-bg-layer ic-bg-stars" aria-hidden="true" />
       <div className="ic-bg-layer ic-bg-grid" aria-hidden="true" />
+      <div className="ic-bg-layer ic-bg-aurora" aria-hidden="true" />
+      <div className="ic-bg-layer ic-bg-float-particles" aria-hidden="true" />
+      <div className="ic-bg-layer ic-bg-shooting-stars" aria-hidden="true" />
+      <div className="ic-bg-layer ic-bg-vortex" aria-hidden="true" />
 
       <div className="intelligence-core-container">
 
