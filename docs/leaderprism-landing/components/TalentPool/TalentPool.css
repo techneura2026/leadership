@@ -1,0 +1,393 @@
+.talent-pool-section {
+  width: 100%;
+  padding: 95px 24px 110px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.talent-pool-container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: 1.5fr 0.5fr;
+  gap: 80px;
+}
+
+/* =========================
+   LEFT CONTENT
+========================= */
+
+.talent-capability-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 15px;
+
+  color: #89ceff;
+
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 1px;
+}
+
+.talent-label-icon-img {
+  width: 22px;
+  height: 22px;
+
+  flex-shrink: 0;
+
+  object-fit: contain;
+}
+
+.talent-pool-left h2 {
+  margin: 0;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 700;
+
+  color: #dae2fd;
+}
+
+.talent-description {
+  margin: 22px 0 35px;
+
+  font-family: "Inter", sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+
+  color: #c2c6d6;
+}
+
+/* =========================
+   9 BOX GRID
+========================= */
+
+.nine-box-wrapper {
+  width: 100%;
+  max-width: 1100px;
+
+  margin-top: 40px;
+
+  padding: 18px;
+
+  background: rgba(15, 23, 42, 0.88);
+
+  border: 1px solid rgba(66, 71, 84, 0.65);
+
+  border-radius: 26px;
+
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+.nine-box-image {
+  display: block;
+
+  width: 130%;
+
+  height: auto;
+
+  border-radius: 16px;
+}
+
+/* =========================
+   RIGHT SIDE
+========================= */
+
+.talent-pool-right {
+  padding-top: 10px;
+}
+
+.talent-table-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 25px;
+}
+
+.talent-table-header h3 {
+  margin: 0;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 22px;
+
+  font-weight: 600;
+
+  color: #dae2fd;
+}
+
+/* =========================
+   SEARCH
+========================= */
+
+.talent-search {
+  position: relative;
+
+  width: 230px;
+}
+
+.talent-search .search-icon {
+  position: absolute;
+
+  top: 50%;
+  left: 14px;
+
+  width: 18px;
+  height: 18px;
+
+  transform: translateY(-50%);
+
+  color: #8c909f;
+}
+
+.talent-search input {
+  width: 100%;
+
+  padding: 10px 15px 10px 39px;
+
+  background: #222a3d;
+
+  border: 1px solid #424754;
+
+  border-radius: 999px;
+
+  outline: none;
+
+  color: #dae2fd;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 12px;
+}
+
+.talent-search input::placeholder {
+  color: #8c909f;
+}
+
+.talent-search input:focus {
+  border-color: #adc6ff;
+}
+
+/* =========================
+   TABLE
+========================= */
+
+.talent-table-wrapper {
+  width: 100%;
+
+  overflow-x: auto;
+}
+
+.talent-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-family: "Inter", sans-serif;
+}
+
+.talent-table th {
+  padding: 14px 10px;
+
+  border-bottom: 1px solid #424754;
+
+  text-align: left;
+
+  color: #8c909f;
+
+  font-size: 9px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.6px;
+}
+
+.talent-table td {
+  padding: 16px 10px;
+
+  border-bottom: 1px solid #424754;
+
+  color: #dae2fd;
+
+  font-size: 12px;
+}
+
+.talent-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.talent-table tbody tr:hover {
+  background: rgba(19, 27, 46, 0.5);
+}
+
+/* =========================
+   CANDIDATE
+========================= */
+
+.candidate-profile {
+  display: flex;
+
+  align-items: center;
+
+  gap: 11px;
+}
+
+.candidate-initials {
+  width: 32px;
+  height: 32px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 50%;
+
+  font-size: 9px;
+
+  font-weight: 700;
+}
+
+.candidate-initials.primary {
+  color: #adc6ff;
+
+  background: rgba(173, 198, 255, 0.15);
+}
+
+.candidate-initials.tertiary {
+  color: #89ceff;
+
+  background: rgba(137, 206, 255, 0.15);
+}
+
+.candidate-initials.neutral {
+  color: #ffffff;
+
+  background: #424754;
+}
+
+.candidate-profile strong {
+  display: block;
+
+  margin-bottom: 3px;
+
+  font-size: 11px;
+
+  color: #dae2fd;
+}
+
+.candidate-profile span {
+  display: block;
+
+  color: #8c909f;
+
+  font-size: 9px;
+}
+
+/* =========================
+   STATUS
+========================= */
+
+.performance-high {
+  color: #adc6ff;
+
+  font-weight: 700;
+}
+
+.performance-medium {
+  color: #89ceff;
+
+  font-weight: 700;
+}
+
+.readiness-pill {
+  display: inline-block;
+
+  padding: 4px 8px;
+
+  border-radius: 999px;
+
+  font-size: 8px;
+
+  font-weight: 700;
+}
+
+.readiness-pill.ready {
+  background: rgba(173, 198, 255, 0.15);
+
+  color: #adc6ff;
+}
+
+.readiness-pill.future {
+  background: #2d3449;
+
+  color: #8c909f;
+}
+
+.score-column,
+.candidate-score {
+  text-align: right !important;
+}
+
+.candidate-score {
+  font-weight: 700;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 950px) {
+  .talent-pool-container {
+    grid-template-columns: 1fr;
+
+    gap: 70px;
+  }
+
+  .nine-box-wrapper {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 650px) {
+  .talent-pool-section {
+    padding: 70px 18px 90px;
+  }
+
+  .talent-pool-left h2 {
+    font-size: 28px;
+  }
+
+  .talent-table-header {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+  .talent-search {
+    width: 100%;
+  }
+
+  .talent-table {
+    min-width: 600px;
+  }
+
+  .potential-label {
+    display: none;
+  }
+}
