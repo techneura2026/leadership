@@ -5,6 +5,17 @@
 # runbooks on a weekly Mon-Fri schedule: start at business open, stop at
 # business close. Because both schedules only fire on weekdays, the VM stays
 # deallocated across the full Fri-evening -> Mon-morning weekend window too.
+#
+# KNOWN GAP: azurerm_automation_schedule has no `enabled`/`is_enabled` argument
+# in this provider version, so Terraform cannot see or correct someone flipping
+# a schedule off in the Portal (this has happened before — both schedules sat
+# disabled for 5 days with zero trace in the Activity Log, which doesn't record
+# Automation schedule enable/disable at all). If the app ever stops "auto
+# activating" again, check this FIRST, not just VM power state:
+#   az automation schedule show -g leaderprism-rg-dev \
+#     --automation-account-name leaderprism-automation-dev \
+#     --name start-weekday-morning --query isEnabled
+# Re-enable with `az automation schedule update ... --is-enabled true`.
 
 locals {
   business_hours_timezone = "Asia/Colombo"
@@ -52,6 +63,14 @@ resource "azurerm_automation_runbook" "start_vm" {
     Connect-AzAccount -Identity | Out-Null
     Start-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName
   PS
+
+  # The Azure API confirms runbook_type is actually "PowerShell72" (az automation
+  # runbook show), but this provider version reads it back as "PowerShell" on
+  # refresh, which makes every plan want to destroy+recreate a working runbook
+  # for no real change. Ignore it rather than risk breaking the job_schedule link.
+  lifecycle {
+    ignore_changes = [runbook_type]
+  }
 }
 
 resource "azurerm_automation_runbook" "stop_vm" {
@@ -71,6 +90,11 @@ resource "azurerm_automation_runbook" "stop_vm" {
     Connect-AzAccount -Identity | Out-Null
     Stop-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -Force
   PS
+
+  # See start_vm — same provider read-back quirk.
+  lifecycle {
+    ignore_changes = [runbook_type]
+  }
 }
 
 resource "azurerm_automation_schedule" "start_weekday_morning" {

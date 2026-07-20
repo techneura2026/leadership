@@ -8,7 +8,14 @@
       "Bash(terraform fmt *)",
       "Bash(terraform validate *)",
       "Bash(terraform plan *)",
-      "Bash(terraform apply *)"
+      "Bash(terraform apply *)",
+      "Bash(az account *)",
+      "Bash(az resource *)",
+      "Bash(az group *)",
+      "Bash(az disk *)",
+      "Bash(az keyvault *)",
+      "Bash(az storage *)",
+      "Bash(az redis *)"
     ],
     "additionalDirectories": [
       "c:\\Work\\leader\\web\\src\\app\\(app)\\my-assessments\\[id]"
