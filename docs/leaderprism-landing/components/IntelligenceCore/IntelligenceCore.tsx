@@ -271,24 +271,52 @@ export default function IntelligenceCore() {
     resize();
     window.addEventListener("resize", resize);
 
-    // Create 3D particles
-    const count = 100;
+    // Colors - bright blue/cyan palette
+    const colors = [
+      [173, 198, 255],
+      [137, 206, 255],
+      [192, 193, 255],
+      [255, 255, 255],
+    ];
+
+    // 3D Wireframe geometric shape (icosahedron)
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const icoRaw = [
+      [0, 1, phi], [0, 1, -phi], [0, -1, phi], [0, -1, -phi],
+      [1, phi, 0], [1, -phi, 0], [-1, phi, 0], [-1, -phi, 0],
+      [phi, 0, 1], [phi, 0, -1], [-phi, 0, 1], [-phi, 0, -1]
+    ];
+    const icoScaleVal = 1.5;
+    const wireframeVerts = icoRaw.map(v => [v[0]*icoScaleVal, v[1]*icoScaleVal, v[2]*icoScaleVal]);
+    const wireframeEdges: [number, number][] = [];
+    for (let i = 0; i < 12; i++) {
+      for (let j = i + 1; j < 12; j++) {
+        const dx = wireframeVerts[i][0] - wireframeVerts[j][0];
+        const dy = wireframeVerts[i][1] - wireframeVerts[j][1];
+        const dz = wireframeVerts[i][2] - wireframeVerts[j][2];
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (Math.abs(dist - 2*icoScaleVal) < 0.1) {
+          wireframeEdges.push([i, j]);
+        }
+      }
+    }
+
+    // Create many particles - large, bright
+    const count = 200;
     const particles: any[] = [];
     for (let i = 0; i < count; i++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
       particles.push({
-        x: (Math.random() - 0.5) * 2,
-        y: (Math.random() - 0.5) * 2,
-        z: Math.random() * 3 + 0.5,
-        size: Math.random() * 2 + 0.5,
-        speed: Math.random() * 0.002 + 0.001,
+        x: (Math.random() - 0.5) * 3,
+        y: (Math.random() - 0.5) * 3,
+        z: Math.random() * 2 + 0.1,
+        size: Math.random() * 4 + 2,
+        speed: Math.random() * 0.005 + 0.002,
         pulse: Math.random() * Math.PI * 2,
-        pulseSpeed: Math.random() * 0.02 + 0.01,
-        color: [
-          [173, 198, 255],
-          [137, 206, 255],
-          [192, 193, 255],
-          [100, 140, 255],
-        ][Math.floor(Math.random() * 4)],
+        pulseSpeed: Math.random() * 0.04 + 0.02,
+        color: c,
+        vx: (Math.random() - 0.5) * 0.003,
+        vy: (Math.random() - 0.5) * 0.003,
       });
     }
 
@@ -302,62 +330,125 @@ export default function IntelligenceCore() {
       const my = (mouseRef.current.y - 0.5) * 2;
 
       // Sort by z for depth
-      particles.sort((a, b) => a.z - b.z);
+      particles.sort((a: any, b: any) => a.z - b.z);
 
+      // Draw particle connections
+      
+      // Draw 3D wireframe geometry in background
+      const wireframeBaseSize = Math.min(w, h) * 0.25;
+      const wireRotY = time * 0.003;
+      const wireRotX = Math.sin(time * 0.002) * 0.25;
+      
+      const projectedWire = wireframeVerts.map(v => {
+        let x = v[0] * wireframeBaseSize;
+        let y = v[1] * wireframeBaseSize;
+        let z = v[2] * wireframeBaseSize;
+        
+        // Rotate around Y axis
+        const cosRY = Math.cos(wireRotY);
+        const sinRY = Math.sin(wireRotY);
+        const x1 = x * cosRY - z * sinRY;
+        const z1 = x * sinRY + z * cosRY;
+        
+        // Rotate around X axis (tilt)
+        const cosRX = Math.cos(wireRotX);
+        const sinRX = Math.sin(wireRotX);
+        const y1 = y * cosRX - z1 * sinRX;
+        const z2 = y * sinRX + z1 * cosRX;
+        
+        // Perspective projection
+        const persp = 800 / (800 + z2);
+        
+        return [
+          x1 * persp + w * 0.5,
+          y1 * persp + h * 0.5,
+          persp
+        ];
+      });
+      
+      ctx!.strokeStyle = 'rgba(173, 198, 255, 0.08)';
+      ctx!.lineWidth = 0.5;
+      wireframeEdges.forEach(([i, j]) => {
+        const [x1, y1] = projectedWire[i];
+        const [x2, y2] = projectedWire[j];
+        ctx!.beginPath();
+        ctx!.moveTo(x1, y1);
+        ctx!.lineTo(x2, y2);
+        ctx!.stroke();
+      });
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const pa = particles[i];
+          const pb = particles[j];
+          const avgZ = (pa.z + pb.z) / 2;
+          const pA = 800 / (800 + pa.z * 400);
+          const pB = 800 / (800 + pb.z * 400);
+          const ax = (pa.x * pA + mx * 0.15 * pa.z) * w / 2 + w / 2;
+          const ay = (pa.y * pA + my * 0.15 * pa.z) * h / 2 + h / 2;
+          const bx = (pb.x * pB + mx * 0.15 * pb.z) * w / 2 + w / 2;
+          const by = (pb.y * pB + my * 0.15 * pb.z) * h / 2 + h / 2;
+          const dx = ax - bx;
+          const dy = ay - by;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 200) {
+            const alpha = (1 - dist / 200) * 0.2;
+            ctx!.beginPath();
+            ctx!.moveTo(ax, ay);
+            ctx!.lineTo(bx, by);
+            ctx!.strokeStyle = `rgba(173, 198, 255, ${alpha})`;
+            ctx!.lineWidth = 0.6;
+            ctx!.stroke();
+          }
+        }
+      }
+
+      // Draw particles
       for (const p of particles) {
         p.pulse += p.pulseSpeed;
         const pulseFactor = 0.6 + 0.4 * Math.sin(p.pulse);
 
-        // Slow drift
-        p.x += Math.sin(time * p.speed + p.z) * 0.002;
-        p.y += Math.cos(time * p.speed + p.z) * 0.002;
+        // Movement
+        p.x += p.vx + Math.sin(time * 0.001 + p.z) * 0.001;
+        p.y += p.vy + Math.cos(time * 0.001 + p.z) * 0.001;
 
-        // 3D perspective projection
-        const perspective = 800 / (800 + p.z * 500);
-        const px = (p.x * perspective + mx * 0.08 * p.z) * w / 2 + w / 2;
-        const py = (p.y * perspective + my * 0.08 * p.z) * h / 2 + h / 2;
+        // 3D projection
+        const perspective = 800 / (800 + p.z * 400);
+        const px = (p.x * perspective + mx * 0.15 * p.z) * w / 2 + w / 2;
+        const py = (p.y * perspective + my * 0.15 * p.z) * h / 2 + h / 2;
+
+        // Clamp to visible area
+        if (px < -100 || px > w + 100 || py < -100 || py > h + 100) {
+          p.x = (Math.random() - 0.5) * 2;
+          p.y = (Math.random() - 0.5) * 2;
+          continue;
+        }
+
         const size = p.size * perspective * pulseFactor;
-
-        // Fade based on depth
-        const depthAlpha = Math.max(0.15, 0.5 - p.z * 0.12);
-
-        // Glow
-        ctx!.beginPath();
-        ctx!.arc(px, py, size, 0, Math.PI * 2);
-        const grad = ctx!.createRadialGradient(px, py, 0, px, py, size * 3);
+        const depthAlpha = Math.max(0.3, 0.8 - p.z * 0.2);
         const [r, g, b] = p.color;
-        grad.addColorStop(0, `rgba(${r},${g},${b},${depthAlpha * 0.8})`);
-        grad.addColorStop(0.3, `rgba(${r},${g},${b},${depthAlpha * 0.3})`);
+
+        // Large visible glow
+        const grad = ctx!.createRadialGradient(px, py, 0, px, py, size * 6);
+        grad.addColorStop(0, `rgba(${r},${g},${b},0.8)`);
+        grad.addColorStop(0.2, `rgba(${r},${g},${b},0.5)`);
+        grad.addColorStop(0.5, `rgba(${r},${g},${b},0.2)`);
         grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx!.beginPath();
+        ctx!.arc(px, py, size * 6, 0, Math.PI * 2);
         ctx!.fillStyle = grad;
         ctx!.fill();
 
-        // Bright core
+        // Bright solid core
         ctx!.beginPath();
-        ctx!.arc(px, py, size * 0.4, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${r},${g},${b},${depthAlpha * 0.9})`;
+        ctx!.arc(px, py, size * 0.8, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(${r},${g},${b},1)`;
         ctx!.fill();
 
-        // Draw connections between nearby particles
-        for (const other of particles) {
-          if (other === p) continue;
-          const otherPerspective = 800 / (800 + other.z * 500);
-          const ox = (other.x * otherPerspective + mx * 0.08 * other.z) * w / 2 + w / 2;
-          const oy = (other.y * otherPerspective + my * 0.08 * other.z) * h / 2 + h / 2;
-          const dx = px - ox;
-          const dy = py - oy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 100) {
-            const alpha = (1 - dist / 100) * 0.08 * depthAlpha;
-            ctx!.beginPath();
-            ctx!.moveTo(px, py);
-            const [r2, g2, b2] = other.color;
-            ctx!.strokeStyle = `rgba(${Math.floor((r + r2) / 2)},${Math.floor((g + g2) / 2)},${Math.floor((b + b2) / 2)},${alpha})`;
-            ctx!.lineWidth = 0.5;
-            ctx!.lineTo(ox, oy);
-            ctx!.stroke();
-          }
-        }
+        // White hot center
+        ctx!.beginPath();
+        ctx!.arc(px, py, size * 0.3, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(255, 255, 255, 1)`;
+        ctx!.fill();
       }
 
       animId = requestAnimationFrame(draw);
@@ -457,6 +548,12 @@ export default function IntelligenceCore() {
       <div className="ic-bg-layer ic-bg-float-particles" aria-hidden="true" />
       <div className="ic-bg-layer ic-bg-shooting-stars" aria-hidden="true" />
       <div className="ic-bg-layer ic-bg-vortex" aria-hidden="true" />
+
+      {/* Floating ambient orbs */}
+      <div className="ic-bg-orb ic-bg-orb--1" aria-hidden="true" />
+      <div className="ic-bg-orb ic-bg-orb--2" aria-hidden="true" />
+      <div className="ic-bg-orb ic-bg-orb--3" aria-hidden="true" />
+      <div className="ic-bg-orb ic-bg-orb--4" aria-hidden="true" />
 
       <div className="intelligence-core-container">
 
