@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getAppLoginUrl } from "@/lib/urls";
 import "./Header.css";
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const loginUrl = getAppLoginUrl();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,8 +41,8 @@ export default function Header() {
 
         {/* Actions */}
         <div className="header-actions">
-          <button className="sign-in-btn">Sign In</button>
-          <button className="demo-btn">Book a Demo</button>
+          <a href={loginUrl} className="sign-in-btn">Sign In</a>
+          <a href={loginUrl} className="demo-btn">Book a Demo</a>
         </div>
       </div>
     </header>

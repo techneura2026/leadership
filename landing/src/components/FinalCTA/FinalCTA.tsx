@@ -1,6 +1,9 @@
+import { getAppLoginUrl } from "@/lib/urls";
 import "./FinalCTA.css";
 
 export default function FinalCTA() {
+  const loginUrl = getAppLoginUrl();
+
   return (
     <section className="final-cta">
       <div className="final-cta-glow"></div>
@@ -14,10 +17,10 @@ export default function FinalCTA() {
           decisions.
         </p>
 
-        <button className="final-cta-button">
+        <a href={loginUrl} className="final-cta-button">
           Book a Demo
           <span>→</span>
-        </button>
+        </a>
       </div>
     </section>
   );

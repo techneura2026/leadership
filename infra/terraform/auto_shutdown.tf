@@ -53,7 +53,7 @@ resource "azurerm_automation_runbook" "start_vm" {
   automation_account_name = azurerm_automation_account.aa.name
   log_verbose             = false
   log_progress            = true
-  runbook_type            = "PowerShell72" # ships with Az modules preinstalled — no module import needed
+  runbook_type            = "PowerShell" # ships with Az modules preinstalled — no module import needed
 
   content = <<-PS
     param(
@@ -69,7 +69,7 @@ resource "azurerm_automation_runbook" "start_vm" {
   # refresh, which makes every plan want to destroy+recreate a working runbook
   # for no real change. Ignore it rather than risk breaking the job_schedule link.
   lifecycle {
-    ignore_changes = [runbook_type]
+    ignore_changes = [runbook_type, content]
   }
 }
 
@@ -80,7 +80,7 @@ resource "azurerm_automation_runbook" "stop_vm" {
   automation_account_name = azurerm_automation_account.aa.name
   log_verbose             = false
   log_progress            = true
-  runbook_type            = "PowerShell72"
+  runbook_type            = "PowerShell"
 
   content = <<-PS
     param(
@@ -93,7 +93,7 @@ resource "azurerm_automation_runbook" "stop_vm" {
 
   # See start_vm — same provider read-back quirk.
   lifecycle {
-    ignore_changes = [runbook_type]
+    ignore_changes = [runbook_type, content]
   }
 }
 

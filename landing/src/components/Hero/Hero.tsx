@@ -1,8 +1,10 @@
+import { getAppLoginUrl } from "@/lib/urls";
 import "./Hero.css";
 import { useEffect, useRef } from "react";
 
 export default function Hero() {
   const cardRef = useRef<HTMLDivElement>(null);
+  const loginUrl = getAppLoginUrl();
 
   useEffect(() => {
     const card = cardRef.current;
@@ -80,14 +82,14 @@ export default function Hero() {
           </p>
 
           <div className="hero-actions">
-            <button className="hero-primary-btn">
+            <a href={loginUrl} className="hero-primary-btn">
               Book a Demo
               <span className="arrow">→</span>
-            </button>
+            </a>
 
-            <button className="hero-secondary-btn">
+            <a href="#capability-360" className="hero-secondary-btn">
               Explore LeaderPrism
-            </button>
+            </a>
           </div>
         </div>
 
