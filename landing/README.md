@@ -1,6 +1,6 @@
-# LeaderPrism Marketing Site
+# LeaderPrism Landing Site
 
-Public marketing/landing page for LeaderPrism. A standalone Next.js app (own Next/React/Tailwind
+Public landing page for LeaderPrism. A standalone Next.js app (own Next/React/Tailwind
 versions, not shared with `web/`), statically exported and deployed to Azure Static Web Apps.
 It is not part of the authenticated product — see the root [CLAUDE.md](../CLAUDE.md) for how it
 fits into the monorepo.
@@ -10,7 +10,7 @@ fits into the monorepo.
 From the repo root (as part of the workspace):
 
 ```bash
-npm run dev -w marketing
+npm run dev -w landing
 ```
 
 Or standalone from this directory:
@@ -28,11 +28,11 @@ Open [http://localhost:3002](http://localhost:3002).
 ## Build
 
 ```bash
-npm run build -w marketing
+npm run build -w landing
 ```
 
-Produces a static export in `marketing/out/` (`output: "export"` in `next.config.ts`), which is
-what `.github/workflows/deploy-marketing.yml` uploads to the Azure Static Web App.
+Produces a static export in `landing/out/` (`output: "export"` in `next.config.ts`), which is
+what `.github/workflows/deploy-landing.yml` uploads to the Azure Static Web App.
 
 ## Structure
 
@@ -41,3 +41,4 @@ src/app/          App Router entry (layout, page, globals.css)
 src/components/   One folder per section, each with its own .tsx + .css
 public/           Images, videos, static assets
 ```
+

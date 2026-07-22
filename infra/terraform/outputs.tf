@@ -11,12 +11,12 @@ output "ssh_private_key" {
   sensitive = true
 }
 
-output "marketing_static_web_app_hostname" {
-  value = azurerm_static_web_app.marketing.default_host_name
+output "landing_static_web_app_hostname" {
+  value = azurerm_static_web_app.landing.default_host_name
 }
 
-output "marketing_static_web_app_deployment_token" {
-  value     = azurerm_static_web_app.marketing.api_key
+output "landing_static_web_app_deployment_token" {
+  value     = azurerm_static_web_app.landing.api_key
   sensitive = true
 }
 

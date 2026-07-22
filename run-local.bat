@@ -7,7 +7,7 @@ echo ============================================================
 
 :: 1. Clean up ports
 echo.
-echo [1/7] Cleaning up local ports: 3000 (Web), 3001 (API), 3002 (Marketing), 5432 (Postgres), 6379 (Redis)...
+echo [1/7] Cleaning up local ports: 3000 (Web), 3001 (API), 3002 (Landing), 5432 (Postgres), 6379 (Redis)...
 powershell -NoProfile -Command ^
   "$ports = @(3000, 3001, 3002, 5432, 6379);" ^
   "if (Get-Command docker -ErrorAction SilentlyContinue) {" ^
@@ -155,6 +155,6 @@ powershell -NoProfile -Command "Write-Host '🚀 Setup complete! Starting develo
 echo ============================================================
 echo.
 
-powershell -NoProfile -Command "Write-Host 'API: http://localhost:3001  Web: http://localhost:3000  Marketing: http://localhost:3002' -ForegroundColor Cyan"
+powershell -NoProfile -Command "Write-Host 'API: http://localhost:3001  Web: http://localhost:3000  Landing: http://localhost:3002' -ForegroundColor Cyan"
 
 call npm run dev

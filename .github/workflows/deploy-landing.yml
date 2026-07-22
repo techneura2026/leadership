@@ -1,11 +1,11 @@
-name: Deploy Marketing Site
+name: Deploy Landing Site
 
 on:
   push:
     branches: [master]
     paths:
-      - 'marketing/**'
-      - '.github/workflows/deploy-marketing.yml'
+      - 'landing/**'
+      - '.github/workflows/deploy-landing.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,15 +28,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build marketing site (static export)
-        run: npm run build -w marketing
+      - name: Build landing site (static export)
+        run: npm run build -w landing
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_MARKETING }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_LANDING }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: 'upload'
-          app_location: 'marketing/out'
+          app_location: 'landing/out'
           output_location: ''
           skip_app_build: true

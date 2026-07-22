@@ -12,7 +12,7 @@ echo "============================================================"
 
 # 1. Clean up ports
 echo ""
-echo "[1/7] Cleaning up local ports: 3000 (Web), 3001 (API), 3002 (Marketing), 5432 (Postgres), 6379 (Redis)..."
+echo "[1/7] Cleaning up local ports: 3000 (Web), 3001 (API), 3002 (Landing), 5432 (Postgres), 6379 (Redis)..."
 for port in 3000 3001 3002 5432 6379; do
   # Kill any process holding these ports
   fuser -k ${port}/tcp 2>/dev/null
@@ -125,7 +125,7 @@ echo "============================================================"
 echo -e "${GREEN}🚀 Setup complete! Starting development servers...${NC}"
 echo "============================================================"
 echo ""
-echo -e "${GREEN}API: http://localhost:3001  Web: http://localhost:3000  Marketing: http://localhost:3002${NC}"
+echo -e "${GREEN}API: http://localhost:3001  Web: http://localhost:3000  Landing: http://localhost:3002${NC}"
 echo ""
 
 npm run dev

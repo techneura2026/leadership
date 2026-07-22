@@ -172,9 +172,9 @@ resource "azurerm_linux_virtual_machine" "vm" {
   )
 }
 
-# Static Web App — hosts the marketing/landing site (static export, deployed via GitHub Actions)
-resource "azurerm_static_web_app" "marketing" {
-  name                = "${var.app_name}-marketing-${var.environment}"
+# Static Web App — hosts the landing site (static export, deployed via GitHub Actions)
+resource "azurerm_static_web_app" "landing" {
+  name                = "${var.app_name}-landing-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   sku_tier            = "Free"
