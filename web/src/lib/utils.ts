@@ -17,9 +17,16 @@ export function getLandingUrl(): string {
   if (process.env.NEXT_PUBLIC_LANDING_URL) {
     return process.env.NEXT_PUBLIC_LANDING_URL;
   }
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://gentle-sea-03bfac610.7.azurestaticapps.net';
+    }
+  }
+  if (process.env.NODE_ENV === 'production') {
     return 'https://gentle-sea-03bfac610.7.azurestaticapps.net';
   }
   return 'http://localhost:3002';
 }
+
 
