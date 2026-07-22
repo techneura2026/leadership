@@ -22,10 +22,13 @@ Built by TechNeura Consulting. Target market: Sri Lankan and regional HR consult
 ## Monorepo Packages
 
 ```
-api/      NestJS backend — all backend logic
-web/      Next.js frontend
-shared/   Shared TypeScript types, enums, interfaces
-infra/    Azure Bicep IaC
+api/        NestJS backend — all backend logic
+web/        Next.js frontend (the product app)
+shared/     Shared TypeScript types, enums, interfaces
+marketing/  Next.js public marketing/landing site — independent app, own Next/React/Tailwind
+            versions, static-exported and deployed to Azure Static Web Apps (not the Tailwind-only
+            / no-CSS-files rule below — it's a self-contained site with its own design system)
+infra/      Terraform IaC (infra/terraform)
 ```
 
 ## Key Commands
@@ -160,4 +163,5 @@ Redis:    localhost:6379
 - [x] Phase 3 — PDF reporting (Puppeteer + Handlebars), BullMQ queue, report templates
 - [x] Phase 4 — UC4 readiness, analytics, succession dashboard (9-box)
 - [x] Phase 5 — 55 unit tests passing, Playwright E2E setup, build verified
-- [ ] Prod deployment — Azure resources (infra/ Bicep stubs ready)
+- [x] Marketing site — landing page live on Azure Static Web Apps (infra/terraform)
+- [ ] Prod deployment — Azure resources (infra/terraform, VM + Static Web App provisioned for dev)

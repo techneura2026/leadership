@@ -1,0 +1,414 @@
+.succession-section {
+  width: 100%;
+  padding: 95px 24px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.succession-container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 85px;
+}
+
+/* =========================
+   LEFT CONTENT
+========================= */
+
+.succession-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.succession-capability-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  color: #adc6ff;
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.succession-label-icon-img {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.succession-content h2 {
+  margin: 0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #dae2fd;
+}
+
+.succession-description {
+  margin: 22px 0 0;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #c2c6d6;
+}
+
+/* =========================
+   RISK CARD
+========================= */
+
+.succession-risk-card {
+  width: 100%;
+  margin-top: 28px;
+  padding: 22px;
+  background: rgba(45, 52, 73, 0.3);
+  border: 1px solid #424754;
+  border-radius: 16px;
+}
+
+.succession-risk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.succession-risk-header h3 {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #adc6ff;
+}
+
+.risk-badge {
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: rgba(255, 180, 171, 0.12);
+  color: #ffb4ab;
+  font-family: "Inter", sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* =========================
+   SUCCESSOR SUMMARY
+========================= */
+
+.successor-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.successor-avatars {
+  display: flex;
+  align-items: center;
+}
+
+.successor-avatar {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -10px;
+  border: 2px solid #0b1326;
+  border-radius: 50%;
+  font-family: "Inter", sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.successor-avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar-one {
+  background: #222a3d;
+  color: #adc6ff;
+}
+
+.avatar-two {
+  background: #171f33;
+  color: #89ceff;
+}
+
+.avatar-more {
+  background: #adc6ff;
+  color: #002e6a;
+}
+
+.successor-summary p {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  color: #c2c6d6;
+}
+
+/* =========================
+   SUCCESSION MAP
+========================= */
+
+.succession-map-wrapper {
+  position: relative;
+  perspective: 1200px;
+}
+
+.succession-map-glow {
+  position: absolute;
+  inset: -45px;
+  background: rgba(173, 198, 255, 0.06);
+  filter: blur(70px);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.succession-map-card {
+  position: relative;
+  padding: 30px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(66, 71, 84, 0.65);
+  border-radius: 28px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translate3d(0, 0, 0);
+  transition: transform 0.15s ease-out, box-shadow 0.35s ease;
+  will-change: transform;
+}
+
+.succession-map-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(173, 198, 255, 0.1),
+    transparent 40%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.succession-map-card:hover::after {
+  opacity: 1;
+}
+
+.succession-map-card > * {
+  position: relative;
+  z-index: 2;
+  transform: translateZ(16px);
+}
+
+/* =========================
+   MAP HEADER
+========================= */
+
+.succession-map-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 28px;
+}
+
+.succession-map-icon-img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.succession-map-header h3 {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #dae2fd;
+}
+
+/* =========================
+   CURRENT CEO
+========================= */
+
+.current-ceo-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: #131b2e;
+  border: 1px solid #424754;
+  border-radius: 12px;
+}
+
+.ceo-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #222a3d;
+  border: 2px solid rgba(173, 198, 255, 0.5);
+  color: #adc6ff;
+  font-family: "Inter", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.current-ceo-card h4 {
+  margin: 0 0 4px;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #dae2fd;
+}
+
+.current-ceo-card p {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-size: 10px;
+  color: #8c909f;
+}
+
+/* =========================
+   CONNECTOR
+========================= */
+
+.succession-connector {
+  width: 1px;
+  height: 30px;
+  margin: 0 auto;
+  background: #424754;
+}
+
+/* =========================
+   CANDIDATES
+========================= */
+
+.succession-candidates {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+}
+
+.candidate-card {
+  padding: 16px;
+  text-align: center;
+  border-radius: 12px;
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+
+.candidate-ready:hover,
+.candidate-future:hover {
+  transform: translate3d(0, -8px, 0) rotateX(2deg);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+}
+
+.candidate-ready {
+  background: rgba(173, 198, 255, 0.05);
+  border: 2px solid #adc6ff;
+}
+
+.candidate-future {
+  background: #131b2e;
+  border: 1px solid #424754;
+  opacity: 0.65;
+}
+
+.candidate-avatar {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: #222a3d;
+  border: 2px solid #adc6ff;
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.candidate-avatar-img {
+  width: 35%;
+  height: 60%;
+  border-radius: 100%;
+  object-fit: cover;
+}
+
+.candidate-card h4 {
+  margin: 0 0 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 12px;
+  font-weight: 720;
+  color: #dae2fd;
+}
+
+.candidate-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-family: "Inter", sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.ready-now {
+  background: #adc6ff;
+  color: #002e6a;
+}
+
+.future-ready {
+  background: #2d3449;
+  color: #8c909f;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+  .succession-container {
+    grid-template-columns: 1fr;
+    gap: 55px;
+  }
+}
+
+@media (max-width: 600px) {
+  .succession-section {
+    padding: 70px 18px;
+  }
+  .succession-content h2 {
+    font-size: 28px;
+  }
+  .succession-description {
+    font-size: 15px;
+  }
+  .succession-risk-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .succession-map-card {
+    padding: 22px;
+  }
+  .succession-candidates {
+    grid-template-columns: 1fr;
+  }
+}
