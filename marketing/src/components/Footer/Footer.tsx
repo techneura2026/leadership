@@ -9,7 +9,7 @@ export default function Footer() {
           <div className="footer-brand">
             <div className="footer-logo">
               <img
-                src="/images/Logo.png"
+                src="/images/logo.png"
                 alt="LeaderPrism"
                 className="footer-logo-img"
               />

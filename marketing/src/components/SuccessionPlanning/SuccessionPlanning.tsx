@@ -44,7 +44,7 @@ export default function SuccessionPlanning() {
         <div className="succession-content">
           <div className="succession-capability-label">
             <img
-              src="/images/Succession-Planning.png"
+              src="/images/succession-planning.png"
               alt="Succession Planning"
               className="succession-label-icon-img"
             />
@@ -86,7 +86,7 @@ export default function SuccessionPlanning() {
           <div className="succession-map-card" ref={cardRef}>
             <div className="succession-map-header">
               <img
-                src="/images/Succession-Planning.png"
+                src="/images/succession-planning.png"
                 alt="Succession Planning"
                 className="succession-map-icon-img"
               />
@@ -110,7 +110,7 @@ export default function SuccessionPlanning() {
             <div className="succession-candidates">
               <div className="candidate-card candidate-ready">
                 <img
-                  src="/images/Hero-Dashboard/Amara Perera.jpg"
+                  src="/images/hero-dashboard/amara-perera.jpg"
                   alt="Amara Perera"
                   className="candidate-avatar-img"
                 />
@@ -124,7 +124,7 @@ export default function SuccessionPlanning() {
 
               <div className="candidate-card candidate-future">
                 <img
-                  src="/images/Hero-Dashboard/Saman Mendis.jpg"
+                  src="/images/hero-dashboard/saman-mendis.jpg"
                   alt="David Mendis"
                   className="candidate-avatar-img"
                 />

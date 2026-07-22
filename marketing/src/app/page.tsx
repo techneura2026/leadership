@@ -1,21 +1,21 @@
 "use client";
 
 import { useEffect } from "react";
-import Header from "../components/Header/Header";
-import Hero from "../components/Hero/Hero";
-import LeadershipSteps from "../components/LeadershipSteps/LeadershipSteps";
-import IntelligenceCore from "../components/IntelligenceCore/IntelligenceCore";
-import AssessmentProcess from "../components/AssessmentProcess/AssessmentProcess";
-import LeadershipAssessment from "../components/LeadershipAssessment/LeadershipAssessment";
-import PersonalityProfiling from "../components/PersonalityProfiling/PersonalityProfiling";
-import CompetencyEvaluation from "../components/CompetencyEvaluation/CompetencyEvaluation";
-import ReadinessAssessment from "../components/ReadinessAssessment/ReadinessAssessment";
-import AIAnalytics from "../components/AIAnalytics/AIAnalytics";
-import SuccessionPlanning from "../components/SuccessionPlanning/SuccessionPlanning";
-import TalentPool from "../components/TalentPool/TalentPool";
-import EnterpriseAdmin from "../components/EnterpriseAdmin/EnterpriseAdmin";
-import FinalCTA from "../components/FinalCTA/FinalCTA";
-import Footer from "../components/Footer/Footer";
+import Header from "@/components/Header/Header";
+import Hero from "@/components/Hero/Hero";
+import LeadershipSteps from "@/components/LeadershipSteps/LeadershipSteps";
+import IntelligenceCore from "@/components/IntelligenceCore/IntelligenceCore";
+import AssessmentProcess from "@/components/AssessmentProcess/AssessmentProcess";
+import LeadershipAssessment from "@/components/LeadershipAssessment/LeadershipAssessment";
+import PersonalityProfiling from "@/components/PersonalityProfiling/PersonalityProfiling";
+import CompetencyEvaluation from "@/components/CompetencyEvaluation/CompetencyEvaluation";
+import ReadinessAssessment from "@/components/ReadinessAssessment/ReadinessAssessment";
+import AIAnalytics from "@/components/AIAnalytics/AIAnalytics";
+import SuccessionPlanning from "@/components/SuccessionPlanning/SuccessionPlanning";
+import TalentPool from "@/components/TalentPool/TalentPool";
+import EnterpriseAdmin from "@/components/EnterpriseAdmin/EnterpriseAdmin";
+import FinalCTA from "@/components/FinalCTA/FinalCTA";
+import Footer from "@/components/Footer/Footer";
 
 function FloatingParticles() {
   return (

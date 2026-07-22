@@ -38,7 +38,7 @@ export default function TalentPool() {
         <div className="talent-pool-left">
           <div className="talent-capability-label">
             <img
-              src="/images/Talent-pool.png"
+              src="/images/talent-pool.png"
               alt="Talent Pool"
               className="talent-label-icon-img"
             />

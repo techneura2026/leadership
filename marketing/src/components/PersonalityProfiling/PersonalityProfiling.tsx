@@ -30,7 +30,7 @@ export default function PersonalityProfiling() {
             <div className="personality-feature-card">
               <div className="personality-feature-icon">
                 <img
-                  src="/images/Trait Analysis.png"
+                  src="/images/trait-analysis.png"
                   alt="Trait Analysis"
                   className="feature-icon-img"
                 />
@@ -46,7 +46,7 @@ export default function PersonalityProfiling() {
             <div className="personality-feature-card">
               <div className="personality-feature-icon tertiary">
                 <img
-                  src="/images/Style Matching.png"
+                  src="/images/style-matching.png"
                   alt="Style Matching"
                   className="feature-icon-img"
                 />

@@ -5,13 +5,15 @@
   "workspaces": [
     "api",
     "web",
-    "shared"
+    "shared",
+    "marketing"
   ],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w api\" \"npm run dev -w web\"",
+    "dev": "concurrently -n api,web,marketing -c blue,green,magenta \"npm run dev -w api\" \"npm run dev -w web\" \"npm run dev -w marketing\"",
     "dev:api": "npm run dev -w api",
     "dev:web": "npm run dev -w web",
-    "build": "npm run build -w shared && npm run build -w api && npm run build -w web",
+    "dev:marketing": "npm run dev -w marketing",
+    "build": "npm run build -w shared && npm run build -w api && npm run build -w web && npm run build -w marketing",
     "test": "npm run test -w api && npm run test -w web",
     "lint": "npm run lint -w api && npm run lint -w web",
     "db:up": "docker compose up db redis -d",

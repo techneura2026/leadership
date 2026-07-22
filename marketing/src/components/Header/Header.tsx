@@ -23,7 +23,7 @@ export default function Header() {
         {/* Logo */}
         <div className="header-logo">
           <div className="header-logo-icon">
-            <img src="/images/Logo.png" alt="LeaderPrism Logo" className="header-logo-img" />
+            <img src="/images/logo.png" alt="LeaderPrism Logo" className="header-logo-img" />
           </div>
           <span className="header-logo-text">LeaderPrism</span>
         </div>

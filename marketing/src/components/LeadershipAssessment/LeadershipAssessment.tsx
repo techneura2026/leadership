@@ -11,7 +11,7 @@ export default function LeadershipAssessment() {
           <div className="assessment-card">
             <div className="assessment-profile">
               <img
-                src="/images/Thomas Wickramasinghe.jpg"
+                src="/images/thomas-wickramasinghe.jpg"
                 alt="Thomas Wickramasinghe"
                 className="assessment-avatar-img"
               />

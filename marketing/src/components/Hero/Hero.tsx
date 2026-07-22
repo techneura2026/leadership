@@ -132,7 +132,7 @@ export default function Hero() {
             <div className="people-list">
               <div className="person-card person-card-active">
                 <img
-                  src="/images/Hero-Dashboard/Amara Perera.jpg"
+                  src="/images/hero-dashboard/amara-perera.jpg"
                   alt="Amara Perera"
                   className="person-avatar-img"
                 />
@@ -150,7 +150,7 @@ export default function Hero() {
 
               <div className="person-card">
                 <img
-                  src="/images/Hero-Dashboard/Saman Mendis.jpg"
+                  src="/images/hero-dashboard/saman-mendis.jpg"
                   alt="Saman Mendis"
                   className="person-avatar-img"
                 />

@@ -1,0 +1,42 @@
+name: Deploy Marketing Site
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'marketing/**'
+      - '.github/workflows/deploy-marketing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 'Build and Deploy to Azure Static Web Apps'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build marketing site (static export)
+        run: npm run build -w marketing
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_MARKETING }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'marketing/out'
+          output_location: ''
+          skip_app_build: true

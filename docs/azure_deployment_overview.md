@@ -28,6 +28,7 @@ Below is the list of active resources provisioned under the `leaderprism-rg-dev`
 | [leaderprism-vnet-dev](file:///c:/Work/leader/infra/terraform/main.tf#L13) | `Microsoft.Network/virtualNetworks` | `centralus` | `Succeeded` | Virtual Network (CIDR: `10.0.0.0/16`) |
 | [leaderprism-nic-dev](file:///c:/Work/leader/infra/terraform/main.tf#L106) | `Microsoft.Network/networkInterfaces` | `centralus` | `Succeeded` | Network interface linking VM, VNet Subnet, and Public IP |
 | [leaderprism-automation-dev](file:///c:/Work/leader/infra/terraform/auto_shutdown.tf#L19) | `Microsoft.Automation/automationAccounts` | `centralus` | `Succeeded` | Automation Account (Basic SKU) running the VM start/stop schedule below |
+| [leaderprism-marketing-dev](file:///c:/Work/leader/infra/terraform/main.tf#L176) | `Microsoft.Web/staticSites` | `centralus` | `Succeeded` | Static Web App (Free SKU) hosting the marketing/landing site (`marketing/`), globally CDN-distributed at `agreeable-desert-06accd510.7.azurestaticapps.net` |
 
 ---
 
@@ -90,6 +91,7 @@ Below is the monthly cost breakdown based on Microsoft Azure's standard retail p
 | **Automation Account** | `Basic` | Free tier: 500 min/mo | **$0.00** | ~44 runbook jobs/month (22 start + 22 stop), each a few seconds — well within the free monthly job-run minutes. |
 | **Bandwidth** | `Data Transfer Egress` | Free first 100 GB | **$0.00+** | Variable depending on file uploads/downloads. |
 | **VNet & Security Group**| `Standard` | Free | **$0.00** | Azure Network structures are included at no cost. |
+| **Static Web App** | `Free` | Free tier: 100 GB bandwidth/mo | **$0.00** | Marketing/landing site — static export, globally CDN-distributed. |
 | **Total Estimated Cost**| | | **~$31.67 / month** | Down from ~$74.25/month (~57% reduction). |
 
 > [!NOTE]
@@ -121,6 +123,12 @@ The deployment workflow is fully automated via GitHub Actions:
   2. Compiles a deployment package tarball (`deploy.tar.gz`).
   3. Transfers the tarball to `/home/ubuntu/app` on the VM using SCP.
   4. Runs SSH scripts to unpack the tarball, generate the production `.env` file, build and spin up the Docker containers, run Database Migrations (`TypeORM`), and execute Seeds.
+
+The marketing/landing site deploys independently:
+
+- **Workflow File:** [.github/workflows/deploy-marketing.yml](file:///c:/Work/leader/.github/workflows/deploy-marketing.yml)
+- **Trigger:** Push to `master` touching `marketing/**`, or manual dispatch.
+- **Actions:** Builds the Next.js static export (`npm run build -w marketing` → `marketing/out`) and uploads it directly to the `leaderprism-marketing-dev` Static Web App via `Azure/static-web-apps-deploy@v1`, using the deployment token from `terraform output -raw marketing_static_web_app_deployment_token` stored as the `AZURE_STATIC_WEB_APPS_API_TOKEN_MARKETING` GitHub secret.
 
 ---
 

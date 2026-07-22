@@ -2,17 +2,17 @@ import "./CompetencyEvaluation.css";
 
 const competencies = [
   {
-    icon: "/images/Strategic Agility.png",
+    icon: "/images/strategic-agility.png",
     title: "Strategic Agility",
     type: "primary",
   },
   {
-    icon: "/images/Inclusive Leadership.png",
+    icon: "/images/inclusive-leadership.png",
     title: "Inclusive Leadership",
     type: "tertiary",
   },
   {
-    icon: "/images/Decision Velocity.png",
+    icon: "/images/decision-velocity.png",
     title: "Decision Velocity",
     type: "secondary",
   },
@@ -85,7 +85,7 @@ export default function CompetencyEvaluation() {
             <div className="competency-feature-card">
               <div className="competency-feature-icon">
                 <img
-                  src="/images/Framework mapping.png"
+                  src="/images/framework-mapping.png"
                   alt="Framework Mapping"
                   className="feature-icon-img"
                 />
@@ -101,7 +101,7 @@ export default function CompetencyEvaluation() {
             <div className="competency-feature-card">
               <div className="competency-feature-icon tertiary">
                 <img
-                  src="/images/Behavioral indicators.png"
+                  src="/images/behavioral-indicators.png"
                   alt="Behavioral Indicators"
                   className="feature-icon-img"
                 />
