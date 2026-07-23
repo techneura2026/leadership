@@ -29,6 +29,8 @@ jobs:
         run: npm ci
 
       - name: Build landing site (static export)
+        env:
+          NEXT_PUBLIC_APP_URL: https://leaderprism-dev-app.centralus.cloudapp.azure.com
         run: npm run build -w landing
 
       - name: Deploy to Azure Static Web Apps
