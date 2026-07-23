@@ -34,7 +34,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://leaderprism-dev-app.centralus.cloudapp.azure.com/api/v1
           INTERNAL_API_URL: http://api:3001
-          NEXT_PUBLIC_LANDING_URL: https://gentle-sea-03bfac610.7.azurestaticapps.net
+          NEXT_PUBLIC_LANDING_URL: https://gentle-sea-02e23e510.7.azurestaticapps.net
         run: npm run build -w web
 
       - name: Create package tarball

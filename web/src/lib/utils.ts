@@ -20,11 +20,11 @@ export function getLandingUrl(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      return 'https://gentle-sea-03bfac610.7.azurestaticapps.net';
+      return 'https://gentle-sea-02e23e510.7.azurestaticapps.net';
     }
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://gentle-sea-03bfac610.7.azurestaticapps.net';
+    return 'https://gentle-sea-02e23e510.7.azurestaticapps.net';
   }
   return 'http://localhost:3002';
 }

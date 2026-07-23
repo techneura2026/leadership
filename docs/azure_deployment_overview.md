@@ -28,7 +28,7 @@ Below is the list of active resources provisioned under the `leaderprism-rg-dev`
 | [leaderprism-vnet-dev](file:///c:/Work/leader/infra/terraform/main.tf#L13) | `Microsoft.Network/virtualNetworks` | `centralus` | `Succeeded` | Virtual Network (CIDR: `10.0.0.0/16`) |
 | [leaderprism-nic-dev](file:///c:/Work/leader/infra/terraform/main.tf#L106) | `Microsoft.Network/networkInterfaces` | `centralus` | `Succeeded` | Network interface linking VM, VNet Subnet, and Public IP |
 | [leaderprism-automation-dev](file:///c:/Work/leader/infra/terraform/auto_shutdown.tf#L19) | `Microsoft.Automation/automationAccounts` | `centralus` | `Succeeded` | Automation Account (Basic SKU) running the VM start/stop schedule below |
-| [leaderprism-landing-dev](file:///c:/Work/leader/infra/terraform/main.tf#L176) | `Microsoft.Web/staticSites` | `centralus` | `Succeeded` | Static Web App (Free SKU) hosting the landing site (`landing/`), globally CDN-distributed at `gentle-sea-03bfac610.7.azurestaticapps.net` |
+| [leaderprism-landing-dev](file:///c:/Work/leader/infra/terraform/main.tf#L176) | `Microsoft.Web/staticSites` | `centralus` | `Succeeded` | Static Web App (Free SKU) hosting the landing site (`landing/`), globally CDN-distributed at `gentle-sea-02e23e510.7.azurestaticapps.net` |
 
 ---
 
