@@ -10,9 +10,14 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Uc2CompetencyService, GapResult, CompetencyProfileResult } from './uc2-competency.service';
+import { RolesGuard } from '../../core/auth/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { UserRole } from '@leaderprism/shared';
+import { SubmitSelfRatingsDto } from './dto/submit-self-ratings.dto';
+import { SubmitManagerRatingsDto } from './dto/submit-manager-ratings.dto';
 
 @ApiTags('Competency Assessment (UC2)')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('assessments')
 export class Uc2CompetencyController {
   constructor(private readonly uc2Service: Uc2CompetencyService) {}
@@ -32,21 +37,13 @@ export class Uc2CompetencyController {
   submitSelf(
     @Request() req: any,
     @Param('caId') caId: string,
-    @Body()
-    body: {
-      participantId: string;
-      ratings: Array<{
-        competencyId: string;
-        levelRated: number;
-        evidenceText?: string;
-        developmentComment?: string;
-      }>;
-    },
+    @Body() body: SubmitSelfRatingsDto,
   ) {
     return this.uc2Service.submitSelfRatings(caId, body.participantId, body.ratings);
   }
 
   @Post(':id/competency/manager')
+  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
   @ApiOperation({ summary: 'Start manager assessment' })
   startManager(
     @Request() req: any,
@@ -62,19 +59,12 @@ export class Uc2CompetencyController {
   }
 
   @Post(':id/competency/manager/:caId/submit')
+  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
   @ApiOperation({ summary: 'Submit manager ratings' })
   submitManager(
     @Request() req: any,
     @Param('caId') caId: string,
-    @Body()
-    body: {
-      ratings: Array<{
-        competencyId: string;
-        levelRated: number;
-        evidenceText?: string;
-        developmentComment?: string;
-      }>;
-    },
+    @Body() body: SubmitManagerRatingsDto,
   ) {
     return this.uc2Service.submitManagerRatings(caId, req.user.sub, body.ratings);
   }

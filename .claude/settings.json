@@ -15,7 +15,9 @@
       "Bash(az disk *)",
       "Bash(az keyvault *)",
       "Bash(az storage *)",
-      "Bash(az redis *)"
+      "Bash(az redis *)",
+      "Bash(grep -rln \"styled-components\\\\|\\\\.module\\\\.css\\\\|css\\\\`\" src)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ],
     "additionalDirectories": [
       "c:\\Work\\leader\\web\\src\\app\\(app)\\my-assessments\\[id]"

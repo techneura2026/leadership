@@ -36,7 +36,7 @@ export class AnalyticsController {
   @Get('radar/me')
   @ApiOperation({ summary: 'Get aggregate radar chart data for the logged-in user' })
   getMeRadar(@Request() req: any): Promise<RadarAggregate> {
-    return this.analyticsService.getUserAggregateRadar(req.user.sub);
+    return this.analyticsService.getUserAggregateRadar(req.user.orgId, req.user.sub);
   }
 
   @Get('radar/org')
@@ -49,7 +49,7 @@ export class AnalyticsController {
   @Get('radar/user/:userId')
   @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
   @ApiOperation({ summary: 'Get aggregate radar chart data for a specific user' })
-  getUserRadar(@Param('userId') userId: string): Promise<RadarAggregate> {
-    return this.analyticsService.getUserAggregateRadar(userId);
+  getUserRadar(@Request() req: any, @Param('userId') userId: string): Promise<RadarAggregate> {
+    return this.analyticsService.getUserAggregateRadar(req.user.orgId, userId);
   }
 }

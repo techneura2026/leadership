@@ -12,9 +12,12 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ItemsService, CreateCompetencyDto, UpdateCompetencyDto } from './items.service';
+import { RolesGuard } from '../../core/auth/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { UserRole } from '@leaderprism/shared';
 
 @ApiTags('Items & Competency Library')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('items')
 export class ItemsController {
   constructor(private readonly itemsService: ItemsService) {}
@@ -32,12 +35,14 @@ export class ItemsController {
   }
 
   @Post('competencies')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
   @ApiOperation({ summary: 'Create an org-specific competency' })
   createCompetency(@Request() req: any, @Body() dto: CreateCompetencyDto) {
     return this.itemsService.createCompetency(req.user.orgId, dto);
   }
 
   @Patch('competencies/:id')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
   @ApiOperation({ summary: 'Update an org-specific competency' })
   updateCompetency(
     @Request() req: any,
