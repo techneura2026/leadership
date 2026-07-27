@@ -11,9 +11,11 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Uc3PersonalityService, QuestionnaireProgress } from './uc3-personality.service';
+import { RolesGuard } from '../../core/auth/guards/roles.guard';
+import { SaveResponseDto } from './dto/save-response.dto';
 
 @ApiTags('Personality Assessment — Big Five (UC3)')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('assessments')
 export class Uc3PersonalityController {
   constructor(private readonly uc3Service: Uc3PersonalityService) {}
@@ -33,7 +35,7 @@ export class Uc3PersonalityController {
   saveResponse(
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
-    @Body() body: { itemId: string; value: number },
+    @Body() body: SaveResponseDto,
   ) {
     return this.uc3Service.saveResponse(
       assessmentId,

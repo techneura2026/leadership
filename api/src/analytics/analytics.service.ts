@@ -276,16 +276,19 @@ export class AnalyticsService {
   }
 
   /**
-   * Returns aggregate radar chart data for a specific user.
+   * Returns aggregate radar chart data for a specific user, scoped to the
+   * requesting org so a user from another organisation can never be queried.
    */
-  async getUserAggregateRadar(userId: string): Promise<RadarAggregate> {
+  async getUserAggregateRadar(orgId: string, userId: string): Promise<RadarAggregate> {
     const competencyData = await this.competencyRatingRepo
       .createQueryBuilder('cr')
       .innerJoin('cr.competencyAssessment', 'ca')
+      .innerJoin('ca.assessment', 'a')
       .innerJoin('ca.participant', 'p')
       .innerJoin('cr.competency', 'comp')
       .innerJoin('comp.domain', 'domain')
       .where('p.user_id = :userId', { userId })
+      .andWhere('a.organisation_id = :orgId', { orgId })
       .select('domain.id', 'domainId')
       .addSelect('domain.name', 'domainName')
       .addSelect('AVG(cr.level_rated)', 'averageScore')
@@ -301,8 +304,10 @@ export class AnalyticsService {
 
     const personalityData = await this.personalityScoreRepo
       .createQueryBuilder('ps')
+      .innerJoin('ps.assessment', 'a')
       .innerJoin('ps.participant', 'p')
       .where('p.user_id = :userId', { userId })
+      .andWhere('a.organisation_id = :orgId', { orgId })
       .select('ps.factor', 'factor')
       .addSelect('AVG(ps.percentile)', 'averagePercentile')
       .groupBy('ps.factor')

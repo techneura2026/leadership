@@ -1,0 +1,376 @@
+.leadership-assessment {
+  width: 100%;
+  padding: 95px 24px;
+
+  background: transparent;
+
+  overflow: hidden;
+}
+
+.leadership-assessment-container {
+  width: 100%;
+  max-width: 1180px;
+
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  align-items: center;
+
+  gap: 85px;
+}
+
+/* =========================
+   LEFT CARD
+========================= */
+
+.assessment-card-wrapper {
+  position: relative;
+}
+
+.assessment-card-glow {
+  position: absolute;
+
+  inset: -30px;
+
+  background: rgba(173, 198, 255, 0.08);
+
+  filter: blur(55px);
+
+  border-radius: 50%;
+
+  pointer-events: none;
+}
+
+.assessment-card {
+  position: relative;
+
+  padding: 32px;
+
+  background: rgba(15, 23, 42, 0.88);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border: 1px solid #424754;
+
+  border-radius: 28px;
+
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+}
+
+/* =========================
+   PROFILE
+========================= */
+
+.assessment-profile {
+  display: flex;
+  align-items: center;
+
+  gap: 16px;
+
+  margin-bottom: 32px;
+}
+
+.assessment-avatar-img {
+  width: 58px;
+  height: 58px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #adc6ff;
+}
+
+.assessment-profile h3 {
+  margin: 0 0 4px;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 17px;
+  font-weight: 600;
+
+  color: #dae2fd;
+}
+
+.assessment-profile p {
+  margin: 0;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 13px;
+
+  color: #8c909f;
+}
+
+/* =========================
+   SCORES
+========================= */
+
+.assessment-scores {
+  display: flex;
+  flex-direction: column;
+
+  gap: 23px;
+}
+
+.score-item {
+  width: 100%;
+}
+
+.score-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 9px;
+}
+
+.score-header span {
+  font-family: "Inter", sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 700;
+
+  color: #dae2fd;
+}
+
+.score-header strong {
+  font-family: "Inter", sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 700;
+}
+
+.score-primary {
+  color: #adc6ff;
+}
+
+.score-tertiary {
+  color: #89ceff;
+}
+
+.score-bar {
+  width: 100%;
+
+  height: 7px;
+
+  background: #2d3449;
+
+  border-radius: 999px;
+
+  overflow: hidden;
+}
+
+.score-progress {
+  height: 100%;
+
+  border-radius: 999px;
+}
+
+.score-progress-primary {
+  background: #adc6ff;
+}
+
+.score-progress-tertiary {
+  background: #89ceff;
+}
+
+/* =========================
+   RATINGS
+========================= */
+
+.assessment-rating-summary {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  margin-top: 32px;
+
+  padding-top: 27px;
+
+  border-top: 1px solid #424754;
+}
+
+.rating-item {
+  text-align: center;
+}
+
+.rating-item span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 9px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.8px;
+
+  color: #8c909f;
+}
+
+.rating-item strong {
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 17px;
+
+  font-weight: 700;
+
+  color: #dae2fd;
+}
+
+/* =========================
+   RIGHT CONTENT
+========================= */
+
+.leadership-assessment-content {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-start;
+}
+
+.capability-label {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  margin-bottom: 15px;
+
+  color: #adc6ff;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 1px;
+}
+
+.capability-icon {
+  font-size: 20px;
+}
+
+.leadership-assessment-content h2 {
+  margin: 0;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 32px;
+
+  line-height: 1.25;
+
+  font-weight: 700;
+
+  color: #dae2fd;
+}
+
+.leadership-assessment-description {
+  margin: 22px 0 0;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 16px;
+
+  line-height: 1.7;
+
+  color: #c2c6d6;
+}
+
+/* =========================
+   BENEFITS
+========================= */
+
+.assessment-benefits {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 18px;
+
+  margin: 27px 0 0;
+
+  padding: 0;
+
+  list-style: none;
+}
+
+.assessment-benefits li {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 14px;
+
+  color: #dae2fd;
+}
+
+.check-icon {
+  width: 20px;
+  height: 20px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+
+  background: #adc6ff;
+
+  color: #002e6a;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+  .leadership-assessment-container {
+    grid-template-columns: 1fr;
+
+    gap: 55px;
+  }
+
+  .leadership-assessment-content {
+    order: 1;
+  }
+
+  .assessment-card-wrapper {
+    order: 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .leadership-assessment {
+    padding: 70px 18px;
+  }
+
+  .leadership-assessment-content h2 {
+    font-size: 28px;
+  }
+
+  .leadership-assessment-description {
+    font-size: 15px;
+  }
+
+  .assessment-card {
+    padding: 22px;
+  }
+
+  .assessment-profile h3 {
+    font-size: 15px;
+  }
+}

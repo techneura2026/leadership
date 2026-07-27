@@ -13,11 +13,14 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
 import * as fs from 'fs';
-import { ReportType } from '@leaderprism/shared';
+import { ReportType, UserRole } from '@leaderprism/shared';
 import { ReportingService } from './reporting.service';
+import { RolesGuard } from '../core/auth/guards/roles.guard';
+import { Roles } from '../shared/decorators/roles.decorator';
 
 @ApiTags('Reports')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
 @Controller('reports')
 export class ReportingController {
   constructor(private readonly reportingService: ReportingService) {}

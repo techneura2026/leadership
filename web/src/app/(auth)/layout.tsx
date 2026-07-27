@@ -1,9 +1,26 @@
+import { getLandingUrl } from '@/lib/utils';
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const landingUrl = getLandingUrl();
+
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%)' }}
     >
+      {/* Back to Home Button */}
+      <div className="absolute top-6 left-6 z-20">
+        <a
+          href={landingUrl}
+          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-700/60 shadow-lg backdrop-blur-sm transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Home
+        </a>
+      </div>
+
       {/* Ambient glow orbs */}
       <div
         className="absolute pointer-events-none"

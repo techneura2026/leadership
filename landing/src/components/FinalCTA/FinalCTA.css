@@ -1,0 +1,154 @@
+.final-cta {
+  position: relative;
+
+  width: 100%;
+
+  padding: 110px 24px;
+
+  background: transparent;
+
+  overflow: hidden;
+
+  border-top: 1px solid rgba(66, 71, 84, 0.35);
+}
+
+.final-cta-glow {
+  position: absolute;
+
+  width: 800px;
+  height: 450px;
+
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+
+  background: radial-gradient(
+    circle,
+    rgba(173, 198, 255, 0.12) 0%,
+    rgba(137, 206, 255, 0.04) 40%,
+    transparent 72%
+  );
+
+  pointer-events: none;
+}
+
+.final-cta-container {
+  position: relative;
+
+  z-index: 2;
+
+  width: 100%;
+  max-width: 780px;
+
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  text-align: center;
+}
+
+.final-cta h2 {
+  margin: 0;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 44px;
+  line-height: 1.2;
+
+  font-weight: 800;
+
+  letter-spacing: -1.2px;
+
+  color: #dae2fd;
+}
+
+.final-cta p {
+  max-width: 650px;
+
+  margin: 22px auto 0;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 16px;
+  line-height: 1.7;
+
+  color: #c2c6d6;
+}
+
+.final-cta-button {
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 12px;
+
+  height: 55px;
+
+  margin-top: 32px;
+
+  padding: 0 30px;
+
+  border: none;
+
+  border-radius: 999px;
+
+  background: #adc6ff;
+
+  color: #002e6a;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow: 0 12px 35px rgba(173, 198, 255, 0.25);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.final-cta-button span {
+  font-size: 22px;
+}
+
+.final-cta-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow: 0 16px 40px rgba(173, 198, 255, 0.35);
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 700px) {
+  .final-cta {
+    padding: 80px 20px;
+  }
+
+  .final-cta h2 {
+    font-size: 34px;
+  }
+
+  .final-cta p {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 450px) {
+  .final-cta h2 {
+    font-size: 29px;
+  }
+
+  .final-cta-button {
+    width: 100%;
+  }
+}

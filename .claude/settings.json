@@ -4,7 +4,20 @@
       "Bash(New-Item -ItemType Directory -Force -Path \"c:\\\\Work\\\\leader\\\\web\\\\src\\\\app\\\\\\(app\\)\\\\my-assessments\\\\[id]\\\\results\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Work\\\\leader\\\\web\\\\e2e\" -Recurse)",
       "Bash(Select-Object FullName)",
-      "Bash(test\")"
+      "Bash(test\")",
+      "Bash(terraform fmt *)",
+      "Bash(terraform validate *)",
+      "Bash(terraform plan *)",
+      "Bash(terraform apply *)",
+      "Bash(az account *)",
+      "Bash(az resource *)",
+      "Bash(az group *)",
+      "Bash(az disk *)",
+      "Bash(az keyvault *)",
+      "Bash(az storage *)",
+      "Bash(az redis *)",
+      "Bash(grep -rln \"styled-components\\\\|\\\\.module\\\\.css\\\\|css\\\\`\" src)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ],
     "additionalDirectories": [
       "c:\\Work\\leader\\web\\src\\app\\(app)\\my-assessments\\[id]"

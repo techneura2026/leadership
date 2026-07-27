@@ -1,0 +1,213 @@
+.assessment-process {
+  width: 100%;
+
+  padding: 90px 24px 95px;
+
+  background: transparent;
+
+  overflow: hidden;
+}
+
+.assessment-process-container {
+  width: 100%;
+  max-width: 1180px;
+
+  margin: 0 auto;
+}
+
+/* =========================
+   HEADING
+========================= */
+
+.assessment-process-heading {
+  text-align: center;
+
+  margin-bottom: 70px;
+}
+
+.assessment-process-heading h2 {
+  margin: 0 0 14px;
+
+  font-family: "Plus Jakarta Sans", sans-serif;
+
+  font-size: 40px;
+  line-height: 1.2;
+
+  font-weight: 800;
+
+  letter-spacing: -1px;
+
+  color: #dae2fd;
+}
+
+.assessment-process-heading p {
+  margin: 0;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 16px;
+  line-height: 1.6;
+
+  color: #c2c6d6;
+}
+
+/* =========================
+   TIMELINE
+========================= */
+
+.assessment-timeline {
+  position: relative;
+
+  width: 100%;
+}
+
+.assessment-line {
+  position: absolute;
+
+  top: 23px;
+  left: 8%;
+
+  width: 84%;
+  height: 1px;
+
+  background: rgba(66, 71, 84, 0.65);
+
+  z-index: 1;
+}
+
+.assessment-steps {
+  position: relative;
+
+  display: grid;
+
+  grid-template-columns: repeat(6, 1fr);
+
+  z-index: 2;
+}
+
+/* =========================
+   STEP
+========================= */
+
+.assessment-step {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  text-align: center;
+}
+
+.assessment-step-circle {
+  width: 48px;
+  height: 48px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  margin-bottom: 17px;
+
+  border-radius: 50%;
+
+  background: #2d3449;
+
+  border: 2px solid #424754;
+
+  color: #8c909f;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+/* First step */
+
+.assessment-step-primary {
+  background: rgba(173, 198, 255, 0.12);
+
+  border-color: #adc6ff;
+
+  color: #adc6ff;
+
+  box-shadow: 0 0 18px rgba(173, 198, 255, 0.2);
+}
+
+/* Last step */
+
+.assessment-step-tertiary {
+  background: rgba(137, 206, 255, 0.12);
+
+  border-color: #89ceff;
+
+  color: #89ceff;
+
+  box-shadow: 0 0 18px rgba(137, 206, 255, 0.2);
+}
+
+.assessment-step p {
+  max-width: 130px;
+
+  margin: 0;
+
+  font-family: "Inter", sans-serif;
+
+  font-size: 10px;
+
+  line-height: 1.4;
+
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+
+  color: #dae2fd;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 800px) {
+  .assessment-process {
+    padding: 75px 20px;
+  }
+
+  .assessment-process-heading {
+    margin-bottom: 50px;
+  }
+
+  .assessment-process-heading h2 {
+    font-size: 32px;
+  }
+
+  .assessment-line {
+    display: none;
+  }
+
+  .assessment-steps {
+    grid-template-columns: repeat(3, 1fr);
+
+    gap: 40px 20px;
+  }
+}
+
+@media (max-width: 500px) {
+  .assessment-process-heading h2 {
+    font-size: 28px;
+  }
+
+  .assessment-process-heading p {
+    font-size: 14px;
+  }
+
+  .assessment-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
