@@ -200,7 +200,7 @@ function ActivityCharts() {
         console.log("---------fetchMonthlyActivity-----------------");
         console.log(res.data.data);
         console.log("--------------------------");
-        setMonthlyActivity(res.data.data);
+         setMonthlyActivity(res.data.data);
       } catch (e) {
         console.log("error in getMonthlyActivity ", e)
       }
@@ -330,7 +330,23 @@ function UserDashboard() {
 
 function AdminDashboard() {
   const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: NaN, totalParticipants: NaN, pendingResponses: NaN, reportsGenerated: NaN, recentAssessments: [] });
-  const [MOCK_ORG_RADAR, setOrgRadar] = useState({ competencyRadar: [], personalityRadar: [] });
+  const [MOCK_ORG_RADAR, setOrgRadar] = useState({
+  competencyRadar: [
+    { key: 'leadership', label: 'Leadership', value: 10 },
+    { key: 'communication', label: 'Communication', value: 10 },
+    { key: 'strategic', label: 'Strategic Thinking', value: 10 },
+    { key: 'teamBuilding', label: 'Team Building', value: 10 },
+    { key: 'innovation', label: 'Innovation', value: 10 },
+    { key: 'decision', label: 'Decision Making', value: 10 },
+  ],
+  personalityRadar: [
+    { key: 'openness', label: 'Openness', value: 10 },
+    { key: 'conscientiousness', label: 'Conscientiousness', value: 10 },
+    { key: 'extraversion', label: 'Extraversion', value: 10 },
+    { key: 'agreeableness', label: 'Agreeableness', value: 10 },
+    { key: 'neuroticism', label: 'Neuroticism', value: 10 },
+  ],
+});
 
   useEffect(() => {
     const getDashboardMetrics = async () => {
@@ -342,7 +358,7 @@ function AdminDashboard() {
         setMonthlyActivity(res.data.data);
       } catch (e) {
         console.error("Error fetching dashboard metrics:", e);
-        setMonthlyActivity({ activeAssessments: 10, totalParticipants: 10, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
+        setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
       }
     }
 
