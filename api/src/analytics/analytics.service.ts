@@ -322,9 +322,7 @@ export class AnalyticsService {
     return { competencyRadar, personalityRadar };
   }
 
-  /**
-   * Returns aggregate radar chart data for an organisation.
-   */
+
   async getOrgAggregateRadar(orgId: string): Promise<RadarAggregate> {
     const competencyData = await this.competencyRatingRepo
       .createQueryBuilder('cr')
@@ -386,25 +384,23 @@ export class AnalyticsService {
     }));
   }
 
-  async getParticipantActivity(orgId: string): Promise<any> {
-    console.log("--------starting this------------------");
-    const raw = await this.assessmentRepo
-      .createQueryBuilder('a')
+
+  async getParticipantActivity(orgId: string) {
+    const raw = await this.participantRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.assessment', 'a')
       .where('a.organisation_id = :orgId', { orgId })
-      .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
-      .select("TO_CHAR(a.created_at, 'YYYY-MM')", 'month')
-      .addSelect('COUNT(DISTINCT a.participant_id)', 'count')
-      .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
-      .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .andWhere("p.created_at >= NOW() - INTERVAL '12 months'")
+      .select("TO_CHAR(p.created_at, 'Mon')", 'month')
+      .addSelect('COUNT(DISTINCT p.user_id)', 'participants')
+      .groupBy("TO_CHAR(p.created_at, 'Mon')")
+      .addGroupBy("DATE_TRUNC('month', p.created_at)")
+      .orderBy("DATE_TRUNC('month', p.created_at)")
       .getRawMany();
 
-    console.log("---------getParticipantActivity-----------------\n\n");
-    console.log(raw);
-    console.log("--------------------------");
-
-    return raw.map((r) => ({
+    return raw.map(r => ({
       month: r.month,
-      count: parseInt(r.count, 10),
+      participants: Number(r.participants),
     }));
   }
 }
