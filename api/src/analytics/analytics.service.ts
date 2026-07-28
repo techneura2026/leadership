@@ -386,24 +386,22 @@ export class AnalyticsService {
     }));
   }
 
-  async getParticipantActivity(orgId: string): Promise<any> {
-    const raw =  await this.assessmentRepo
-      .createQueryBuilder('a')
-      .where('a.organisation_id = :orgId', { orgId })
-      .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
-      .select("TO_CHAR(a.created_at, 'YYYY-MM')", 'month')
-      .addSelect('COUNT(DISTINCT a.participant_id)', 'count')
-      .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
-      .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
-      .getRawMany();
+async getParticipantActivity(orgId: string) {
+  const raw = await this.participantRepo
+    .createQueryBuilder('p')
+    .innerJoin('p.assessment', 'a')
+    .where('a.organisation_id = :orgId', { orgId })
+    .andWhere("p.created_at >= NOW() - INTERVAL '12 months'")
+    .select("TO_CHAR(p.created_at, 'Mon')", 'month')
+    .addSelect('COUNT(DISTINCT p.user_id)', 'participants')
+    .groupBy("TO_CHAR(p.created_at, 'Mon')")
+    .addGroupBy("DATE_TRUNC('month', p.created_at)")
+    .orderBy("DATE_TRUNC('month', p.created_at)")
+    .getRawMany();
 
-      console.log("---------getParticipantActivity-----------------");
-      console.log(raw);
-      console.log("--------------------------");
-      
-    return raw.map((r) => ({
-      month: r.month,
-      count: parseInt(r.count, 10),
-    }));
-  }
+  return raw.map(r => ({
+    month: r.month,
+    participants: Number(r.participants),
+  }));
+}
 }

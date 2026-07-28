@@ -200,7 +200,7 @@ function ActivityCharts() {
         console.log("---------fetchMonthlyActivity-----------------"); 
         console.log(res.data.data);
         console.log("--------------------------");
-        // setMonthlyActivity(res.data.data);
+         setMonthlyActivity(res.data.data);
       } catch (e) {
         console.log("error in getMonthlyActivity ", e)
       }
@@ -328,7 +328,7 @@ function UserDashboard() {
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
-  const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: 10, totalParticipants: 10, pendingResponses: 10, reportsGenerated: 10, recentAssessments: [] });
+  const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: 80, totalParticipants: 10, pendingResponses: 10, reportsGenerated: 10, recentAssessments: [] });
   const [MOCK_ORG_RADAR, setOrgRadar] = useState({ competencyRadar: [], personalityRadar:  [] });
 
   useEffect(() => {
@@ -338,10 +338,10 @@ function AdminDashboard() {
         console.log("---------fetchDashboardMetrics-----------------");
         console.log(res.data.data);
         console.log("--------------------------");
-        // setMonthlyActivity(res.data.data);
+         setMonthlyActivity(res.data.data);
       } catch (e) {
         console.error("Error fetching dashboard metrics:", e);
-        // setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
+         setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
       }
     }
 
