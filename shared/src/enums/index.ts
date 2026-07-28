@@ -57,6 +57,7 @@ export enum ReportType {
   ORG_SUMMARY = 'org_summary',
 }
 
+
 export enum ErrorCode {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   UNAUTHORISED = 'UNAUTHORISED',

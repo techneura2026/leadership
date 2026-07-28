@@ -111,7 +111,7 @@ export class PdfService {
     // Lazy-load Puppeteer to avoid startup costs
     const puppeteer = await import('puppeteer');
     const browser = await puppeteer.default.launch({
-      headless: true,
+      headless: 'shell',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
 

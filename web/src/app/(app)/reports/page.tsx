@@ -62,12 +62,12 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [generating, setGenerating] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
-  
+
   // Real State connected to backend
   const [reports, setReports] = useState<ReportModel[]>([]);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<any[]>();
   const [participants, setParticipants] = useState<any[]>([]);
-  
+
   const [showAssessmentMenu, setShowAssessmentMenu] = useState(false);
   const assessmentMenuRef = useRef<HTMLDivElement>(null);
 
@@ -79,10 +79,13 @@ export default function ReportsPage() {
         const reportsRes = await api.get('/reports');
         const reportsPayload = reportsRes.data?.data || reportsRes.data || [];
         setReports(Array.isArray(reportsPayload) ? reportsPayload : []);
+        console.log(reportsRes, "\n\n---------------\n\n")
 
-        const assessmentsRes = await api.get('/assessments'); 
-        const assessmentsPayload = assessmentsRes.data?.data || assessmentsRes.data || [];
+        const assessmentsRes = await api.get('/assessments');
+        console.log(assessmentsRes, "\n\n------assessmentsRes---------\n\n")
+        const assessmentsPayload = assessmentsRes.data?.data?.data || assessmentsRes.data || [];
         setAssessments(Array.isArray(assessmentsPayload) ? assessmentsPayload : []);
+        console.log('assessments', assessments, Array.isArray(assessmentsRes.data?.data?.data))
       } catch (error) {
         console.error("Error loading initial data: ", error);
       }
@@ -96,7 +99,7 @@ export default function ReportsPage() {
         const res = await api.get('/reports');
         const payload = res.data?.data || res.data || [];
         if (Array.isArray(payload)) setReports(payload);
-      } catch (e) {}
+      } catch (e) { }
     }, 5000);
 
     return () => clearInterval(interval);
@@ -138,21 +141,30 @@ export default function ReportsPage() {
 
   // 4. Connect Individual Generate to POST /reports/generate
   async function handleGenerate(participantId: string) {
-    const asmt = assessments.find((a) => a.id === selectedAssessment);
+    const asmt = assessments?.find((a) => a.id === selectedAssessment);
     if (!asmt) return;
 
+    if (asmt.assessmentType == '360_feedback') {
+      asmt.assessmentType = 'individual_360'
+    }
+
     setGenerating(participantId);
+    // console.log('asmt.assessmentType', asmt)
     try {
       const res = await api.post('/reports/generate', {
         assessmentId: selectedAssessment,
         participantId: participantId,
-        reportType: asmt.type,
+        reportType: asmt.assessmentType,
         language: 'en'
       });
-      
+
       const newReport = res.data?.data || res.data;
       if (newReport) {
-        setReports((prev) => [newReport, ...prev]);
+        setReports((prev) => {
+          // Remove existing report with the same ID before adding the new one
+          const filtered = prev.filter((item) => item.id !== newReport.id);
+          return [newReport, ...filtered];
+        });
       }
     } catch (error) {
       console.error("Failed to generate report:", error);
@@ -164,13 +176,16 @@ export default function ReportsPage() {
   // 5. Connect Bulk Generate by looping through participants and calling POST /reports/generate
   async function handleBulkGenerate() {
     if (!selectedAssessment || participants.length === 0) return;
-    const asmt = assessments.find((a) => a.id === selectedAssessment);
+    const asmt = assessments?.find((a) => a.id === selectedAssessment);
     if (!asmt) return;
 
     setBulkGenerating(true);
     try {
       for (const p of participants) {
         const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
+        console.log('selectedAssessment', selectedAssessment)
+        console.log('existing', existing)
+
         if (!existing) {
           await api.post('/reports/generate', {
             assessmentId: selectedAssessment,
@@ -194,9 +209,9 @@ export default function ReportsPage() {
   async function handleDownload(report: ReportModel) {
     try {
       const response = await api.get(`/reports/${report.id}/download`, {
-        responseType: 'blob' 
+        responseType: 'blob'
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -291,7 +306,7 @@ export default function ReportsPage() {
           >
             <span className={selectedAssessment ? 'text-gray-900 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}>
               {selectedAssessment
-                ? (assessments.find((a) => a.id === selectedAssessment)?.title ?? 'Select assessment')
+                ? (assessments?.find((a) => a.id === selectedAssessment)?.title ?? 'Select assessment')
                 : 'All assessments'}
             </span>
             <svg className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showAssessmentMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -313,7 +328,7 @@ export default function ReportsPage() {
                   All assessments
                 </span>
               </button>
-              {assessments.map((a) => {
+              {assessments?.map((a) => {
                 const isSelected = selectedAssessment === a.id;
                 return (
                   <button
@@ -457,7 +472,7 @@ export default function ReportsPage() {
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                 {filteredReports.map((r) => {
-                  const asmt = assessments.find((a) => a.id === r.assessmentId);
+                  const asmt = assessments?.find((a) => a.id === r.assessmentId);
                   const name = r.participantName || 'Participant';
                   const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
 
@@ -523,7 +538,7 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
-       {/* Info banner */}
+      {/* Info banner */}
       <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl px-5 py-4 flex items-start gap-3">
         <svg className="w-4 h-4 text-blue-500 dark:text-blue-300 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
