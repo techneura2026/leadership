@@ -75,7 +75,7 @@ export class AnalyticsService {
     private readonly roleProfileRepo: Repository<RoleProfile>,
     @InjectRepository(PersonalityScore)
     private readonly personalityScoreRepo: Repository<PersonalityScore>,
-  ) {}
+  ) { }
 
   /**
    * Returns key organisational dashboard metrics.
@@ -375,10 +375,10 @@ export class AnalyticsService {
       .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
       .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
       .getRawMany();
-      
-      console.log("---------getMonthlyActivity-----------------");
-      console.log(raw);
-      console.log("--------------------------");
+
+    console.log("---------getMonthlyActivity-----------------");
+    console.log(raw);
+    console.log("--------------------------");
 
     return raw.map((r) => ({
       month: r.month,
@@ -387,7 +387,8 @@ export class AnalyticsService {
   }
 
   async getParticipantActivity(orgId: string): Promise<any> {
-    const raw =  await this.assessmentRepo
+    console.log("--------starting this------------------");
+    const raw = await this.assessmentRepo
       .createQueryBuilder('a')
       .where('a.organisation_id = :orgId', { orgId })
       .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
@@ -397,10 +398,10 @@ export class AnalyticsService {
       .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
       .getRawMany();
 
-      console.log("---------getParticipantActivity-----------------");
-      console.log(raw);
-      console.log("--------------------------");
-      
+    console.log("---------getParticipantActivity-----------------\n\n");
+    console.log(raw);
+    console.log("--------------------------");
+
     return raw.map((r) => ({
       month: r.month,
       count: parseInt(r.count, 10),
