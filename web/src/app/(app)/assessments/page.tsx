@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AssessmentDto, AssessmentStatus, AssessmentType } from '@leaderprism/shared';
+import { api } from '@/lib/api';
 
 type FilterTab = 'all' | AssessmentStatus;
 
@@ -23,56 +24,69 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
   [AssessmentStatus.ARCHIVED]: 'neutral',
 };
 
-const MOCK_ASSESSMENTS: AssessmentDto[] = [
-  {
-    id: '1',
-    organisationId: 'org-demo',
-    title: 'Annual Leadership 360° Review 2025',
-    assessmentType: AssessmentType.FEEDBACK_360,
-    status: AssessmentStatus.ACTIVE,
-    config: {},
-    startDate: '2025-05-01T00:00:00.000Z',
-    endDate: '2025-07-31T00:00:00.000Z',
-    createdAt: '2025-04-15T00:00:00.000Z',
-  },
-  {
-    id: '2',
-    organisationId: 'org-demo',
-    title: 'Q2 Leadership Competency Assessment',
-    assessmentType: AssessmentType.COMPETENCY,
-    status: AssessmentStatus.DRAFT,
-    config: {},
-    startDate: '2025-06-01T00:00:00.000Z',
-    endDate: '2025-08-31T00:00:00.000Z',
-    createdAt: '2025-05-20T00:00:00.000Z',
-  },
-  {
-    id: '3',
-    organisationId: 'org-demo',
-    title: 'Big Five Personality Profiling — Cohort 2025',
-    assessmentType: AssessmentType.PERSONALITY,
-    status: AssessmentStatus.CLOSED,
-    config: {},
-    startDate: '2025-03-01T00:00:00.000Z',
-    endDate: '2025-04-30T00:00:00.000Z',
-    createdAt: '2025-02-15T00:00:00.000Z',
-  },
-  {
-    id: '4',
-    organisationId: 'org-demo',
-    title: 'Leadership Readiness Assessment Q3 2025',
-    assessmentType: AssessmentType.READINESS,
-    status: AssessmentStatus.ACTIVE,
-    config: {},
-    startDate: '2025-06-15T00:00:00.000Z',
-    endDate: '2025-09-30T00:00:00.000Z',
-    createdAt: '2025-06-01T00:00:00.000Z',
-  },
-];
+// Mock data
+// const MOCK_ASSESSMENTS: AssessmentDto[] = [
+//   {
+//     id: '1',
+//     organisationId: 'org-demo',
+//     title: 'Annual Leadership 360° Review 2025',
+//     assessmentType: AssessmentType.FEEDBACK_360,
+//     status: AssessmentStatus.ACTIVE,
+//     config: {},
+//     startDate: '2025-05-01T00:00:00.000Z',
+//     endDate: '2025-07-31T00:00:00.000Z',
+//     createdAt: '2025-04-15T00:00:00.000Z',
+//   },
+//   {
+//     id: '2',
+//     organisationId: 'org-demo',
+//     title: 'Q2 Leadership Competency Assessment',
+//     assessmentType: AssessmentType.COMPETENCY,
+//     status: AssessmentStatus.DRAFT,
+//     config: {},
+//     startDate: '2025-06-01T00:00:00.000Z',
+//     endDate: '2025-08-31T00:00:00.000Z',
+//     createdAt: '2025-05-20T00:00:00.000Z',
+//   },
+//   {
+//     id: '3',
+//     organisationId: 'org-demo',
+//     title: 'Big Five Personality Profiling — Cohort 2025',
+//     assessmentType: AssessmentType.PERSONALITY,
+//     status: AssessmentStatus.CLOSED,
+//     config: {},
+//     startDate: '2025-03-01T00:00:00.000Z',
+//     endDate: '2025-04-30T00:00:00.000Z',
+//     createdAt: '2025-02-15T00:00:00.000Z',
+//   },
+//   {
+//     id: '4',
+//     organisationId: 'org-demo',
+//     title: 'Leadership Readiness Assessment Q3 2025',
+//     assessmentType: AssessmentType.READINESS,
+//     status: AssessmentStatus.ACTIVE,
+//     config: {},
+//     startDate: '2025-06-15T00:00:00.000Z',
+//     endDate: '2025-09-30T00:00:00.000Z',
+//     createdAt: '2025-06-01T00:00:00.000Z',
+//   },
+// ];
+
 
 export default function AssessmentsPage() {
+  const [MOCK_ASSESSMENTS,setAssessments] = useState<AssessmentDto[]>([]);
   const router = useRouter();
   const [filter, setFilter] = useState<FilterTab>('all');
+
+  useEffect(()=>{
+    (async()=>{
+      const res = await api.get<{data:AssessmentDto[]}>("/assessments/mine")
+      console.log("---------------AssessmentsPage-------assessments----");
+      console.log(res.data);
+      
+      setAssessments(res.data.data)
+    })();
+  },[])
 
   const filtered = MOCK_ASSESSMENTS.filter((a) => filter === 'all' || a.status === filter);
 

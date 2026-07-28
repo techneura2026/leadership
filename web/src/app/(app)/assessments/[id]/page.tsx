@@ -564,7 +564,7 @@ function ParticipantsTab({
         </h3>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
         >
           + Add Participant
         </button>

@@ -269,7 +269,7 @@ const READINESS_DIMENSIONS = [
 type CategoryItem = { id: string; name: string; description: string; iconPath: string; color: string };
 
 const CAT_COLOR_CLASSES: Record<string, { iconBg: string; iconText: string; selectedBorder: string; selectedBg: string }> = {
-  blue:    { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-50'    },
+  blue:    { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-200'    },
   violet:  { iconBg: 'bg-violet-100',  iconText: 'text-violet-600',  selectedBorder: 'border-violet-500',  selectedBg: 'bg-violet-50'  },
   amber:   { iconBg: 'bg-amber-100',   iconText: 'text-amber-600',   selectedBorder: 'border-amber-500',   selectedBg: 'bg-amber-50'   },
   cyan:    { iconBg: 'bg-cyan-100',    iconText: 'text-cyan-600',    selectedBorder: 'border-cyan-500',    selectedBg: 'bg-cyan-50'    },
@@ -773,7 +773,7 @@ function StepCompetencyCategories({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900">{cat.name}</p>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-black' : 'text-gray-50'}`}>{cat.name}</p>
                     {isSelected && (
                       <span className={cn('w-5 h-5 rounded-full flex items-center justify-center shrink-0', colors.iconBg)}>
                         <svg className={cn('w-3 h-3', colors.iconText)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1026,7 +1026,7 @@ function StepParticipants360({
                             className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                           />
                           {raterSearch && filteredRaters.length > 0 && (
-                            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100">
+                            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl dark:bg-slate-800 bg-white/95 backdrop-blur-sm overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100">
                               {filteredRaters.slice(0, 6).map((user) => (
                                 <button
                                   key={user.id}
@@ -1040,8 +1040,8 @@ function StepParticipants360({
                                     });
                                     setRaterSearches((prev) => ({ ...prev, [participant.userId]: '' }));
                                   }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors rounded-lg mx-1 my-1"
-                                >
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50/80 hover:dark:bg-slate-700 text-left transition-colors rounded-lg mx-1 my-1"
+                                > 
                                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
                                     {user.firstName[0]}{user.lastName[0]}
                                   </div>
@@ -1078,7 +1078,7 @@ function StepParticipants360({
                           </button>
 
                           {relationshipMenuOpen[participant.userId] && (
-                            <div className="absolute right-0 z-30 mt-1.5 w-full min-w-[160px] overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl">
+                            <div className="absolute right-0 z-30 mt-1.5 w-full min-w-[160px] overflow-hidden rounded-xl border border-gray-200 bg-red p-1.5 shadow-xl dark:bg-slate-800">
                               {RELATIONSHIP_OPTIONS.map((option) => {
                                 const selected = relationship === option.value;
                                 return (
@@ -1825,6 +1825,7 @@ function StepReview({
                   )}
                 </div>
                 <span className="text-sm font-medium text-gray-900">{cat?.name ?? id}</span>
+
               </div>
               <span className="text-xs text-gray-500">{qCount} question{qCount !== 1 ? 's' : ''}</span>
             </div>
