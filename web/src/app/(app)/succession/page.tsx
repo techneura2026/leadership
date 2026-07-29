@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import {
-  Users, CheckCircle2, TrendingUp, Layers, Search, ChevronRight,
-  Building2, Download, FileWarning,
+  Users, CheckCircle2, TrendingUp, Layers, Search, ChevronRight, ChevronUp, ChevronDown,
+  Download, FileWarning, Briefcase, Network,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
@@ -371,13 +371,6 @@ const READINESS_META: Record<ReadinessRating, { variant: 'success' | 'warning' |
   [ReadinessRating.NOT_YET_READY]: { variant: 'neutral', label: 'Not Ready',    color: 'bg-gray-400' },
 };
 
-const READINESS_ORDER: ReadinessRating[] = [
-  ReadinessRating.READY_NOW,
-  ReadinessRating.ONE_TWO_YEARS,
-  ReadinessRating.DEVELOPING,
-  ReadinessRating.NOT_YET_READY,
-];
-
 const CRITICALITY_META: Record<string, { variant: 'error' | 'warning' | 'info'; label: string }> = {
   critical: { variant: 'error',   label: 'Critical' },
   high:     { variant: 'warning', label: 'High' },
@@ -705,188 +698,231 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
   );
 }
 
-// ── Talent Pool — Hierarchy Tree ─────────────────────────────────────────────
+// ── Talent Pool — Organisation Hierarchy Tree ─────────────────────────────────
 
-function CandidateLeaf({ candidate }: { candidate: Candidate }) {
-  const rm = READINESS_META[candidate.readinessRating];
-  return (
-    <div className="relative flex items-center gap-3 py-2.5 pl-5 pr-3 hover:bg-[var(--bg-subtle)] rounded-lg transition-colors">
-      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-px bg-gray-200" />
-      <Avatar seed={candidate.id} size="sm" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-900 truncate">{candidate.name}</p>
-        <p className="text-xs text-gray-500 truncate">{candidate.title}</p>
-      </div>
-      <Badge variant={rm.variant} className="hidden sm:inline-flex shrink-0">{rm.label}</Badge>
-      <div className="w-20 hidden md:block shrink-0">
-        <ScoreBar score={candidate.compositeScore} />
-      </div>
-    </div>
-  );
-}
-
-function TierNode({
-  tier,
-  candidates,
-  isOpen,
-  onToggle,
-}: {
-  tier: ReadinessRating;
-  candidates: Candidate[];
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  const meta = READINESS_META[tier];
-  return (
-    <div className="relative pl-6">
-      <span className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
-      <button
-        onClick={onToggle}
-        className="relative w-full flex items-center gap-2.5 py-2 pl-5 pr-3 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors text-left"
-      >
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-px bg-gray-200" />
-        <ChevronRight className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.25} />
-        <span className={`w-2 h-2 rounded-full shrink-0 ${meta.color}`} />
-        <span className="text-sm font-semibold text-gray-700">{meta.label}</span>
-        <span className="text-xs text-gray-400">({candidates.length})</span>
-      </button>
-      {isOpen && (
-        <div className="pl-6 relative">
-          <span className="absolute left-2 top-0 bottom-3 w-px bg-gray-200" />
-          {candidates.map((c) => (
-            <CandidateLeaf key={c.id} candidate={c} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DepartmentNode({
-  department,
-  candidates,
-  openTiers,
-  onToggleTier,
-  isOpen,
-  onToggle,
-}: {
+interface OrgNode {
+  id: string;
+  name: string;
+  title: string;
   department: string;
-  candidates: Candidate[];
-  openTiers: Set<string>;
-  onToggleTier: (key: string) => void;
-  isOpen: boolean;
-  onToggle: () => void;
+  candidate: Candidate | null; // null = current incumbent, not a succession candidate
+  children: OrgNode[];
+}
+
+interface OrgPosition {
+  id: string;
+  parentId: string | null;
+  name?: string;
+  title?: string;
+  department?: string;
+  candidateId?: string;
+}
+
+// Reporting lines built from the same mock roles/candidates used elsewhere on this page —
+// incumbents come from MOCK_KEY_ROLES, succession candidates are slotted in under the
+// role/manager they'd realistically report to.
+const ORG_POSITIONS: OrgPosition[] = [
+  { id: 'ceo', parentId: null, name: 'Michael Chen', title: 'Chief Executive Officer', department: 'Executive' },
+  { id: 'cfo', parentId: 'ceo', name: 'Sarah Park', title: 'Chief Financial Officer', department: 'Finance' },
+  { id: 'vp-eng', parentId: 'ceo', name: 'James Wilson', title: 'VP Engineering', department: 'Engineering' },
+  { id: 'vp-sales', parentId: 'ceo', name: 'Elena Torres', title: 'VP Sales', department: 'Sales' },
+  { id: 'head-hr', parentId: 'ceo', name: 'Raj Patel', title: 'Head of HR', department: 'HR' },
+  { id: 'head-ops', parentId: 'ceo', name: 'Lisa Wang', title: 'Head of Operations', department: 'Operations' },
+  { id: 'n-c1', parentId: 'ceo', candidateId: 'c1' },
+
+  { id: 'fin-ctrl', parentId: 'cfo', name: 'Nina Shah', title: 'Finance Controller', department: 'Finance' },
+  { id: 'n-c3', parentId: 'cfo', candidateId: 'c3' },
+  { id: 'n-c5', parentId: 'fin-ctrl', candidateId: 'c5' },
+  { id: 'n-c14', parentId: 'n-c3', candidateId: 'c14' },
+
+  { id: 'eng-mgr', parentId: 'vp-eng', name: 'Alan Rodrigo', title: 'Engineering Manager', department: 'Engineering' },
+  { id: 'n-c2', parentId: 'vp-eng', candidateId: 'c2' },
+  { id: 'n-c4', parentId: 'eng-mgr', candidateId: 'c4' },
+  { id: 'n-c11', parentId: 'n-c2', candidateId: 'c11' },
+
+  { id: 'n-c6', parentId: 'vp-sales', candidateId: 'c6' },
+  { id: 'n-c12', parentId: 'vp-sales', candidateId: 'c12' },
+  { id: 'n-c9', parentId: 'n-c6', candidateId: 'c9' },
+  { id: 'n-c15', parentId: 'n-c6', candidateId: 'c15' },
+
+  { id: 'n-c7', parentId: 'head-hr', candidateId: 'c7' },
+  { id: 'n-c13', parentId: 'n-c7', candidateId: 'c13' },
+
+  { id: 'n-c8', parentId: 'head-ops', candidateId: 'c8' },
+  { id: 'n-c10', parentId: 'n-c8', candidateId: 'c10' },
+];
+
+function buildOrgTree(candidates: Candidate[]): OrgNode {
+  const byId = new Map(candidates.map((c) => [c.id, c]));
+  const nodes = new Map<string, OrgNode>();
+  ORG_POSITIONS.forEach((pos) => {
+    const candidate = pos.candidateId ? byId.get(pos.candidateId) ?? null : null;
+    nodes.set(pos.id, {
+      id: pos.id,
+      name: candidate ? candidate.name : pos.name ?? '',
+      title: candidate ? candidate.title : pos.title ?? '',
+      department: candidate ? candidate.department : pos.department ?? '',
+      candidate,
+      children: [],
+    });
+  });
+  let root: OrgNode | null = null;
+  ORG_POSITIONS.forEach((pos) => {
+    const node = nodes.get(pos.id)!;
+    if (pos.parentId === null) root = node;
+    else nodes.get(pos.parentId)?.children.push(node);
+  });
+  return root!;
+}
+
+function nodeMatchesQuery(node: OrgNode, q: string): boolean {
+  return (
+    node.name.toLowerCase().includes(q) ||
+    node.title.toLowerCase().includes(q) ||
+    node.department.toLowerCase().includes(q)
+  );
+}
+
+function filterOrgTree(node: OrgNode, q: string): OrgNode | null {
+  const children = node.children
+    .map((c) => filterOrgTree(c, q))
+    .filter((c): c is OrgNode => c !== null);
+  if (nodeMatchesQuery(node, q) || children.length > 0) {
+    return { ...node, children };
+  }
+  return null;
+}
+
+function collectIds(node: OrgNode, out: string[] = []): string[] {
+  out.push(node.id);
+  node.children.forEach((c) => collectIds(c, out));
+  return out;
+}
+
+const READINESS_RING: Record<ReadinessRating, string> = {
+  [ReadinessRating.READY_NOW]: '#22c55e',
+  [ReadinessRating.ONE_TWO_YEARS]: '#facc15',
+  [ReadinessRating.DEVELOPING]: '#60a5fa',
+  [ReadinessRating.NOT_YET_READY]: '#9ca3af',
+};
+const INCUMBENT_RING = '#cbd5e1';
+
+function OrgChartNode({
+  node,
+  openIds,
+  onToggle,
+  forceOpen,
+}: {
+  node: OrgNode;
+  openIds: Set<string>;
+  onToggle: (id: string) => void;
+  forceOpen: boolean;
 }) {
-  const avgScore = candidates.reduce((sum, c) => sum + c.compositeScore, 0) / candidates.length;
-  const tiers = READINESS_ORDER
-    .map((tier) => ({ tier, list: candidates.filter((c) => c.readinessRating === tier) }))
-    .filter((t) => t.list.length > 0);
+  const hasChildren = node.children.length > 0;
+  const isOpen = forceOpen || openIds.has(node.id);
+  const rm = node.candidate ? READINESS_META[node.candidate.readinessRating] : null;
+  const ringColor = node.candidate ? READINESS_RING[node.candidate.readinessRating] : INCUMBENT_RING;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[var(--bg-subtle)] transition-colors text-left"
-      >
-        <ChevronRight className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.25} />
-        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-          <Building2 className="w-4.5 h-4.5" strokeWidth={2} />
+    <li>
+      <div className="relative inline-flex flex-col items-center w-44">
+        {/* Avatar — overlaps the top edge of the card, ringed by readiness colour */}
+        <div
+          className="relative z-10 rounded-full p-0.5"
+          style={{ background: 'var(--bg-surface)', boxShadow: `0 0 0 3px ${ringColor}` }}
+        >
+          <Avatar seed={node.candidate?.id ?? node.id} size="xl" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">{department}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{candidates.length} candidate{candidates.length === 1 ? '' : 's'} · avg score {avgScore.toFixed(1)}</p>
-        </div>
-        <div className="hidden sm:flex items-center -space-x-2 shrink-0">
-          {candidates.slice(0, 4).map((c) => (
-            <Avatar key={c.id} seed={c.id} size="sm" ring />
-          ))}
-          {candidates.length > 4 && (
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold ring-2 ring-[var(--bg-surface)]" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
-              +{candidates.length - 4}
+
+        {/* Card */}
+        <div className="w-full -mt-8 pt-10 pb-3 px-3 rounded-2xl border bg-white shadow-sm hover:shadow-md transition-shadow" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-sm font-bold text-gray-900 truncate">{node.name}</p>
+          <p className="text-xs text-gray-500 truncate mt-0.5">{node.title}</p>
+          {node.candidate && rm ? (
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <Badge variant={rm.variant} className="!text-[10px]">{rm.label}</Badge>
+              <span className="text-[11px] font-semibold text-gray-600 tabular-nums">{node.candidate.compositeScore.toFixed(0)} pts</span>
             </div>
+          ) : (
+            <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+              <Briefcase className="w-3 h-3" strokeWidth={2} /> Incumbent
+            </span>
           )}
         </div>
-        <Badge variant="neutral" className="shrink-0">{candidates.length}</Badge>
-      </button>
 
-      {isOpen && (
-        <div className="px-4 pb-4 pt-1 border-t border-gray-100 space-y-1">
-          {tiers.map(({ tier, list }) => {
-            const key = `${department}:${tier}`;
-            return (
-              <TierNode
-                key={key}
-                tier={tier}
-                candidates={list}
-                isOpen={openTiers.has(key)}
-                onToggle={() => onToggleTier(key)}
-              />
-            );
-          })}
-        </div>
+        {/* Expand / collapse toggle — overlaps the bottom edge of the card */}
+        {hasChildren && (
+          <button
+            onClick={() => onToggle(node.id)}
+            className="relative z-10 -mt-3 flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
+            style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
+          >
+            {isOpen ? <ChevronUp className="w-3 h-3" strokeWidth={2.5} /> : <ChevronDown className="w-3 h-3" strokeWidth={2.5} />}
+            {node.children.length}
+          </button>
+        )}
+      </div>
+
+      {isOpen && hasChildren && (
+        <ul>
+          {node.children.map((child) => (
+            <OrgChartNode key={child.id} node={child} openIds={openIds} onToggle={onToggle} forceOpen={forceOpen} />
+          ))}
+        </ul>
       )}
-    </div>
+    </li>
   );
 }
 
 function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
   const [search, setSearch] = useState('');
-  const [openDepts, setOpenDepts] = useState<Set<string>>(new Set());
-  const [openTiers, setOpenTiers] = useState<Set<string>>(new Set());
-
-  const departments = useMemo(
-    () => Array.from(new Set(candidates.map((c) => c.department))).sort(),
-    [candidates],
-  );
+  const orgTree = useMemo(() => buildOrgTree(candidates), [candidates]);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set([orgTree.id]));
 
   const query = search.trim().toLowerCase();
-  const matchesQuery = (c: Candidate) =>
-    !query ||
-    c.name.toLowerCase().includes(query) ||
-    c.title.toLowerCase().includes(query) ||
-    c.department.toLowerCase().includes(query);
+  const displayRoot = query ? filterOrgTree(orgTree, query) : orgTree;
 
-  const grouped = departments
-    .map((dept) => ({
-      department: dept,
-      candidates: candidates.filter((c) => c.department === dept && matchesQuery(c)),
-    }))
-    .filter((d) => d.candidates.length > 0);
+  const totalCount = collectIds(orgTree).length;
+  const candidateCount = candidates.length;
+  const incumbentCount = totalCount - candidateCount;
 
-  function toggleDept(dept: string) {
-    setOpenDepts((prev) => {
+  function toggleNode(id: string) {
+    setOpenIds((prev) => {
       const next = new Set(prev);
-      next.has(dept) ? next.delete(dept) : next.add(dept);
-      return next;
-    });
-  }
-  function toggleTier(key: string) {
-    setOpenTiers((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
   function expandAll() {
-    setOpenDepts(new Set(departments));
-    setOpenTiers(new Set(
-      departments.flatMap((d) => READINESS_ORDER.map((t) => `${d}:${t}`)),
-    ));
+    setOpenIds(new Set(collectIds(orgTree)));
   }
   function collapseAll() {
-    setOpenDepts(new Set());
-    setOpenTiers(new Set());
+    setOpenIds(new Set());
   }
 
   return (
     <div className="space-y-4">
+      {/* Summary + legend */}
+      <div className="flex items-center gap-4 flex-wrap text-xs text-gray-500">
+        <span className="flex items-center gap-1.5 font-medium text-gray-700">
+          <Network className="w-3.5 h-3.5" strokeWidth={2} />
+          {totalCount} roles · {candidateCount} succession candidates · {incumbentCount} incumbents
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Briefcase className="w-3.5 h-3.5" strokeWidth={2} /> Incumbent — current role holder
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-green-500" /> Candidate readiness colour-coded
+        </span>
+      </div>
+
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={2} />
           <input
             type="text"
-            placeholder="Search talent pool…"
+            placeholder="Search the org chart…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -908,22 +944,17 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
         </div>
       </div>
 
-      {/* Tree */}
-      <div className="space-y-3">
-        {grouped.map((d) => (
-          <DepartmentNode
-            key={d.department}
-            department={d.department}
-            candidates={d.candidates}
-            openTiers={openTiers}
-            onToggleTier={toggleTier}
-            isOpen={openDepts.has(d.department) || Boolean(query)}
-            onToggle={() => toggleDept(d.department)}
-          />
-        ))}
-        {grouped.length === 0 && (
-          <div className="text-center py-16 text-sm text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-            No candidates match &ldquo;{search}&rdquo;.
+      {/* Org chart tree */}
+      <div className="bg-white rounded-2xl border border-gray-200">
+        {displayRoot ? (
+          <div className="org-chart-scroll">
+            <ul className="org-chart">
+              <OrgChartNode node={displayRoot} openIds={openIds} onToggle={toggleNode} forceOpen={Boolean(query)} />
+            </ul>
+          </div>
+        ) : (
+          <div className="text-center py-16 text-sm text-gray-400">
+            No roles or candidates match &ldquo;{search}&rdquo;.
           </div>
         )}
       </div>

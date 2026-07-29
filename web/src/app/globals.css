@@ -779,6 +779,75 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   ORG CHART — pure-CSS connector-line hierarchy tree (Succession → Talent Pool)
+   Classic floated-<li> technique: each <ul> shrink-wraps its floated <li>s via
+   display:table, and :first-child/:last-child/:only-child rules draw the
+   horizontal spanning bar + vertical drops with no JS positioning math.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.org-chart-scroll {
+  overflow-x: auto;
+  padding: 8px 24px 40px;
+}
+.org-chart,
+.org-chart ul {
+  display: table;
+  margin: 0 auto;
+}
+.org-chart ul {
+  padding-top: 40px;
+  position: relative;
+}
+.org-chart li {
+  float: left;
+  list-style: none;
+  text-align: center;
+  position: relative;
+  padding: 40px 14px 0 14px;
+}
+.org-chart li::before,
+.org-chart li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 40px;
+  border-top: 2px solid var(--border-strong);
+}
+.org-chart li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid var(--border-strong);
+}
+.org-chart li:only-child {
+  padding-top: 0;
+}
+.org-chart li:only-child::before,
+.org-chart li:only-child::after {
+  display: none;
+}
+.org-chart li:first-child::before,
+.org-chart li:last-child::after {
+  border: 0 none;
+}
+.org-chart li:last-child::before {
+  border-right: 2px solid var(--border-strong);
+  border-radius: 0 8px 0 0;
+}
+.org-chart li:first-child::after {
+  border-radius: 8px 0 0 0;
+}
+.org-chart ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  border-left: 2px solid var(--border-strong);
+  width: 0;
+  height: 40px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════════════════════════════════ */
 
