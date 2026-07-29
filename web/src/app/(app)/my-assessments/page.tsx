@@ -351,79 +351,79 @@ function formatElapsed(seconds: number): string {
 
 // ── Mock assessments ──────────────────────────────────────────────────────────
 
-const MOCK_ASSESSMENTS: MockAssessmentItem[] = [
-  {
-    id: 'mock-360-001',
-    title: 'Annual Leadership Review 2025',
-    type: '360° Feedback',
-    typeVariant: 'info',
-    roleLabel: 'Giving Feedback',
-    subject: 'Sarah Johnson',
-    endDate: '2025-06-30T00:00:00.000Z',
-    pendingStatusLabel: 'Feedback Requested',
-    completedStatusLabel: 'Feedback Given',
-    pendingActionLabel: 'Give Feedback',
-    completedActionLabel: 'Feedback Given',
-    successTitle: 'Feedback Submitted!',
-    successBody:
-      'Your responses have been recorded and will be included in the final report.',
-    successNextSteps:
-      'Once all raters complete their feedback, the HR team will compile the results into a comprehensive 360° report for Sarah.',
-    questions: FEEDBACK_360_QUESTIONS,
-  },
-  {
-    id: 'mock-comp-001',
-    title: 'Leadership Competency Assessment Q2 2025',
-    type: 'Competency',
-    typeVariant: 'warning',
-    roleLabel: 'Self Assessment',
-    endDate: '2025-07-15T00:00:00.000Z',
-    pendingStatusLabel: 'Pending',
-    completedStatusLabel: 'Completed',
-    pendingActionLabel: 'Start Assessment',
-    completedActionLabel: 'Completed',
-    successTitle: 'Assessment Submitted!',
-    successBody: 'Your competency self-assessment has been recorded.',
-    successNextSteps:
-      'Your HR manager will review your responses and schedule a debrief session to discuss your competency profile.',
-    questions: COMPETENCY_QUESTIONS,
-    hasVideoInterview: true,
-  },
-  {
-    id: 'mock-pers-001',
-    title: 'Big Five Personality Profile 2025',
-    type: 'Personality',
-    typeVariant: 'success',
-    roleLabel: 'Self Assessment',
-    endDate: '2025-07-20T00:00:00.000Z',
-    pendingStatusLabel: 'Pending',
-    completedStatusLabel: 'Completed',
-    pendingActionLabel: 'Start Assessment',
-    completedActionLabel: 'Completed',
-    successTitle: 'Profile Submitted!',
-    successBody: 'Your personality profile responses have been recorded.',
-    successNextSteps:
-      'Your Big Five personality report will be generated and shared with your HR manager within 2 business days.',
-    questions: PERSONALITY_QUESTIONS,
-  },
-  {
-    id: 'mock-read-001',
-    title: 'Leadership Readiness Assessment 2025',
-    type: 'Readiness',
-    typeVariant: 'neutral',
-    roleLabel: 'Self Assessment',
-    endDate: '2025-07-31T00:00:00.000Z',
-    pendingStatusLabel: 'Pending',
-    completedStatusLabel: 'Completed',
-    pendingActionLabel: 'Start Assessment',
-    completedActionLabel: 'Completed',
-    successTitle: 'Assessment Submitted!',
-    successBody: 'Your leadership readiness assessment has been recorded.',
-    successNextSteps:
-      'A detailed readiness report will be prepared to support your succession planning discussion with your HR team.',
-    questions: READINESS_QUESTIONS,
-  },
-];
+// const MOCK_ASSESSMENTS: MockAssessmentItem[] = [
+//   {
+//     id: 'mock-360-001',
+//     title: '1Annual Leadership Review 2025',
+//     type: '360° Feedback',
+//     typeVariant: 'info',
+//     roleLabel: 'Giving Feedback',
+//     subject: 'Sarah Johnson',
+//     endDate: '2025-06-30T00:00:00.000Z',
+//     pendingStatusLabel: 'Feedback Requested',
+//     completedStatusLabel: 'Feedback Given',
+//     pendingActionLabel: 'Give Feedback',
+//     completedActionLabel: 'Feedback Given',
+//     successTitle: 'Feedback Submitted!',
+//     successBody:
+//       'Your responses have been recorded and will be included in the final report.',
+//     successNextSteps:
+//       'Once all raters complete their feedback, the HR team will compile the results into a comprehensive 360° report for Sarah.',
+//     questions: FEEDBACK_360_QUESTIONS,
+//   },
+//   {
+//     id: 'mock-comp-001',
+//     title: 'Leadership Competency Assessment Q2 2025',
+//     type: 'Competency',
+//     typeVariant: 'warning',
+//     roleLabel: 'Self Assessment',
+//     endDate: '2025-07-15T00:00:00.000Z',
+//     pendingStatusLabel: 'Pending',
+//     completedStatusLabel: 'Completed',
+//     pendingActionLabel: 'Start Assessment',
+//     completedActionLabel: 'Completed',
+//     successTitle: 'Assessment Submitted!',
+//     successBody: 'Your competency self-assessment has been recorded.',
+//     successNextSteps:
+//       'Your HR manager will review your responses and schedule a debrief session to discuss your competency profile.',
+//     questions: COMPETENCY_QUESTIONS,
+//     hasVideoInterview: true,
+//   },
+//   {
+//     id: 'mock-pers-001',
+//     title: 'Big Five Personality Profile 2025',
+//     type: 'Personality',
+//     typeVariant: 'success',
+//     roleLabel: 'Self Assessment',
+//     endDate: '2025-07-20T00:00:00.000Z',
+//     pendingStatusLabel: 'Pending',
+//     completedStatusLabel: 'Completed',
+//     pendingActionLabel: 'Start Assessment',
+//     completedActionLabel: 'Completed',
+//     successTitle: 'Profile Submitted!',
+//     successBody: 'Your personality profile responses have been recorded.',
+//     successNextSteps:
+//       'Your Big Five personality report will be generated and shared with your HR manager within 2 business days.',
+//     questions: PERSONALITY_QUESTIONS,
+//   },
+//   {
+//     id: 'mock-read-001',
+//     title: 'Leadership Readiness Assessment 2025',
+//     type: 'Readiness',
+//     typeVariant: 'neutral',
+//     roleLabel: 'Self Assessment',
+//     endDate: '2025-07-31T00:00:00.000Z',
+//     pendingStatusLabel: 'Pending',
+//     completedStatusLabel: 'Completed',
+//     pendingActionLabel: 'Start Assessment',
+//     completedActionLabel: 'Completed',
+//     successTitle: 'Assessment Submitted!',
+//     successBody: 'Your leadership readiness assessment has been recorded.',
+//     successNextSteps:
+//       'A detailed readiness report will be prepared to support your succession planning discussion with your HR team.',
+//     questions: READINESS_QUESTIONS,
+//   },
+// ];
 
 // ── Answer helpers ────────────────────────────────────────────────────────────
 
@@ -1571,6 +1571,46 @@ export default function MyAssessmentsPage() {
   const [view, setView] = useState<View>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [MOCK_ASSESSMENTS, setAssessment] = useState<MockAssessmentItem[]>([{
+    id: 'mock-360-001',
+    title: '1Annual Leadership Review 2025',
+    type: '360° Feedback',
+    typeVariant: 'info',
+    roleLabel: 'Giving Feedback',
+    subject: 'Sarah Johnson',
+    endDate: '2025-06-30T00:00:00.000Z',
+    pendingStatusLabel: 'Feedback Requested',
+    completedStatusLabel: 'Feedback Given',
+    pendingActionLabel: 'Give Feedback',
+    completedActionLabel: 'Feedback Given',
+    successTitle: 'Feedback Submitted!',
+    successBody:
+      'Your responses have been recorded and will be included in the final report.',
+    successNextSteps:
+      'Once all raters complete their feedback, the HR team will compile the results into a comprehensive 360° report for Sarah.',
+    questions: FEEDBACK_360_QUESTIONS,
+  },
+  {
+    id: 'mock-comp-001',
+    title: 'Leadership Competency Assessment Q2 2025',
+    type: 'Competency',
+    typeVariant: 'warning',
+    roleLabel: 'Self Assessment',
+    endDate: '2025-07-15T00:00:00.000Z',
+    pendingStatusLabel: 'Pending',
+    completedStatusLabel: 'Completed',
+    pendingActionLabel: 'Start Assessment',
+    completedActionLabel: 'Completed',
+    successTitle: 'Assessment Submitted!',
+    successBody: 'Your competency self-assessment has been recorded.',
+    successNextSteps:
+      'Your HR manager will review your responses and schedule a debrief session to discuss your competency profile.',
+    questions: COMPETENCY_QUESTIONS,
+    hasVideoInterview: true,
+  }
+  ]
+  )
+
 
   const selectedAssessment = MOCK_ASSESSMENTS.find((a) => a.id === selectedId);
 

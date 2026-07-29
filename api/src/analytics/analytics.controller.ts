@@ -33,6 +33,7 @@ export class AnalyticsController {
     return this.analyticsService.getSuccessionOverview(req.user.orgId);
   }
 
+  //this is for my assessments
   @Get('radar/me')
   @ApiOperation({ summary: 'Get aggregate radar chart data for the logged-in user' })
   getMeRadar(@Request() req: any): Promise<RadarAggregate> {

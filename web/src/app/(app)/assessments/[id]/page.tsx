@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/Badge';
@@ -1041,8 +1042,40 @@ export default function AssessmentDetailPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
 
-  const assessment = MOCK_ASSESSMENTS_MAP[id] ?? null;
-  const participants = MOCK_PARTICIPANTS_MAP[id] ?? [];
+const [assessment, setAssessment] = useState<AssessmentDto | null>(null);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  const loadAssessment = async () => {
+    try {
+      const res = await api.get(`/assessments/${id}`);
+      setAssessment(res.data.data);
+    } catch (err) {
+      console.error(err);
+      setAssessment(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (id) {
+    loadAssessment();
+  }
+}, [id]);
+
+
+const [participants, setParticipants] = useState<Participant[]>([]);
+
+useEffect(() => {
+    const loadParticipants = async () => {
+        const res = await api.get(`/assessments/${id}/participants`);
+        setParticipants(res.data.data);
+    };
+
+    if(id){
+        loadParticipants();
+    }
+}, [id]);
   const nominations = MOCK_NOMINATIONS_MAP[id] ?? [];
   const reports = MOCK_REPORTS_MAP[id] ?? [];
 
@@ -1054,6 +1087,21 @@ export default function AssessmentDetailPage() {
       (t.key !== 'feedback-givers' || is360) &&
       (t.key !== 'results' || isPersonality),
   );
+
+
+
+  if (loading) {
+    return (
+        <div className="flex justify-center py-10">
+            <Spinner />
+        </div>
+    );
+}
+
+
+
+
+
 
   if (!assessment) {
     return (

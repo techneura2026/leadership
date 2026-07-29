@@ -197,10 +197,10 @@ function ActivityCharts() {
 
       try {
         const res = await api.get<{ data: any }>('/analytics/activity/monthly');
-        console.log("---------fetchMonthlyActivity-----------------"); 
+        console.log("---------fetchMonthlyActivity-----------------");
         console.log(res.data.data);
         console.log("--------------------------");
-        // setMonthlyActivity(res.data.data);
+         setMonthlyActivity(res.data.data);
       } catch (e) {
         console.log("error in getMonthlyActivity ", e)
       }
@@ -217,12 +217,13 @@ function ActivityCharts() {
         setParticipantTrend(res.data.data);
       } catch (e) {
         console.log("error in getParticipantTrend ", e)
+        
       }
     }
 
     getMonthlyActivity();
     getParticipantTrend();
-    console.log(MOCK_MONTHLY_ACTIVITY,"MOCK_MONTHLY_ACTIVITY")
+    console.log(MOCK_MONTHLY_ACTIVITY, "MOCK_MONTHLY_ACTIVITY")
 
   }, [])
 
@@ -328,8 +329,24 @@ function UserDashboard() {
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
-  const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: 10, totalParticipants: 10, pendingResponses: 10, reportsGenerated: 10, recentAssessments: [] });
-  const [MOCK_ORG_RADAR, setOrgRadar] = useState({ competencyRadar: [], personalityRadar:  [] });
+  const [MOCK_METRICS, setMonthlyActivity] = useState({ activeAssessments: NaN, totalParticipants: NaN, pendingResponses: NaN, reportsGenerated: NaN, recentAssessments: [] });
+  const [MOCK_ORG_RADAR, setOrgRadar] = useState({
+  competencyRadar: [
+    { key: 'leadership', label: 'Leadership', value: 10 },
+    { key: 'communication', label: 'Communication', value: 10 },
+    { key: 'strategic', label: 'Strategic Thinking', value: 10 },
+    { key: 'teamBuilding', label: 'Team Building', value: 10 },
+    { key: 'innovation', label: 'Innovation', value: 10 },
+    { key: 'decision', label: 'Decision Making', value: 10 },
+  ],
+  personalityRadar: [
+    { key: 'openness', label: 'Openness', value: 10 },
+    { key: 'conscientiousness', label: 'Conscientiousness', value: 10 },
+    { key: 'extraversion', label: 'Extraversion', value: 10 },
+    { key: 'agreeableness', label: 'Agreeableness', value: 10 },
+    { key: 'neuroticism', label: 'Neuroticism', value: 10 },
+  ],
+});
 
   useEffect(() => {
     const getDashboardMetrics = async () => {
@@ -338,10 +355,10 @@ function AdminDashboard() {
         console.log("---------fetchDashboardMetrics-----------------");
         console.log(res.data.data);
         console.log("--------------------------");
-        // setMonthlyActivity(res.data.data);
+        setMonthlyActivity(res.data.data);
       } catch (e) {
         console.error("Error fetching dashboard metrics:", e);
-        // setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
+        setMonthlyActivity({ activeAssessments: 0, totalParticipants: 0, pendingResponses: 0, reportsGenerated: 0, recentAssessments: [] });
       }
     }
 
