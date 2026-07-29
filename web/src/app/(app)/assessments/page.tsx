@@ -73,22 +73,26 @@ const STATUS_VARIANT: Record<AssessmentStatus, 'neutral' | 'success' | 'info' | 
 // ];
 
 
+const PAGE_SIZE = 9;
+
+type AssessmentListResponse = {
+  data: { data: AssessmentDto[]; total: number; page: number; limit: number };
+};
+
 export default function AssessmentsPage() {
-  const [MOCK_ASSESSMENTS,setAssessments] = useState<AssessmentDto[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentDto[]>([]);
   const router = useRouter();
   const [filter, setFilter] = useState<FilterTab>('all');
-
-  useEffect(()=>{
-    (async()=>{
-      const res = await api.get<{data:AssessmentDto[]}>("/assessments/mine")
-      console.log("---------------AssessmentsPage-------assessments----");
-      console.log(res.data);
-      
-      setAssessments(res.data.data)
-    })();
-  },[])
-
-  const filtered = MOCK_ASSESSMENTS.filter((a) => filter === 'all' || a.status === filter);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [tabCounts, setTabCounts] = useState<Record<FilterTab, number>>({
+    all: 0,
+    [AssessmentStatus.ACTIVE]: 0,
+    [AssessmentStatus.DRAFT]: 0,
+    [AssessmentStatus.CLOSED]: 0,
+    [AssessmentStatus.ARCHIVED]: 0,
+  });
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -96,6 +100,53 @@ export default function AssessmentsPage() {
     { key: AssessmentStatus.DRAFT, label: 'Draft' },
     { key: AssessmentStatus.CLOSED, label: 'Closed' },
   ];
+
+  function handleFilterChange(next: FilterTab) {
+    setFilter(next);
+    setPage(1);
+  }
+
+  // Fetch the current page of assessments whenever the filter or page changes
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const params: Record<string, string | number> = { page, limit: PAGE_SIZE };
+      if (filter !== 'all') params.status = filter;
+
+      const res = await api.get<AssessmentListResponse>('/assessments', { params });
+      if (cancelled) return;
+      setAssessments(res.data.data.data);
+      setTotal(res.data.data.total);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, page]);
+
+  // Fetch per-tab counts once, independent of the current page
+  useEffect(() => {
+    (async () => {
+      const statuses = tabs.map((t) => t.key);
+      const results = await Promise.all(
+        statuses.map((status) =>
+          api.get<AssessmentListResponse>('/assessments', {
+            params: { page: 1, limit: 1, ...(status !== 'all' ? { status } : {}) },
+          }),
+        ),
+      );
+      setTabCounts((prev) => {
+        const next = { ...prev };
+        statuses.forEach((status, i) => {
+          next[status] = results[i].data.data.total;
+        });
+        return next;
+      });
+    })();
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -118,13 +169,11 @@ export default function AssessmentsPage() {
       {/* Filter tabs */}
       <div className="flex items-center gap-1.5 mb-6 flex-wrap">
         {tabs.map((tab) => {
-          const count = tab.key !== 'all'
-            ? MOCK_ASSESSMENTS.filter((a) => a.status === tab.key).length
-            : null;
+          const count = tabCounts[tab.key];
           return (
             <button
               key={tab.key}
-              onClick={() => setFilter(tab.key)}
+              onClick={() => handleFilterChange(tab.key)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                 filter === tab.key
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -132,19 +181,17 @@ export default function AssessmentsPage() {
               }`}
             >
               {tab.label}
-              {count !== null && (
-                <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${
-                  filter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {count}
-                </span>
-              )}
+              <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${
+                filter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {count}
+              </span>
             </button>
           );
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {!loading && assessments.length === 0 && (
         <EmptyState
           title="No assessments found"
           description={
@@ -157,15 +204,42 @@ export default function AssessmentsPage() {
         />
       )}
 
-      {filtered.length > 0 && (
+      {assessments.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((assessment) => (
+          {assessments.map((assessment) => (
             <AssessmentCard
               key={assessment.id}
               assessment={assessment}
               onView={() => router.push(`/assessments/${assessment.id}`)}
             />
           ))}
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+          <p className="text-sm text-gray-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, total)} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-500 px-2">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

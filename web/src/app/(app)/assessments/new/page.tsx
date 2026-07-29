@@ -16,7 +16,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type QuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'TABLE';
-type RaterRelationship = 'SUPERVISOR' | 'PEER' | 'DIRECT_REPORT';
+type RaterRelationship = 'self' | 'supervisor' | 'peer' | 'direct_report' | 'stakeholder';
 
 interface QuestionOption {
   id: string;
@@ -846,21 +846,27 @@ function StepParticipants360({
   }
 
   const RELATIONSHIP_LABELS: Record<RaterRelationship, string> = {
-    SUPERVISOR: 'Supervisor',
-    PEER: 'Peer',
-    DIRECT_REPORT: 'Direct Report',
+    self: 'Self',
+    supervisor: 'Supervisor',
+    peer: 'Peer',
+    direct_report: 'Direct Report',
+    stakeholder: 'Stakeholder',
   };
 
   const RELATIONSHIP_COLORS: Record<RaterRelationship, string> = {
-    SUPERVISOR: 'bg-purple-100 text-purple-700',
-    PEER: 'bg-blue-100 text-blue-700',
-    DIRECT_REPORT: 'bg-orange-100 text-orange-700',
+    self: 'bg-gray-100 text-gray-700',
+    supervisor: 'bg-purple-100 text-purple-700',
+    peer: 'bg-blue-100 text-blue-700',
+    direct_report: 'bg-orange-100 text-orange-700',
+    stakeholder: 'bg-green-100 text-green-700',
   };
 
   const RELATIONSHIP_OPTIONS: Array<{ value: RaterRelationship; label: string }> = [
-    { value: 'SUPERVISOR', label: 'Supervisor' },
-    { value: 'PEER', label: 'Peer' },
-    { value: 'DIRECT_REPORT', label: 'Direct Report' },
+    { value: 'self', label: 'Self' },
+    { value: 'supervisor', label: 'Supervisor' },
+    { value: 'peer', label: 'Peer' },
+    { value: 'direct_report', label: 'Direct Report' },
+    { value: 'stakeholder', label: 'Stakeholder' },
   ];
 
   useEffect(() => {
@@ -944,7 +950,7 @@ function StepParticipants360({
           {participants360.map((participant) => {
             const isExpanded = expandedId === participant.userId;
             const raterSearch = raterSearches[participant.userId] ?? '';
-            const relationship = raterRelationships[participant.userId] ?? 'PEER';
+            const relationship = raterRelationships[participant.userId] ?? 'peer';
             const filteredRaters = getFilteredRaters(participant.userId, participant);
 
             return (
@@ -2335,7 +2341,7 @@ export default function NewAssessmentPage() {
           endDate: state.endDate || null,
           config: {
             categories: state.selectedCategories,
-            questions: Object.values(state.competencyQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.competencyQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
@@ -2395,7 +2401,7 @@ export default function NewAssessmentPage() {
           config: {
             isRatingMandatory: state.isRatingMandatory,
             traits: state.personalityTraits,
-            questions: Object.values(state.personalityQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.personalityQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
@@ -2414,7 +2420,7 @@ export default function NewAssessmentPage() {
           endDate: state.endDate || null,
           config: {
             dimensions: state.readinessDimensions,
-            questions: Object.values(state.readinessQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.readinessQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
