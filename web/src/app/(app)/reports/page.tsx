@@ -4,15 +4,29 @@ import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Avatar } from '@/components/ui/Avatar';
+import { cn } from '@/lib/utils';
+import { TYPE_META } from '@/lib/assessmentTypeMeta';
 import {
   Files,
   BadgeCheck,
   LoaderCircle,
   TriangleAlert,
+  Zap,
+  Download,
+  RotateCcw,
+  ChevronDown,
+  Check,
+  Info,
+  Plus,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { AssessmentType } from '@leaderprism/shared';
+import { generateReportPdf, type ReportData } from '@/lib/reportPdf';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type ReportStatus = 'ready' | 'processing' | 'pending' | 'failed';
+type ReportType = 'individual_360' | 'competency' | 'personality' | 'readiness';
 
 interface ReportModel {
   id: string;
@@ -20,25 +34,108 @@ interface ReportModel {
   participantId: string;
   participantName: string;
   participantRole: string;
-  reportType: string;
+  reportType: ReportType;
   status: ReportStatus;
   generatedAt: string | null;
   fileSize: string | null;
   pages: number | null;
 }
 
-const REPORT_TYPE_LABELS: Record<string, string> = {
+interface MockAssessment {
+  id: string;
+  title: string;
+  assessmentType: AssessmentType;
+}
+
+interface MockParticipant {
+  id: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+}
+
+// ── Mock Data ─────────────────────────────────────────────────────────────────
+
+const MOCK_ASSESSMENTS: MockAssessment[] = [
+  { id: 'ra1', title: 'Q3 Leadership 360° Review', assessmentType: AssessmentType.FEEDBACK_360 },
+  { id: 'ra2', title: 'Senior Manager Competency Assessment', assessmentType: AssessmentType.COMPETENCY },
+  { id: 'ra3', title: 'Personality Profiling — Cohort C', assessmentType: AssessmentType.PERSONALITY },
+  { id: 'ra4', title: 'Leadership Readiness — Batch 2026-H2', assessmentType: AssessmentType.READINESS },
+  { id: 'ra5', title: 'Engineering Competency Refresh', assessmentType: AssessmentType.COMPETENCY },
+  { id: 'ra6', title: 'Mid-Year 360° Feedback', assessmentType: AssessmentType.FEEDBACK_360 },
+];
+
+const MOCK_PARTICIPANTS_BY_ASSESSMENT: Record<string, MockParticipant[]> = {
+  ra1: [
+    { id: 'p1', firstName: 'Amara', lastName: 'Perera', jobTitle: 'Senior Manager – Strategy' },
+    { id: 'p2', firstName: 'David', lastName: 'Mendis', jobTitle: 'Engineering Lead' },
+    { id: 'p3', firstName: 'Anika', lastName: 'Jayasekara', jobTitle: 'HR Business Partner' },
+  ],
+  ra2: [
+    { id: 'p4', firstName: 'Priya', lastName: 'Kumari', jobTitle: 'Finance Manager' },
+    { id: 'p5', firstName: 'Kasun', lastName: 'Fernando', jobTitle: 'Senior Software Engineer' },
+  ],
+  ra3: [
+    { id: 'p6', firstName: 'Nirosha', lastName: 'Rajapaksa', jobTitle: 'Senior Finance Analyst' },
+    { id: 'p7', firstName: 'Dilshan', lastName: 'Maduwantha', jobTitle: 'Product Designer' },
+    { id: 'p8', firstName: 'Fiona', lastName: 'Krishnaswamy', jobTitle: 'HR Coordinator' },
+  ],
+  ra4: [
+    { id: 'p9', firstName: 'Tom', lastName: 'Wickramasinghe', jobTitle: 'Senior Sales Manager' },
+    { id: 'p10', firstName: 'Ravi', lastName: 'Seneviratne', jobTitle: 'Operations Manager' },
+  ],
+  ra5: [
+    { id: 'p5', firstName: 'Kasun', lastName: 'Fernando', jobTitle: 'Senior Software Engineer' },
+    { id: 'p11', firstName: 'Chamari', lastName: 'De Silva', jobTitle: 'Operations Analyst' },
+  ],
+  ra6: [
+    { id: 'p12', firstName: 'Mark', lastName: 'Silva', jobTitle: 'Sales Account Manager' },
+    { id: 'p13', firstName: 'Sasha', lastName: 'Perera', jobTitle: 'Finance Coordinator' },
+    { id: 'p14', firstName: 'Leo', lastName: 'Bandara', jobTitle: 'Sales Associate' },
+  ],
+};
+
+function makeReport(
+  id: string, assessmentId: string, participantId: string, reportType: ReportType,
+  status: ReportStatus, generatedAt: string | null, fileSize: string | null, pages: number | null,
+): ReportModel {
+  const participant = MOCK_PARTICIPANTS_BY_ASSESSMENT[assessmentId]?.find((p) => p.id === participantId);
+  return {
+    id, assessmentId, participantId,
+    participantName: participant ? `${participant.firstName} ${participant.lastName}` : 'Participant',
+    participantRole: participant?.jobTitle ?? '',
+    reportType, status, generatedAt, fileSize, pages,
+  };
+}
+
+const MOCK_REPORTS_INITIAL: ReportModel[] = [
+  makeReport('r1', 'ra1', 'p1', 'individual_360', 'ready', '2026-07-24T09:12:00Z', '1.4 MB', 9),
+  makeReport('r2', 'ra1', 'p2', 'individual_360', 'ready', '2026-07-24T09:15:00Z', '1.6 MB', 10),
+  makeReport('r3', 'ra1', 'p3', 'individual_360', 'processing', null, null, null),
+  makeReport('r4', 'ra2', 'p4', 'competency', 'ready', '2026-07-20T14:02:00Z', '980 KB', 6),
+  makeReport('r5', 'ra2', 'p5', 'competency', 'failed', null, null, null),
+  makeReport('r6', 'ra3', 'p6', 'personality', 'ready', '2026-07-15T08:45:00Z', '1.1 MB', 7),
+  makeReport('r7', 'ra3', 'p7', 'personality', 'ready', '2026-07-15T08:47:00Z', '1.1 MB', 7),
+  makeReport('r8', 'ra3', 'p8', 'personality', 'ready', '2026-07-15T08:50:00Z', '1.0 MB', 7),
+  makeReport('r9', 'ra4', 'p9', 'readiness', 'ready', '2026-07-05T11:30:00Z', '1.3 MB', 8),
+  makeReport('r10', 'ra4', 'p10', 'readiness', 'processing', null, null, null),
+  makeReport('r11', 'ra5', 'p5', 'competency', 'ready', '2026-06-28T10:00:00Z', '950 KB', 6),
+];
+
+// ── Meta ──────────────────────────────────────────────────────────────────────
+
+const REPORT_TYPE_ASSESSMENT: Record<ReportType, AssessmentType> = {
+  individual_360: AssessmentType.FEEDBACK_360,
+  competency: AssessmentType.COMPETENCY,
+  personality: AssessmentType.PERSONALITY,
+  readiness: AssessmentType.READINESS,
+};
+
+const REPORT_TYPE_LABELS: Record<ReportType, string> = {
   individual_360: '360° Feedback',
   competency: 'Competency',
   personality: 'Personality',
   readiness: 'Readiness',
-};
-
-const REPORT_TYPE_ICON: Record<string, string> = {
-  individual_360: '🔄',
-  competency: '🎯',
-  personality: '🧠',
-  readiness: '🚀',
 };
 
 const STATUS_VARIANT: Record<ReportStatus, 'success' | 'warning' | 'neutral' | 'error'> = {
@@ -57,74 +154,38 @@ const STATUS_LABELS: Record<ReportStatus, string> = {
 
 type StatusFilter = 'all' | ReportStatus;
 
+function reportTypeOf(assessmentType: AssessmentType): ReportType {
+  const entry = Object.entries(REPORT_TYPE_ASSESSMENT).find(([, v]) => v === assessmentType);
+  return (entry?.[0] as ReportType) ?? 'individual_360';
+}
+
+function randomPages() { return 6 + Math.floor(Math.random() * 5); }
+function randomSize() { return `${(0.8 + Math.random() * 0.9).toFixed(1)} MB`; }
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function ReportsPage() {
   const [selectedAssessment, setSelectedAssessment] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [generating, setGenerating] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
-
-  // Real State connected to backend
-  const [reports, setReports] = useState<ReportModel[]>([]);
-  const [assessments, setAssessments] = useState<any[]>();
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [reports, setReports] = useState<ReportModel[]>(MOCK_REPORTS_INITIAL);
 
   const [showAssessmentMenu, setShowAssessmentMenu] = useState(false);
   const assessmentMenuRef = useRef<HTMLDivElement>(null);
 
-  // 1. Fetch Assessments and Reports on load
-  useEffect(() => {
-    const getInitialData = async () => {
-      try {
-        // Fetch generated reports from GET /reports
-        const reportsRes = await api.get('/reports');
-        const reportsPayload = reportsRes.data?.data || reportsRes.data || [];
-        setReports(Array.isArray(reportsPayload) ? reportsPayload : []);
-        console.log(reportsRes, "\n\n---------------\n\n")
+  const assessments = MOCK_ASSESSMENTS;
+  const participants = selectedAssessment ? (MOCK_PARTICIPANTS_BY_ASSESSMENT[selectedAssessment] ?? []) : [];
 
-        const assessmentsRes = await api.get('/assessments');
-        console.log(assessmentsRes, "\n\n------assessmentsRes---------\n\n")
-        const assessmentsPayload = assessmentsRes.data?.data?.data || assessmentsRes.data || [];
-        setAssessments(Array.isArray(assessmentsPayload) ? assessmentsPayload : []);
-        console.log('assessments', assessments, Array.isArray(assessmentsRes.data?.data?.data))
-      } catch (error) {
-        console.error("Error loading initial data: ", error);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (assessmentMenuRef.current && !assessmentMenuRef.current.contains(event.target as Node)) {
+        setShowAssessmentMenu(false);
       }
-    };
-
-    getInitialData();
-
-    // 2. Polling: Refresh reports every 5 seconds to catch "processing" -> "ready" transitions
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.get('/reports');
-        const payload = res.data?.data || res.data || [];
-        if (Array.isArray(payload)) setReports(payload);
-      } catch (e) { }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // 3. Fetch Participants whenever selectedAssessment changes
-  useEffect(() => {
-    if (!selectedAssessment) {
-      setParticipants([]);
-      return;
     }
-
-    const getParticipants = async () => {
-      try {
-        // NOTE: Make sure your backend has a GET /assessments/:id/participants endpoint!
-        const res = await api.get(`/assessments/${selectedAssessment}/participants`);
-        const payload = res.data?.data || res.data || [];
-        setParticipants(Array.isArray(payload) ? payload : []);
-      } catch (error) {
-        console.error("Error loading participants: ", error);
-      }
-    };
-
-    getParticipants();
-  }, [selectedAssessment]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const filteredReports = reports.filter((r) => {
     if (selectedAssessment && r.assessmentId !== selectedAssessment) return false;
@@ -139,89 +200,77 @@ export default function ReportsPage() {
     failed: reports.filter((r) => r.status === 'failed').length,
   };
 
-  // 4. Connect Individual Generate to POST /reports/generate
-  async function handleGenerate(participantId: string) {
-    const asmt = assessments?.find((a) => a.id === selectedAssessment);
-    if (!asmt) return;
-
-    if (asmt.assessmentType == '360_feedback') {
-      asmt.assessmentType = 'individual_360'
-    }
-
-    setGenerating(participantId);
-    // console.log('asmt.assessmentType', asmt)
-    try {
-      const res = await api.post('/reports/generate', {
-        assessmentId: selectedAssessment,
-        participantId: participantId,
-        reportType: asmt.assessmentType,
-        language: 'en'
-      });
-
-      const newReport = res.data?.data || res.data;
-      if (newReport) {
-        setReports((prev) => {
-          // Remove existing report with the same ID before adding the new one
-          const filtered = prev.filter((item) => item.id !== newReport.id);
-          return [newReport, ...filtered];
-        });
-      }
-    } catch (error) {
-      console.error("Failed to generate report:", error);
-    } finally {
-      setGenerating(null);
-    }
+  // Simulate async PDF generation entirely client-side against mock state
+  function completeReport(id: string, delay: number) {
+    setTimeout(() => {
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, status: 'ready', generatedAt: new Date().toISOString(), fileSize: randomSize(), pages: randomPages() }
+            : r,
+        ),
+      );
+    }, delay);
   }
 
-  // 5. Connect Bulk Generate by looping through participants and calling POST /reports/generate
+  function queueReport(assessmentId: string, participantId: string) {
+    const asmt = assessments.find((a) => a.id === assessmentId);
+    if (!asmt) return;
+    const reportType = reportTypeOf(asmt.assessmentType);
+    const id = `r-${assessmentId}-${participantId}-${Date.now()}`;
+
+    setReports((prev) => [
+      makeReport(id, assessmentId, participantId, reportType, 'processing', null, null, null),
+      ...prev.filter((r) => !(r.assessmentId === assessmentId && r.participantId === participantId)),
+    ]);
+
+    completeReport(id, 1600 + Math.random() * 900);
+  }
+
+  // Any reports seeded as "processing" in the initial mock data should still resolve on their own,
+  // as if they were queued moments before the page loaded.
+  useEffect(() => {
+    MOCK_REPORTS_INITIAL.filter((r) => r.status === 'processing').forEach((r, i) => {
+      completeReport(r.id, 2200 + i * 900);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleGenerate(participantId: string) {
+    if (!selectedAssessment) return;
+    setGenerating(participantId);
+    queueReport(selectedAssessment, participantId);
+    setTimeout(() => setGenerating(null), 400);
+  }
+
+  async function handleRetry(report: ReportModel) {
+    queueReport(report.assessmentId, report.participantId);
+  }
+
   async function handleBulkGenerate() {
     if (!selectedAssessment || participants.length === 0) return;
-    const asmt = assessments?.find((a) => a.id === selectedAssessment);
-    if (!asmt) return;
-
     setBulkGenerating(true);
-    try {
-      for (const p of participants) {
-        const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
-        console.log('selectedAssessment', selectedAssessment)
-        console.log('existing', existing)
-
-        if (!existing) {
-          await api.post('/reports/generate', {
-            assessmentId: selectedAssessment,
-            participantId: p.id,
-            reportType: asmt.type,
-            language: 'en'
-          });
-        }
-      }
-      // Refresh list after bulk triggering
-      const res = await api.get('/reports');
-      setReports(res.data?.data || res.data || []);
-    } catch (error) {
-      console.error("Bulk generate failed:", error);
-    } finally {
-      setBulkGenerating(false);
-    }
+    participants.forEach((p) => {
+      const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
+      if (!existing || existing.status === 'failed') queueReport(selectedAssessment, p.id);
+    });
+    setTimeout(() => setBulkGenerating(false), 500);
   }
 
-  // 6. Connect PDF Download to GET /reports/:id/download
   async function handleDownload(report: ReportModel) {
-    try {
-      const response = await api.get(`/reports/${report.id}/download`, {
-        responseType: 'blob'
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `report-${report.participantName || report.id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Download failed:", error);
-    }
+    const asmt = assessments.find((a) => a.id === report.assessmentId);
+    const data: ReportData = {
+      id: report.id,
+      participantName: report.participantName,
+      participantRole: report.participantRole,
+      assessmentTitle: asmt?.title ?? 'Assessment Report',
+      reportType: report.reportType,
+      generatedAt: report.generatedAt
+        ? format(new Date(report.generatedAt), 'dd MMM yyyy')
+        : format(new Date(), 'dd MMM yyyy'),
+      organisationName: 'LeaderPrism Demo Org',
+    };
+    await generateReportPdf(data);
   }
 
   const statusTabs: { key: StatusFilter; label: string }[] = [
@@ -231,23 +280,20 @@ export default function ReportsPage() {
     { key: 'failed', label: 'Failed' },
   ];
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (assessmentMenuRef.current && !assessmentMenuRef.current.contains(event.target as Node)) {
-        setShowAssessmentMenu(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const STAT_CARDS = [
+    { label: 'Total Reports', value: stats.total, icon: Files, gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)', glow: 'rgba(70,95,255,0.25)' },
+    { label: 'Ready to Download', value: stats.ready, icon: BadgeCheck, gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)', glow: 'rgba(34,197,94,0.22)' },
+    { label: 'Processing', value: stats.processing, icon: LoaderCircle, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', glow: 'rgba(245,158,11,0.22)', spin: true },
+    { label: 'Failed', value: stats.failed, icon: TriangleAlert, gradient: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)', glow: 'rgba(244,63,94,0.22)' },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Reports</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Generate and download PDF assessment reports</p>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Generate and download PDF assessment reports</p>
         </div>
         {selectedAssessment && participants.length > 0 && (
           <button
@@ -262,9 +308,7 @@ export default function ReportsPage() {
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
+                <Zap className="w-4 h-4" strokeWidth={2.25} />
                 Bulk Generate
               </>
             )}
@@ -274,73 +318,79 @@ export default function ReportsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Reports', value: stats.total, icon: Files, color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300' },
-          { label: 'Ready to Download', value: stats.ready, icon: BadgeCheck, color: 'bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-300' },
-          { label: 'Processing', value: stats.processing, icon: LoaderCircle, color: 'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-600 dark:text-yellow-300' },
-          { label: 'Failed', value: stats.failed, icon: TriangleAlert, color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300' },
-        ].map((stat) => {
+        {STAT_CARDS.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-4 flex items-center gap-3 shadow-sm">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}>
-                <Icon className={`h-5 w-5 ${stat.label === 'Processing' ? 'animate-spin' : ''}`} />
+            <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mb-4"
+                style={{ background: stat.gradient, boxShadow: `0 4px 12px ${stat.glow}` }}
+              >
+                <Icon className={cn('w-5 h-5 text-white', stat.spin && 'animate-spin')} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{stat.value}</p>
-                <p className="text-xs text-gray-500 dark:text-slate-400">{stat.label}</p>
-              </div>
+              <p className="text-3xl font-bold text-gray-900 tabular-nums tracking-tight">{stat.value}</p>
+              <p className="text-sm text-gray-500 mt-1.5 font-medium">{stat.label}</p>
             </div>
           );
         })}
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
-        <label className="text-sm font-medium text-gray-700 dark:text-slate-300 whitespace-nowrap">Assessment</label>
-        <div className="relative w-full sm:max-w-xs" ref={assessmentMenuRef}>
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Assessment</label>
+        <div className="relative w-full sm:max-w-sm" ref={assessmentMenuRef}>
           <button
             type="button"
             onClick={() => setShowAssessmentMenu((prev) => !prev)}
-            className="flex w-full items-center justify-between rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-left text-sm text-gray-700 dark:text-slate-200 shadow-sm transition-all duration-200 hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-left text-sm shadow-sm transition-all duration-200 hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
-            <span className={selectedAssessment ? 'text-gray-900 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}>
-              {selectedAssessment
-                ? (assessments?.find((a) => a.id === selectedAssessment)?.title ?? 'Select assessment')
-                : 'All assessments'}
+            <span className="flex items-center gap-2 min-w-0">
+              {selectedAssessment && (() => {
+                const asmt = assessments.find((a) => a.id === selectedAssessment);
+                if (!asmt) return null;
+                const meta = TYPE_META[asmt.assessmentType];
+                const Icon = meta.icon;
+                return (
+                  <span className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.gradient }}>
+                    <Icon className="w-3 h-3 text-white" strokeWidth={2} />
+                  </span>
+                );
+              })()}
+              <span className={cn('truncate', selectedAssessment ? 'text-gray-900' : 'text-gray-500')}>
+                {selectedAssessment
+                  ? (assessments.find((a) => a.id === selectedAssessment)?.title ?? 'Select assessment')
+                  : 'All assessments'}
+              </span>
             </span>
-            <svg className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showAssessmentMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
-            </svg>
+            <ChevronDown className={cn('h-4 w-4 text-gray-400 shrink-0 transition-transform duration-200', showAssessmentMenu && 'rotate-180')} strokeWidth={2} />
           </button>
 
           {showAssessmentMenu && (
-            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
+            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg py-1">
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedAssessment('');
-                  setShowAssessmentMenu(false);
-                }}
-                className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-700 dark:hover:text-blue-300"
+                onClick={() => { setSelectedAssessment(''); setShowAssessmentMenu(false); }}
+                className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
               >
-                <span className={!selectedAssessment ? 'font-medium text-blue-700 dark:text-blue-300' : 'text-gray-600 dark:text-slate-300'}>
-                  All assessments
-                </span>
+                <span className={!selectedAssessment ? 'font-semibold text-blue-700' : 'text-gray-600'}>All assessments</span>
+                {!selectedAssessment && <Check className="w-4 h-4 text-blue-600" strokeWidth={2.5} />}
               </button>
-              {assessments?.map((a) => {
+              {assessments.map((a) => {
                 const isSelected = selectedAssessment === a.id;
+                const meta = TYPE_META[a.assessmentType];
+                const Icon = meta.icon;
                 return (
                   <button
                     key={a.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedAssessment(a.id);
-                      setShowAssessmentMenu(false);
-                    }}
-                    className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-slate-800"
+                    onClick={() => { setSelectedAssessment(a.id); setShowAssessmentMenu(false); }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                   >
-                    <span className={isSelected ? 'font-medium text-gray-900 dark:text-slate-100' : 'text-gray-600 dark:text-slate-300'}>{a.title}</span>
+                    <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: meta.gradient }}>
+                      <Icon className="w-3.5 h-3.5 text-white" strokeWidth={2} />
+                    </span>
+                    <span className={cn('flex-1 truncate', isSelected ? 'font-semibold text-gray-900' : 'text-gray-600')}>{a.title}</span>
+                    {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" strokeWidth={2.5} />}
                   </button>
                 );
               })}
@@ -350,7 +400,7 @@ export default function ReportsPage() {
         {selectedAssessment && (
           <button
             onClick={() => setSelectedAssessment('')}
-            className="text-xs text-gray-400 dark:text-slate-500 transition-colors hover:text-gray-600 dark:hover:text-slate-300"
+            className="text-xs text-gray-400 transition-colors hover:text-gray-600"
           >
             Clear
           </button>
@@ -359,32 +409,29 @@ export default function ReportsPage() {
 
       {/* Generate section — only when an assessment is selected */}
       {selectedAssessment && participants.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100">Generate Reports</h2>
-              <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">Queue individual PDF reports for participants</p>
+              <h2 className="text-sm font-semibold text-gray-800">Generate Reports</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Queue individual PDF reports for participants</p>
             </div>
-            <span className="text-xs bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 font-medium px-2.5 py-1 rounded-full">
+            <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full">
               {participants.length} participants
             </span>
           </div>
-          <div className="divide-y divide-gray-50 dark:divide-slate-800">
+          <div className="divide-y divide-gray-50">
             {participants.map((p) => {
               const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
               const isGenerating = generating === p.id;
-              const name = p.name || `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'User';
-              const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+              const name = `${p.firstName} ${p.lastName}`;
 
               return (
-                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/70 transition-colors">
+                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-                      {initials}
-                    </div>
+                    <Avatar seed={p.id} size="sm" />
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-slate-100">{name}</p>
-                      <p className="text-xs text-gray-400 dark:text-slate-500">{p.role || p.jobTitle || 'Participant'}</p>
+                      <p className="text-sm font-medium text-gray-900">{name}</p>
+                      <p className="text-xs text-gray-400">{p.jobTitle}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -396,6 +443,7 @@ export default function ReportsPage() {
                         onClick={() => handleDownload(existing)}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
                       >
+                        <Download className="w-3.5 h-3.5" strokeWidth={2} />
                         Download PDF
                       </button>
                     ) : existing?.status === 'processing' ? (
@@ -409,7 +457,7 @@ export default function ReportsPage() {
                         disabled={isGenerating}
                         className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors flex items-center gap-1.5"
                       >
-                        {isGenerating ? 'Queuing…' : 'Generate'}
+                        {isGenerating ? 'Queuing…' : (existing?.status === 'failed' ? 'Retry' : 'Generate')}
                       </button>
                     )}
                   </div>
@@ -421,14 +469,14 @@ export default function ReportsPage() {
       )}
 
       {/* Reports table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-100">All Reports</h2>
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5">{filteredReports.length} report{filteredReports.length !== 1 ? 's' : ''}</p>
+            <h2 className="text-sm font-semibold text-gray-800">All Reports</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{filteredReports.length} report{filteredReports.length !== 1 ? 's' : ''}</p>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             {statusTabs.map((tab) => {
               const count = tab.key === 'all'
                 ? reports.filter((r) => !selectedAssessment || r.assessmentId === selectedAssessment).length
@@ -437,13 +485,13 @@ export default function ReportsPage() {
                 <button
                   key={tab.key}
                   onClick={() => setStatusFilter(tab.key)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === tab.key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800'
-                    }`}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium rounded-lg transition-all',
+                    statusFilter === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100',
+                  )}
                 >
                   {tab.label}
-                  <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${statusFilter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400'}`}>
+                  <span className={cn('ml-1 rounded-full px-1.5 py-0.5 text-xs', statusFilter === tab.key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500')}>
                     {count}
                   </span>
                 </button>
@@ -459,8 +507,8 @@ export default function ReportsPage() {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[640px]">
-              <thead className="text-xs text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800/70 border-b border-gray-100 dark:border-slate-800">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-5 py-3 font-medium">Participant</th>
                   <th className="text-left px-5 py-3 font-medium">Assessment</th>
@@ -470,34 +518,32 @@ export default function ReportsPage() {
                   <th className="text-left px-5 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
+              <tbody className="divide-y divide-gray-50">
                 {filteredReports.map((r) => {
-                  const asmt = assessments?.find((a) => a.id === r.assessmentId);
-                  const name = r.participantName || 'Participant';
-                  const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+                  const asmt = assessments.find((a) => a.id === r.assessmentId);
+                  const meta = TYPE_META[REPORT_TYPE_ASSESSMENT[r.reportType]];
+                  const TypeIcon = meta.icon;
 
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/70 transition-colors">
+                    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {initials}
-                          </div>
+                          <Avatar seed={r.participantId} size="sm" />
                           <div>
-                            <p className="font-medium text-gray-900 dark:text-slate-100">{name}</p>
-                            <p className="text-xs text-gray-400 dark:text-slate-500">{r.participantRole || '—'}</p>
+                            <p className="font-medium text-gray-900">{r.participantName}</p>
+                            <p className="text-xs text-gray-400">{r.participantRole || '—'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <p className="text-gray-600 dark:text-slate-300 max-w-[180px] truncate" title={asmt?.title}>
+                        <p className="text-gray-600 max-w-[180px] truncate" title={asmt?.title}>
                           {asmt?.title ?? r.assessmentId}
                         </p>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-full px-2.5 py-1">
-                          <span>{REPORT_TYPE_ICON[r.reportType] || '📄'}</span>
-                          {REPORT_TYPE_LABELS[r.reportType] ?? r.reportType}
+                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border', meta.chip)}>
+                          <TypeIcon className="w-3 h-3" strokeWidth={2} />
+                          {REPORT_TYPE_LABELS[r.reportType]}
                         </span>
                       </td>
                       <td className="px-5 py-3.5">
@@ -508,22 +554,29 @@ export default function ReportsPage() {
                           <Badge variant={STATUS_VARIANT[r.status]}>{STATUS_LABELS[r.status]}</Badge>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-gray-400 dark:text-slate-500 text-xs">
-                        {r.generatedAt ? format(new Date(r.generatedAt), 'dd MMM yyyy, HH:mm') : '—'}
+                      <td className="px-5 py-3.5 text-gray-400 text-xs">
+                        {r.generatedAt ? (
+                          <>
+                            <p>{format(new Date(r.generatedAt), 'dd MMM yyyy, HH:mm')}</p>
+                            {r.pages && r.fileSize && <p className="text-gray-300 mt-0.5">{r.pages} pages · {r.fileSize}</p>}
+                          </>
+                        ) : '—'}
                       </td>
                       <td className="px-5 py-3.5">
                         {r.status === 'ready' ? (
                           <button
                             onClick={() => handleDownload(r)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 bg-blue-50 dark:bg-blue-950/50 hover:bg-gray-100 dark:hover:bg-blue-900/50 px-3 py-1.5 rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
                           >
+                            <Download className="w-3.5 h-3.5" strokeWidth={2} />
                             Download
                           </button>
                         ) : r.status === 'failed' ? (
                           <button
-                            onClick={() => handleGenerate(r.participantId)}
-                            className="text-xs font-medium text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/70 px-3 py-1.5 rounded-lg transition-colors"
+                            onClick={() => handleRetry(r)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
                           >
+                            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
                             Retry
                           </button>
                         ) : (
@@ -538,14 +591,30 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* Quick-add: generate a report for an assessment not yet started */}
+      {!selectedAssessment && (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-5 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+              <Plus className="w-5 h-5 text-gray-400" strokeWidth={2} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Need to generate a report?</p>
+              <p className="text-xs text-gray-400 mt-0.5">Select an assessment above to view its participants and queue reports.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info banner */}
-      <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl px-5 py-4 flex items-start gap-3">
-        <svg className="w-4 h-4 text-blue-500 dark:text-blue-300 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+      <div className="bg-blue-50 border border-blue-100 rounded-2xl px-5 py-4 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+          <Info className="w-4 h-4 text-blue-600" strokeWidth={2} />
+        </div>
         <div>
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-300">About PDF Reports</p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+          <p className="text-sm font-medium text-blue-800">About PDF Reports</p>
+          <p className="text-xs text-blue-600 mt-0.5">
             Reports are generated as multi-page PDFs and are typically ready within 30–60 seconds.
             Processing reports are automatically updated — no need to refresh the page.
             Generated reports are available for download for 90 days.
