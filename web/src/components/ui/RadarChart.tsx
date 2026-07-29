@@ -15,8 +15,8 @@ interface RadarChartProps {
 }
 
 const COLORS = {
-  fill: 'rgba(59, 130, 246, 0.25)',
-  stroke: 'rgb(59, 130, 246)',
+  fill: 'rgba(70, 95, 255, 0.22)',
+  stroke: 'rgb(70, 95, 255)',
   grid: '#e5e7eb',
   axis: '#d1d5db',
   label: '#374151',
@@ -59,9 +59,6 @@ function splitText(text: string, maxLen = 14): string[] {
 }
 
 export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
-  const n = axes.length;
-  if (n < 3) return null;
-
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -73,6 +70,9 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
 
     return () => observer.disconnect();
   }, []);
+
+  const n = axes.length;
+  if (n < 3) return null;
 
   const theme = isDark ? COLORS.dark : COLORS;
 

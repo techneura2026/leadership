@@ -1,8 +1,10 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface Candidate {
+  id?: string;
   name: string;
   performance: 'high' | 'medium' | 'low';
   potential: 'high' | 'medium' | 'low';
@@ -36,23 +38,6 @@ function getCellLabel(performance: string, potential: string): string {
   if (performance === 'low' && potential === 'medium') return 'Inconsistent';
   if (performance === 'medium' && potential === 'low') return 'Effective';
   return 'Risk';
-}
-
-function Avatar({ name }: { name: string }) {
-  const initials = name
-    .split(' ')
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase();
-  return (
-    <div
-      className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold shrink-0"
-      title={name}
-    >
-      {initials}
-    </div>
-  );
 }
 
 export function NineBoxGrid({ candidates }: NineBoxGridProps) {
@@ -109,8 +94,8 @@ export function NineBoxGrid({ candidates }: NineBoxGridProps) {
                       <p className="text-[10px] font-semibold text-gray-500 mb-1.5">{label}</p>
                       <div className="flex flex-wrap gap-1">
                         {cellCandidates.map((c) => (
-                          <div key={c.name} className="flex flex-col items-center gap-0.5">
-                            <Avatar name={c.name} />
+                          <div key={c.id ?? c.name} className="flex flex-col items-center gap-0.5">
+                            <Avatar seed={c.id ?? c.name} size="sm" ring />
                             <span className="text-[9px] text-gray-600 text-center leading-tight max-w-[36px] truncate">
                               {c.name.split(' ')[0]}
                             </span>

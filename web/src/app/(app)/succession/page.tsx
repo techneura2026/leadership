@@ -1,8 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+  Users, CheckCircle2, TrendingUp, Layers, Search, ChevronRight,
+  Building2, Download, FileWarning,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
+import { Avatar } from '@/components/ui/Avatar';
 import { NineBoxGrid } from '@/components/charts/NineBoxGrid';
 import { ReadinessRating } from '@leaderprism/shared';
 import { generateSuccessionPdf } from '@/lib/successionPdf';
@@ -366,6 +371,13 @@ const READINESS_META: Record<ReadinessRating, { variant: 'success' | 'warning' |
   [ReadinessRating.NOT_YET_READY]: { variant: 'neutral', label: 'Not Ready',    color: 'bg-gray-400' },
 };
 
+const READINESS_ORDER: ReadinessRating[] = [
+  ReadinessRating.READY_NOW,
+  ReadinessRating.ONE_TWO_YEARS,
+  ReadinessRating.DEVELOPING,
+  ReadinessRating.NOT_YET_READY,
+];
+
 const CRITICALITY_META: Record<string, { variant: 'error' | 'warning' | 'info'; label: string }> = {
   critical: { variant: 'error',   label: 'Critical' },
   high:     { variant: 'warning', label: 'High' },
@@ -406,7 +418,7 @@ function StatCard({ count, label, variant, icon }: {
     neutral: 'text-gray-600 dark:text-slate-300',
   }[variant];
   return (
-    <div className={`bg-gradient-to-b ${bg} rounded-xl border p-5 flex items-center gap-4 shadow-sm dark:shadow-slate-950/20`}>
+    <div className={`bg-gradient-to-b ${bg} rounded-2xl border p-5 flex items-center gap-4 shadow-sm dark:shadow-slate-950/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}>
       <div className={`w-11 h-11 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
         {icon}
       </div>
@@ -414,16 +426,6 @@ function StatCard({ count, label, variant, icon }: {
         <p className={`text-3xl font-bold ${textColor}`}>{count}</p>
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{label}</p>
       </div>
-    </div>
-  );
-}
-
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const initials = name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
-  const sizes = { sm: 'w-7 h-7 text-[10px]', md: 'w-9 h-9 text-xs', lg: 'w-12 h-12 text-sm' };
-  return (
-    <div className={`${sizes[size]} rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold shrink-0`}>
-      {initials}
     </div>
   );
 }
@@ -455,22 +457,14 @@ function OverviewTab({ candidates, roles, bench }: {
     <div className="space-y-6">
       {/* Top Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard count={candidates.length} label="Total Candidates" variant="info"
-          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" /></svg>}
-        />
-        <StatCard count={readyNow} label="Ready Now" variant="success"
-          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>}
-        />
-        <StatCard count={hipos.length} label="High Potential" variant="warning"
-          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
-        />
-        <StatCard count={coverageRate} label="Role Coverage %" variant="info"
-          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-        />
+        <StatCard count={candidates.length} label="Total Candidates" variant="info" icon={<Users className="w-5 h-5" strokeWidth={2} />} />
+        <StatCard count={readyNow} label="Ready Now" variant="success" icon={<CheckCircle2 className="w-5 h-5" strokeWidth={2} />} />
+        <StatCard count={hipos.length} label="High Potential" variant="warning" icon={<TrendingUp className="w-5 h-5" strokeWidth={2} />} />
+        <StatCard count={coverageRate} label="Role Coverage %" variant="info" icon={<Layers className="w-5 h-5" strokeWidth={2} />} />
       </div>
 
       {/* Readiness Distribution */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Readiness Distribution</h2>
         <div className="space-y-3">
           {Object.entries(READINESS_META).map(([rating, meta]) => {
@@ -491,7 +485,7 @@ function OverviewTab({ candidates, roles, bench }: {
       </div>
 
       {/* Bench Strength by Department */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Bench Strength by Department</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[560px]">
@@ -541,7 +535,7 @@ function OverviewTab({ candidates, roles, bench }: {
       </div>
 
       {/* High Potential Spotlight */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-700">High Potential Spotlight</h2>
           <Badge variant="warning">{hipos.length} identified</Badge>
@@ -552,7 +546,7 @@ function OverviewTab({ candidates, roles, bench }: {
             return (
               <div key={c.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="flex items-start gap-3 mb-3">
-                  <Avatar name={c.name} size="md" />
+                  <Avatar seed={c.id} size="md" ring />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
                     <p className="text-xs text-gray-500 truncate">{c.title}</p>
@@ -580,7 +574,7 @@ function OverviewTab({ candidates, roles, bench }: {
 function NineBoxTab({ candidates }: { candidates: Candidate[] }) {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-semibold text-gray-700">9-Box Grid — Performance × Potential</h2>
           <span className="text-xs text-gray-400">{candidates.length} candidates plotted</span>
@@ -589,6 +583,7 @@ function NineBoxTab({ candidates }: { candidates: Candidate[] }) {
           Performance (X-axis) reflects assessment outcomes. Potential (Y-axis) reflects readiness trajectory.
         </p>
         <NineBoxGrid candidates={candidates.map(c => ({
+          id: c.id,
           name: c.name,
           performance: c.performance,
           potential: c.potential,
@@ -597,7 +592,7 @@ function NineBoxTab({ candidates }: { candidates: Candidate[] }) {
       </div>
 
       {/* Legend */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-2xl border border-gray-200 p-5 hover:shadow-md transition-shadow">
         <h3 className="text-xs font-semibold text-gray-500 mb-3">Grid Cell Legend</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
           {[
@@ -629,8 +624,8 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200">
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold text-gray-700">Key Roles & Succession Pipeline ({roles.length} roles)</h2>
         <div className="flex gap-2 text-xs">
           {Object.entries(CRITICALITY_META).map(([k, v]) => (
@@ -650,14 +645,7 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
                 onClick={() => setExpanded(isOpen ? null : role.id)}
               >
                 <div className="flex items-center gap-3">
-                  {/* Expand icon */}
-                  <svg
-                    className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`}
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                  {/* Role info */}
+                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-gray-900">{role.title}</span>
@@ -669,16 +657,9 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
                       <span className="text-gray-400"> ({role.incumbentTenure})</span>
                     </p>
                   </div>
-                  {/* Successor avatars preview */}
                   <div className="flex items-center -space-x-2 shrink-0">
                     {role.successors.slice(0, 3).map(s => (
-                      <div
-                        key={s.candidateId}
-                        className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-semibold border-2 border-white"
-                        title={s.name}
-                      >
-                        {s.name.split(' ').slice(0, 2).map(n => n[0]).join('')}
-                      </div>
+                      <Avatar key={s.candidateId} seed={s.candidateId} size="sm" ring />
                     ))}
                     {role.successors.length === 0 && (
                       <span className="text-xs text-gray-400 italic">None</span>
@@ -687,7 +668,6 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
                 </div>
               </button>
 
-              {/* Expanded detail */}
               {isOpen && (
                 <div className="px-11 pb-4 bg-gray-50 border-t border-gray-100">
                   <p className="text-xs text-gray-500 font-medium pt-3 mb-2">
@@ -699,7 +679,7 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
                       return (
                         <div key={s.candidateId} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3">
                           <span className="text-xs text-gray-400 font-bold w-4">#{idx + 1}</span>
-                          <Avatar name={s.name} size="sm" />
+                          <Avatar seed={s.candidateId} size="sm" />
                           <span className="text-sm font-medium text-gray-800 flex-1">{s.name}</span>
                           <Badge variant={rm.variant}>{rm.label}</Badge>
                           <div className="w-32">
@@ -709,7 +689,8 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
                       );
                     })}
                     {role.successors.length === 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-600">
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-600 flex items-center gap-2">
+                        <FileWarning className="w-4 h-4 shrink-0" strokeWidth={2} />
                         No successors identified. This role is a succession gap — consider initiating a readiness assessment.
                       </div>
                     )}
@@ -724,112 +705,226 @@ function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
   );
 }
 
+// ── Talent Pool — Hierarchy Tree ─────────────────────────────────────────────
+
+function CandidateLeaf({ candidate }: { candidate: Candidate }) {
+  const rm = READINESS_META[candidate.readinessRating];
+  return (
+    <div className="relative flex items-center gap-3 py-2.5 pl-5 pr-3 hover:bg-[var(--bg-subtle)] rounded-lg transition-colors">
+      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-px bg-gray-200" />
+      <Avatar seed={candidate.id} size="sm" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-900 truncate">{candidate.name}</p>
+        <p className="text-xs text-gray-500 truncate">{candidate.title}</p>
+      </div>
+      <Badge variant={rm.variant} className="hidden sm:inline-flex shrink-0">{rm.label}</Badge>
+      <div className="w-20 hidden md:block shrink-0">
+        <ScoreBar score={candidate.compositeScore} />
+      </div>
+    </div>
+  );
+}
+
+function TierNode({
+  tier,
+  candidates,
+  isOpen,
+  onToggle,
+}: {
+  tier: ReadinessRating;
+  candidates: Candidate[];
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const meta = READINESS_META[tier];
+  return (
+    <div className="relative pl-6">
+      <span className="absolute left-2 top-0 bottom-0 w-px bg-gray-200" />
+      <button
+        onClick={onToggle}
+        className="relative w-full flex items-center gap-2.5 py-2 pl-5 pr-3 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors text-left"
+      >
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-px bg-gray-200" />
+        <ChevronRight className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.25} />
+        <span className={`w-2 h-2 rounded-full shrink-0 ${meta.color}`} />
+        <span className="text-sm font-semibold text-gray-700">{meta.label}</span>
+        <span className="text-xs text-gray-400">({candidates.length})</span>
+      </button>
+      {isOpen && (
+        <div className="pl-6 relative">
+          <span className="absolute left-2 top-0 bottom-3 w-px bg-gray-200" />
+          {candidates.map((c) => (
+            <CandidateLeaf key={c.id} candidate={c} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DepartmentNode({
+  department,
+  candidates,
+  openTiers,
+  onToggleTier,
+  isOpen,
+  onToggle,
+}: {
+  department: string;
+  candidates: Candidate[];
+  openTiers: Set<string>;
+  onToggleTier: (key: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const avgScore = candidates.reduce((sum, c) => sum + c.compositeScore, 0) / candidates.length;
+  const tiers = READINESS_ORDER
+    .map((tier) => ({ tier, list: candidates.filter((c) => c.readinessRating === tier) }))
+    .filter((t) => t.list.length > 0);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-4 hover:bg-[var(--bg-subtle)] transition-colors text-left"
+      >
+        <ChevronRight className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2.25} />
+        <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+          <Building2 className="w-4.5 h-4.5" strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{department}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{candidates.length} candidate{candidates.length === 1 ? '' : 's'} · avg score {avgScore.toFixed(1)}</p>
+        </div>
+        <div className="hidden sm:flex items-center -space-x-2 shrink-0">
+          {candidates.slice(0, 4).map((c) => (
+            <Avatar key={c.id} seed={c.id} size="sm" ring />
+          ))}
+          {candidates.length > 4 && (
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-semibold ring-2 ring-[var(--bg-surface)]" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)' }}>
+              +{candidates.length - 4}
+            </div>
+          )}
+        </div>
+        <Badge variant="neutral" className="shrink-0">{candidates.length}</Badge>
+      </button>
+
+      {isOpen && (
+        <div className="px-4 pb-4 pt-1 border-t border-gray-100 space-y-1">
+          {tiers.map(({ tier, list }) => {
+            const key = `${department}:${tier}`;
+            return (
+              <TierNode
+                key={key}
+                tier={tier}
+                candidates={list}
+                isOpen={openTiers.has(key)}
+                onToggle={() => onToggleTier(key)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
-  const [filter, setFilter] = useState<ReadinessRating | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [openDepts, setOpenDepts] = useState<Set<string>>(new Set());
+  const [openTiers, setOpenTiers] = useState<Set<string>>(new Set());
 
-  const filtered = candidates.filter(c => {
-    const matchRating = filter === 'all' || c.readinessRating === filter;
-    const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.department.toLowerCase().includes(search.toLowerCase());
-    return matchRating && matchSearch;
-  });
+  const departments = useMemo(
+    () => Array.from(new Set(candidates.map((c) => c.department))).sort(),
+    [candidates],
+  );
 
-  const filterTabs = [
-    { key: 'all', label: `All (${candidates.length})` },
-    ...Object.entries(READINESS_META).map(([k, v]) => ({
-      key: k,
-      label: `${v.label} (${candidates.filter(c => c.readinessRating === k).length})`,
-    })),
-  ];
+  const query = search.trim().toLowerCase();
+  const matchesQuery = (c: Candidate) =>
+    !query ||
+    c.name.toLowerCase().includes(query) ||
+    c.title.toLowerCase().includes(query) ||
+    c.department.toLowerCase().includes(query);
+
+  const grouped = departments
+    .map((dept) => ({
+      department: dept,
+      candidates: candidates.filter((c) => c.department === dept && matchesQuery(c)),
+    }))
+    .filter((d) => d.candidates.length > 0);
+
+  function toggleDept(dept: string) {
+    setOpenDepts((prev) => {
+      const next = new Set(prev);
+      next.has(dept) ? next.delete(dept) : next.add(dept);
+      return next;
+    });
+  }
+  function toggleTier(key: string) {
+    setOpenTiers((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+  function expandAll() {
+    setOpenDepts(new Set(departments));
+    setOpenTiers(new Set(
+      departments.flatMap((d) => READINESS_ORDER.map((t) => `${d}:${t}`)),
+    ));
+  }
+  function collapseAll() {
+    setOpenDepts(new Set());
+    setOpenTiers(new Set());
+  }
 
   return (
     <div className="space-y-4">
-      {/* Filter + Search */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex gap-1 flex-wrap">
-          {filterTabs.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setFilter(t.key as ReadinessRating | 'all')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
-                filter === t.key
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="relative ml-auto">
-          {!search && (<svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>)}
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={2} />
           <input
             type="text"
-            placeholder="Search candidates..."
+            placeholder="Search talent pool…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="placeholder:px-4  text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-52"
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
+        </div>
+        <div className="flex gap-2 ml-auto">
+          <button
+            onClick={expandAll}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Expand all
+          </button>
+          <button
+            onClick={collapseAll}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Collapse all
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium">Candidate</th>
-              <th className="text-left px-4 py-3 font-medium">Department</th>
-              <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Performance</th>
-              <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Potential</th>
-              <th className="text-left px-4 py-3 font-medium">Readiness</th>
-              <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Score</th>
-              <th className="text-left px-4 py-3 font-medium hidden xl:table-cell">Key Strengths</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(c => {
-              const rm = READINESS_META[c.readinessRating];
-              const perfColor = c.performance === 'high' ? 'text-green-600' : c.performance === 'medium' ? 'text-yellow-600' : 'text-red-500';
-              const potColor = c.potential === 'high' ? 'text-green-600' : c.potential === 'medium' ? 'text-yellow-600' : 'text-red-500';
-              return (
-                <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar name={c.name} size="sm" />
-                      <div>
-                        <p className="font-medium text-gray-900">{c.name}</p>
-                        <p className="text-xs text-gray-400">{c.title}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">{c.department}</td>
-                  <td className={`px-4 py-3 capitalize font-medium hidden md:table-cell ${perfColor}`}>{c.performance}</td>
-                  <td className={`px-4 py-3 capitalize font-medium hidden md:table-cell ${potColor}`}>{c.potential}</td>
-                  <td className="px-4 py-3"><Badge variant={rm.variant}>{rm.label}</Badge></td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    <div className="w-28">
-                      <ScoreBar score={c.compositeScore} />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 hidden xl:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {c.keyStrengths.slice(0, 2).map(s => (
-                        <span key={s} className="text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full">{s}</span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-sm text-gray-400">No candidates match the current filter.</div>
+      {/* Tree */}
+      <div className="space-y-3">
+        {grouped.map((d) => (
+          <DepartmentNode
+            key={d.department}
+            department={d.department}
+            candidates={d.candidates}
+            openTiers={openTiers}
+            onToggleTier={toggleTier}
+            isOpen={openDepts.has(d.department) || Boolean(query)}
+            onToggle={() => toggleDept(d.department)}
+          />
+        ))}
+        {grouped.length === 0 && (
+          <div className="text-center py-16 text-sm text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
+            No candidates match &ldquo;{search}&rdquo;.
+          </div>
         )}
       </div>
     </div>
@@ -847,7 +942,7 @@ export default function SuccessionPage() {
     try {
       await generateSuccessionPdf({
         organisationName: 'LeaderPrism Demo Org',
-        generatedAt: 'Jun 2026',
+        generatedAt: 'Jul 2026',
         candidates: MOCK_CANDIDATES,
         keyRoles: MOCK_KEY_ROLES,
         bench: MOCK_BENCH,
@@ -860,14 +955,14 @@ export default function SuccessionPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Succession Planning</h1>
           <p className="text-sm text-gray-500 mt-1">Leadership talent pipeline, readiness overview, and bench strength analysis.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-gray-400 bg-gray-100 border border-gray-200 rounded-full px-3 py-1">
-            Updated Jun 2026
+            Updated Jul 2026
           </span>
           <button
             onClick={handleExport}
@@ -884,9 +979,7 @@ export default function SuccessionPage() {
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <Download className="w-4 h-4" strokeWidth={2} />
                 Export PDF
               </>
             )}

@@ -1,30 +1,30 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Menu, Search, Bell, Sun, Moon, ChevronDown, LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { useTheme } from '@/components/ThemeProvider';
 
-function SunIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 6.343l-.707-.707m12.728 12.728l-.707-.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-    </svg>
-  );
-}
-
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const { theme, toggle } = useTheme();
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
 
   async function handleLogout() {
     try {
@@ -38,63 +38,121 @@ export function Header() {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10">
-      <div />
+    <header className="h-16 flex items-center justify-between gap-3 px-4 sm:px-6 shrink-0 z-30" style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Mobile menu button */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 -ml-2 rounded-lg shrink-0"
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
 
-      <div className="flex items-center gap-2">
-        {/* Desktop user info */}
-        <div className="hidden md:flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900 leading-none">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-xs text-gray-500 mt-1 capitalize leading-none">
-              {user?.role?.replace(/_/g, ' ')}
-            </p>
-          </div>
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #1248a0 100%)' }}
+        {/* Search */}
+        <div className="hidden sm:flex items-center gap-2 w-full max-w-xs rounded-xl px-3.5 py-2.5" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
+          <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            placeholder="Search or type command..."
+            className="!border-0 !shadow-none !p-0 bg-transparent w-full text-sm placeholder:text-current"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          <kbd
+            className="hidden lg:flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md shrink-0"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
           >
-            {initials}
-          </div>
+            ⌘K
+          </kbd>
         </div>
+      </div>
 
-        {/* Mobile avatar */}
-        <div className="flex md:hidden items-center">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg, #1a60b8 0%, #1248a0 100%)' }}
-          >
-            {initials}
-          </div>
-        </div>
-
-        <div className="w-px h-6 bg-gray-100 mx-1" />
-
-        {/* Dark / Light mode toggle */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Theme toggle */}
         <button
           onClick={toggle}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all"
+          className="flex items-center justify-center w-9 h-9 rounded-lg transition-all"
+          style={{ color: 'var(--text-secondary)' }}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           aria-label="Toggle theme"
         >
-          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
         </button>
 
-        <div className="w-px h-6 bg-gray-100 mx-1" />
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen((v) => !v)}
+            className="relative flex items-center justify-center w-9 h-9 rounded-lg transition-all"
+            style={{ color: 'var(--text-secondary)' }}
+            aria-label="Notifications"
+          >
+            <Bell className="w-[18px] h-[18px]" />
+            <span
+              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+              style={{ background: '#f04438', boxShadow: '0 0 0 2px var(--bg-surface)' }}
+            />
+          </button>
+          {notifOpen && (
+            <div
+              className="absolute right-0 mt-2 w-72 rounded-2xl overflow-hidden z-40"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}
+            >
+              <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Notifications</p>
+              </div>
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>You&apos;re all caught up</p>
+              </div>
+            </div>
+          )}
+        </div>
 
-        {/* Sign out */}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition-all"
-          title="Sign out"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          <span className="hidden sm:block">Sign out</span>
-        </button>
+        <div className="w-px h-6 mx-1" style={{ background: 'var(--border)' }} />
+
+        {/* Profile dropdown */}
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl transition-all"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%)' }}
+            >
+              {initials}
+            </div>
+            <div className="hidden md:block text-left leading-none">
+              <p className="text-sm font-semibold leading-none">{user?.firstName} {user?.lastName}</p>
+              <p className="text-xs mt-1 capitalize leading-none" style={{ color: 'var(--text-muted)' }}>
+                {user?.role?.replace(/_/g, ' ')}
+              </p>
+            </div>
+            <ChevronDown className="hidden md:block w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+          </button>
+
+          {profileOpen && (
+            <div
+              className="absolute right-0 mt-2 w-56 rounded-2xl overflow-hidden z-40 py-1.5"
+              style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}
+            >
+              <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user?.firstName} {user?.lastName}</p>
+                <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{user?.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors"
+                style={{ color: '#f04438' }}
+              >
+                <LogOut className="w-4 h-4" />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

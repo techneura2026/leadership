@@ -7,37 +7,37 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN SYSTEM — LeaderPrism HR Platform
    ───────────────────────────────────────────────────────────────────────────
-   Theme:    Professional Navy + Blue (HR system aesthetic — Workday/SAP style)
+   Theme:    Modern Indigo-Blue (TailAdmin-inspired admin aesthetic)
    Dark:     class-based (.dark on <html>)
    Grid:     8pt · Typography: Golden Ratio scale (φ = 1.618) at 15px base
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── LIGHT MODE VARIABLES ─────────────────────────────────────────────────── */
 :root {
-  /* ── HR Primary (Professional Navy-Blue) ────────────────────────────── */
-  --blue-50:  #eff6ff;
-  --blue-100: #dbeafe;
-  --blue-200: #bfdbfe;
-  --blue-300: #93c5fd;
-  --blue-400: #60a5fa;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
-  --blue-800: #1e40af;
-  --blue-900: #1e3a8a;
+  /* ── Brand (Indigo-Blue) ───────────────────────────────────────────── */
+  --blue-50:  #ecf3ff;
+  --blue-100: #dde9ff;
+  --blue-200: #c2d6ff;
+  --blue-300: #9cb9ff;
+  --blue-400: #7592ff;
+  --blue-500: #465fff;
+  --blue-600: #3641f5;
+  --blue-700: #2a31d8;
+  --blue-800: #252dae;
+  --blue-900: #262e89;
 
   /* ── Slate Neutrals ─────────────────────────────────────────────────── */
-  --slate-50:  #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1;
-  --slate-400: #94a3b8;
-  --slate-500: #64748b;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1e293b;
-  --slate-900: #0f172a;
-  --slate-950: #020617;
+  --slate-50:  #f9fafb;
+  --slate-100: #f2f4f7;
+  --slate-200: #e4e7ec;
+  --slate-300: #d0d5dd;
+  --slate-400: #98a2b3;
+  --slate-500: #667085;
+  --slate-600: #475467;
+  --slate-700: #344054;
+  --slate-800: #1d2939;
+  --slate-900: #101828;
+  --slate-950: #0c111d;
 
   /* ── Semantic Colors ────────────────────────────────────────────────── */
   --green-50:  #f0fdf4;  --green-100: #dcfce7;  --green-500: #22c55e;  --green-600: #16a34a;  --green-700: #15803d;
@@ -46,38 +46,38 @@
   --purple-50: #faf5ff;  --purple-500:#a855f7;
   --indigo-500: #6366f1; --indigo-600: #4f46e5;
 
-  /* ── Sidebar (always dark, HR navy style) ───────────────────────────── */
-  --sidebar-bg:            #0d2137;
-  --sidebar-border:        rgba(255,255,255,0.06);
-  --sidebar-text:          #7ba8c8;
-  --sidebar-text-hover:    #d8eaf8;
-  --sidebar-text-active:   #ffffff;
-  --sidebar-item-hover:    rgba(255,255,255,0.07);
-  --sidebar-active-from:   #1a60b8;
-  --sidebar-active-to:     #1248a0;
-  --sidebar-active-shadow: 0 2px 10px rgba(26,96,184,0.42);
+  /* ── Sidebar (theme-aware: white in light, deep navy in dark) ────────── */
+  --sidebar-bg:            #ffffff;
+  --sidebar-border:        #e4e7ec;
+  --sidebar-text:          #667085;
+  --sidebar-text-hover:    #101828;
+  --sidebar-text-active:   #3641f5;
+  --sidebar-item-hover:    #f9fafb;
+  --sidebar-active-from:   #ecf3ff;
+  --sidebar-active-to:     #ecf3ff;
+  --sidebar-active-shadow: none;
 
   /* ── App Surfaces (Light) ───────────────────────────────────────────── */
-  --bg-app:         #edf2f9;
+  --bg-app:         #f9fafb;
   --bg-surface:     #ffffff;
   --bg-elevated:    #ffffff;
-  --bg-subtle:      #f4f7fd;
+  --bg-subtle:      #f2f4f7;
 
   /* ── Text (Light) ───────────────────────────────────────────────────── */
-  --text-primary:   #0f172a;
-  --text-secondary: #374151;
-  --text-muted:     #6b7280;
+  --text-primary:   #101828;
+  --text-secondary: #344054;
+  --text-muted:     #667085;
 
   /* ── Borders (Light) ────────────────────────────────────────────────── */
-  --border:         #dde4f0;
-  --border-strong:  #c4cfe3;
+  --border:         #e4e7ec;
+  --border-strong:  #d0d5dd;
 
-  /* ── HR Primary Action Color ────────────────────────────────────────── */
-  --primary:              #1a60b8;
-  --primary-hover:        #124ea0;
-  --primary-light:        #3b82f6;
-  --primary-shadow:       0 4px 14px rgba(26,96,184,0.30);
-  --primary-shadow-hover: 0 8px 24px rgba(26,96,184,0.44);
+  /* ── Primary Action Color ──────────────────────────────────────────── */
+  --primary:              #465fff;
+  --primary-hover:        #3641f5;
+  --primary-light:        #7592ff;
+  --primary-shadow:       0 4px 14px rgba(70,95,255,0.28);
+  --primary-shadow-hover: 0 8px 24px rgba(70,95,255,0.40);
 
   /* ── Motion ─────────────────────────────────────────────────────────── */
   --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
@@ -87,11 +87,11 @@
   --duration-slow: 480ms;
 
   /* ── Shadows ────────────────────────────────────────────────────────── */
-  --shadow-xs: 0 1px 2px rgba(15,23,42,0.05);
-  --shadow-sm: 0 2px 8px -2px rgba(15,23,42,0.08);
-  --shadow-md: 0 8px 24px -6px rgba(15,23,42,0.12);
-  --shadow-lg: 0 20px 48px -12px rgba(15,23,42,0.14);
-  --shadow-xl: 0 32px 64px -16px rgba(15,23,42,0.16);
+  --shadow-xs: 0 1px 2px rgba(16,24,40,0.05);
+  --shadow-sm: 0 2px 8px -2px rgba(16,24,40,0.08);
+  --shadow-md: 0 8px 24px -6px rgba(16,24,40,0.10);
+  --shadow-lg: 0 20px 48px -12px rgba(16,24,40,0.12);
+  --shadow-xl: 0 32px 64px -16px rgba(16,24,40,0.14);
 
   /* ── Radii ──────────────────────────────────────────────────────────── */
   --radius-sm: 8px;
@@ -104,31 +104,36 @@
 
 /* ── DARK MODE VARIABLE OVERRIDES ─────────────────────────────────────────── */
 .dark {
-  /* Sidebar (deeper navy in dark) */
-  --sidebar-bg:         #060f1c;
-  --sidebar-text:       #5a7ea0;
-  --sidebar-text-hover: #b8d0e8;
+  /* Sidebar (deep navy in dark) */
+  --sidebar-bg:            #1d2939;
+  --sidebar-border:        #29354a;
+  --sidebar-text:          #98a2b3;
+  --sidebar-text-hover:    #f9fafb;
+  --sidebar-text-active:   #ffffff;
+  --sidebar-item-hover:    rgba(255,255,255,0.06);
+  --sidebar-active-from:   rgba(70,95,255,0.16);
+  --sidebar-active-to:     rgba(70,95,255,0.16);
 
   /* Surfaces */
-  --bg-app:         #0d1117;
-  --bg-surface:     #161c28;
-  --bg-elevated:    #1c2536;
-  --bg-subtle:      #111722;
+  --bg-app:         #0c111d;
+  --bg-surface:     #101828;
+  --bg-elevated:    #1d2939;
+  --bg-subtle:      #161e2c;
 
   /* Text */
-  --text-primary:   #e2eaf5;
-  --text-secondary: #98afc4;
-  --text-muted:     #526a82;
+  --text-primary:   #f2f4f7;
+  --text-secondary: #98a2b3;
+  --text-muted:     #667085;
 
   /* Borders */
-  --border:         #1e2d42;
-  --border-strong:  #263a50;
+  --border:         #29354a;
+  --border-strong:  #344054;
 
   /* Primary (slightly brighter on dark backgrounds) */
-  --primary:              #2a78d4;
-  --primary-hover:        #1a60b8;
-  --primary-shadow:       0 4px 14px rgba(42,120,212,0.30);
-  --primary-shadow-hover: 0 8px 24px rgba(42,120,212,0.44);
+  --primary:              #7592ff;
+  --primary-hover:        #9cb9ff;
+  --primary-shadow:       0 4px 14px rgba(117,146,255,0.24);
+  --primary-shadow-hover: 0 8px 24px rgba(117,146,255,0.36);
 
   /* Shadows (deeper in dark mode) */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.25);
