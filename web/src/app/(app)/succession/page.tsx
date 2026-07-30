@@ -925,7 +925,7 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
             placeholder="Search the org chart…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
           />
         </div>
         <div className="flex gap-2 ml-auto">

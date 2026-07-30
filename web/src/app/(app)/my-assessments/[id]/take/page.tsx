@@ -440,7 +440,7 @@ function CompetencyTaker({
         <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Review & Submit</h2>
           <p className="text-sm text-gray-500 mb-6">
-            You've rated all {competencies.length} competencies. Submit when ready.
+            You&apos;ve rated all {competencies.length} competencies. Submit when ready.
           </p>
           <div className="space-y-2 mb-6">
             {competencies.map((c) => (
