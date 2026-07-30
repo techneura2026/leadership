@@ -102,13 +102,15 @@ function SidebarContent({
       {/* Powered by */}
       <div className="px-4 py-4 flex items-center justify-center gap-2 shrink-0" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
         <span className="text-[10px] font-medium" style={{ color: 'var(--sidebar-text)' }}>Powered by</span>
-        <Image
-          src="/logo-techneura.png"
-          alt="TechNeura Labs"
-          width={56}
-          height={14}
-          className="object-contain opacity-70 dark:invert dark:opacity-80"
-        />
+        <div className="px-2 py-1 rounded-md flex items-center" style={{ background: '#1d2939' }}>
+          <Image
+            src="/logo-techneura.png"
+            alt="TechNeura Labs"
+            width={56}
+            height={14}
+            className="object-contain"
+          />
+        </div>
       </div>
     </>
   );
