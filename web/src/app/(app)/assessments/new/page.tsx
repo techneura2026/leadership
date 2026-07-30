@@ -8,6 +8,8 @@ import { api } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/lib/utils';
 import { AssessmentChatbot, type GeneratedQuestion } from '@/components/AssessmentChatbot';
+import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { TYPE_META } from '@/lib/assessmentTypeMeta';
 import {
   AssessmentType,
   CompetencyDto,
@@ -16,7 +18,7 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type QuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'TABLE';
-type RaterRelationship = 'SUPERVISOR' | 'PEER' | 'DIRECT_REPORT';
+type RaterRelationship = 'self' | 'supervisor' | 'peer' | 'direct_report' | 'stakeholder';
 
 interface QuestionOption {
   id: string;
@@ -69,33 +71,7 @@ interface WizardState {
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-const TypeIcon360 = () => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-  </svg>
-);
-const TypeIconCompetency = () => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-  </svg>
-);
-const TypeIconPersonality = () => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-  </svg>
-);
-const TypeIconReadiness = () => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-  </svg>
-);
-
-const TYPE_ICONS: Record<string, () => React.JSX.Element> = {
-  [AssessmentType.FEEDBACK_360]: TypeIcon360,
-  [AssessmentType.COMPETENCY]: TypeIconCompetency,
-  [AssessmentType.PERSONALITY]: TypeIconPersonality,
-  [AssessmentType.READINESS]: TypeIconReadiness,
-};
+// Type icons/colours are shared with the assessments list & detail pages — see @/lib/assessmentTypeMeta
 
 const TYPE_OPTIONS = [
   {
@@ -269,20 +245,30 @@ const READINESS_DIMENSIONS = [
 type CategoryItem = { id: string; name: string; description: string; iconPath: string; color: string };
 
 const CAT_COLOR_CLASSES: Record<string, { iconBg: string; iconText: string; selectedBorder: string; selectedBg: string }> = {
-  blue:    { iconBg: 'bg-blue-100',    iconText: 'text-blue-600',    selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-200'    },
-  violet:  { iconBg: 'bg-violet-100',  iconText: 'text-violet-600',  selectedBorder: 'border-violet-500',  selectedBg: 'bg-violet-50'  },
-  amber:   { iconBg: 'bg-amber-100',   iconText: 'text-amber-600',   selectedBorder: 'border-amber-500',   selectedBg: 'bg-amber-50'   },
-  cyan:    { iconBg: 'bg-cyan-100',    iconText: 'text-cyan-600',    selectedBorder: 'border-cyan-500',    selectedBg: 'bg-cyan-50'    },
-  emerald: { iconBg: 'bg-emerald-100', iconText: 'text-emerald-600', selectedBorder: 'border-emerald-500', selectedBg: 'bg-emerald-50' },
-  pink:    { iconBg: 'bg-pink-100',    iconText: 'text-pink-600',    selectedBorder: 'border-pink-500',    selectedBg: 'bg-pink-50'    },
-  orange:  { iconBg: 'bg-orange-100',  iconText: 'text-orange-600',  selectedBorder: 'border-orange-500',  selectedBg: 'bg-orange-50'  },
-  teal:    { iconBg: 'bg-teal-100',    iconText: 'text-teal-600',    selectedBorder: 'border-teal-500',    selectedBg: 'bg-teal-50'    },
-  sky:     { iconBg: 'bg-sky-100',     iconText: 'text-sky-600',     selectedBorder: 'border-sky-500',     selectedBg: 'bg-sky-50'     },
-  rose:    { iconBg: 'bg-rose-100',    iconText: 'text-rose-600',    selectedBorder: 'border-rose-500',    selectedBg: 'bg-rose-50'    },
+  blue:    { iconBg: 'bg-blue-100 dark:bg-blue-950/40',       iconText: 'text-blue-600 dark:text-blue-300',       selectedBorder: 'border-blue-500',    selectedBg: 'bg-blue-50 dark:bg-blue-950/30'       },
+  violet:  { iconBg: 'bg-violet-100 dark:bg-violet-950/40',   iconText: 'text-violet-600 dark:text-violet-300',   selectedBorder: 'border-violet-500',  selectedBg: 'bg-violet-50 dark:bg-violet-950/30'   },
+  amber:   { iconBg: 'bg-amber-100 dark:bg-amber-950/40',     iconText: 'text-amber-600 dark:text-amber-300',     selectedBorder: 'border-amber-500',   selectedBg: 'bg-amber-50 dark:bg-amber-950/30'     },
+  cyan:    { iconBg: 'bg-cyan-100 dark:bg-cyan-950/40',       iconText: 'text-cyan-600 dark:text-cyan-300',       selectedBorder: 'border-cyan-500',    selectedBg: 'bg-cyan-50 dark:bg-cyan-950/30'       },
+  emerald: { iconBg: 'bg-emerald-100 dark:bg-emerald-950/40', iconText: 'text-emerald-600 dark:text-emerald-300', selectedBorder: 'border-emerald-500', selectedBg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+  pink:    { iconBg: 'bg-pink-100 dark:bg-pink-950/40',       iconText: 'text-pink-600 dark:text-pink-300',       selectedBorder: 'border-pink-500',    selectedBg: 'bg-pink-50 dark:bg-pink-950/30'       },
+  orange:  { iconBg: 'bg-orange-100 dark:bg-orange-950/40',   iconText: 'text-orange-600 dark:text-orange-300',   selectedBorder: 'border-orange-500',  selectedBg: 'bg-orange-50 dark:bg-orange-950/30'   },
+  teal:    { iconBg: 'bg-teal-100 dark:bg-teal-950/40',       iconText: 'text-teal-600 dark:text-teal-300',       selectedBorder: 'border-teal-500',    selectedBg: 'bg-teal-50 dark:bg-teal-950/30'       },
+  sky:     { iconBg: 'bg-sky-100 dark:bg-sky-950/40',         iconText: 'text-sky-600 dark:text-sky-300',         selectedBorder: 'border-sky-500',     selectedBg: 'bg-sky-50 dark:bg-sky-950/30'         },
+  rose:    { iconBg: 'bg-rose-100 dark:bg-rose-950/40',       iconText: 'text-rose-600 dark:text-rose-300',       selectedBorder: 'border-rose-500',    selectedBg: 'bg-rose-50 dark:bg-rose-950/30'       },
 };
 
 // ── Stepper ────────────────────────────────────────────────────────────────────
-function Stepper({ current, steps }: { current: number; steps: typeof STEPS_DEFAULT }) {
+function Stepper({
+  current,
+  steps,
+  accentGradient = 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)',
+  accentRing = 'rgba(70,95,255,0.16)',
+}: {
+  current: number;
+  steps: typeof STEPS_DEFAULT;
+  accentGradient?: string;
+  accentRing?: string;
+}) {
   return (
     <div className="mb-8">
       <div className="hidden sm:flex items-center justify-between w-full mx-auto relative z-10 max-w-lg">
@@ -290,19 +276,15 @@ function Stepper({ current, steps }: { current: number; steps: typeof STEPS_DEFA
           <div key={step.n} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-2 shrink-0">
               <div
-                className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300',
-                  current > step.n
-                    ? 'bg-blue-600 text-white'
-                    : current === step.n
-                    ? 'bg-blue-600 text-white shadow-md ring-4 ring-blue-50'
-                    : 'bg-gray-100 text-gray-400',
-                )}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300"
+                style={
+                  current >= step.n
+                    ? { background: accentGradient, color: '#fff', boxShadow: current === step.n ? `0 0 0 4px ${accentRing}` : undefined }
+                    : { background: 'var(--bg-subtle)', color: 'var(--text-muted)' }
+                }
               >
                 {current > step.n ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <CheckCircle2 className="w-4 h-4" strokeWidth={2.5} />
                 ) : (
                   step.n
                 )}
@@ -318,10 +300,8 @@ function Stepper({ current, steps }: { current: number; steps: typeof STEPS_DEFA
             </div>
             {idx < steps.length - 1 && (
               <div
-                className={cn(
-                  'flex-1 h-[2px] mx-4 rounded-full transition-all duration-300',
-                  current > step.n ? 'bg-blue-600' : 'bg-gray-100',
-                )}
+                className="flex-1 h-[2px] mx-4 rounded-full transition-all duration-300"
+                style={{ background: current > step.n ? accentGradient : 'var(--bg-subtle)' }}
               />
             )}
           </div>
@@ -333,10 +313,8 @@ function Stepper({ current, steps }: { current: number; steps: typeof STEPS_DEFA
           {steps.map((step) => (
             <div
               key={step.n}
-              className={cn(
-                'flex-1 h-1.5 rounded-full transition-all duration-300',
-                current >= step.n ? 'bg-blue-600' : 'bg-gray-100',
-              )}
+              className="flex-1 h-1.5 rounded-full transition-all duration-300"
+              style={{ background: current >= step.n ? accentGradient : 'var(--bg-subtle)' }}
             />
           ))}
         </div>
@@ -356,25 +334,34 @@ function StepType({ selected, onSelect }: { selected: AssessmentType | null; onS
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Select Assessment Type</h2>
       <p className="text-sm text-gray-500 mb-6">Choose the type of assessment you want to create.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {TYPE_OPTIONS.map((opt) => (
-          <button
-            key={opt.type}
-            onClick={() => onSelect(opt.type)}
-            className={cn(
-              'text-left rounded-xl border-2 p-5 transition-all hover:shadow-md',
-              selected === opt.type ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300',
-            )}
-          >
-            <div className={cn(
-              'w-10 h-10 rounded-lg flex items-center justify-center mb-3',
-              selected === opt.type ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500',
-            )}>
-              {TYPE_ICONS[opt.type]()}
-            </div>
-            <h3 className="text-sm font-semibold text-gray-900">{opt.label}</h3>
-            <p className="text-xs text-gray-500 mt-1 leading-relaxed">{opt.description}</p>
-          </button>
-        ))}
+        {TYPE_OPTIONS.map((opt) => {
+          const meta = TYPE_META[opt.type];
+          const Icon = meta.icon;
+          const isSelected = selected === opt.type;
+          return (
+            <button
+              key={opt.type}
+              onClick={() => onSelect(opt.type)}
+              className={cn(
+                'relative text-left rounded-2xl border-2 p-5 transition-all hover:shadow-md',
+                isSelected ? 'border-transparent bg-white shadow-md -translate-y-0.5' : 'border-gray-200 bg-white hover:border-gray-300',
+              )}
+              style={isSelected ? { boxShadow: `0 0 0 2px ${meta.ring}, 0 8px 20px -6px ${meta.glow}` } : undefined}
+            >
+              {isSelected && (
+                <CheckCircle2 className="absolute top-4 right-4 w-5 h-5" style={{ color: meta.ring }} strokeWidth={2} />
+              )}
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: meta.gradient, boxShadow: `0 4px 12px ${meta.glow}` }}
+              >
+                <Icon className="w-5.5 h-5.5 text-white" strokeWidth={1.75} />
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900">{opt.label}</h3>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">{opt.description}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -761,7 +748,7 @@ function StepCompetencyCategories({
               key={cat.id}
               onClick={() => onToggle(cat.id)}
               className={cn(
-                'text-left rounded-xl border-2 p-4 transition-all hover:shadow-sm',
+                'text-left rounded-2xl border-2 p-4 transition-all hover:shadow-sm',
                 isSelected ? `${colors.selectedBorder} ${colors.selectedBg}` : 'border-gray-200 bg-white hover:border-gray-300',
               )}
             >
@@ -773,7 +760,7 @@ function StepCompetencyCategories({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`text-sm font-semibold ${isSelected ? 'text-black' : 'text-gray-50'}`}>{cat.name}</p>
+                    <p className="text-sm font-semibold text-gray-900">{cat.name}</p>
                     {isSelected && (
                       <span className={cn('w-5 h-5 rounded-full flex items-center justify-center shrink-0', colors.iconBg)}>
                         <svg className={cn('w-3 h-3', colors.iconText)} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -846,21 +833,27 @@ function StepParticipants360({
   }
 
   const RELATIONSHIP_LABELS: Record<RaterRelationship, string> = {
-    SUPERVISOR: 'Supervisor',
-    PEER: 'Peer',
-    DIRECT_REPORT: 'Direct Report',
+    self: 'Self',
+    supervisor: 'Supervisor',
+    peer: 'Peer',
+    direct_report: 'Direct Report',
+    stakeholder: 'Stakeholder',
   };
 
   const RELATIONSHIP_COLORS: Record<RaterRelationship, string> = {
-    SUPERVISOR: 'bg-purple-100 text-purple-700',
-    PEER: 'bg-blue-100 text-blue-700',
-    DIRECT_REPORT: 'bg-orange-100 text-orange-700',
+    self: 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200',
+    supervisor: 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
+    peer: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+    direct_report: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
+    stakeholder: 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300',
   };
 
   const RELATIONSHIP_OPTIONS: Array<{ value: RaterRelationship; label: string }> = [
-    { value: 'SUPERVISOR', label: 'Supervisor' },
-    { value: 'PEER', label: 'Peer' },
-    { value: 'DIRECT_REPORT', label: 'Direct Report' },
+    { value: 'self', label: 'Self' },
+    { value: 'supervisor', label: 'Supervisor' },
+    { value: 'peer', label: 'Peer' },
+    { value: 'direct_report', label: 'Direct Report' },
+    { value: 'stakeholder', label: 'Stakeholder' },
   ];
 
   useEffect(() => {
@@ -944,7 +937,7 @@ function StepParticipants360({
           {participants360.map((participant) => {
             const isExpanded = expandedId === participant.userId;
             const raterSearch = raterSearches[participant.userId] ?? '';
-            const relationship = raterRelationships[participant.userId] ?? 'PEER';
+            const relationship = raterRelationships[participant.userId] ?? 'peer';
             const filteredRaters = getFilteredRaters(participant.userId, participant);
 
             return (
@@ -1835,13 +1828,33 @@ function StepReview({
     );
   }
 
+  const meta = state.type ? TYPE_META[state.type] : null;
+  const ReviewIcon = meta?.icon;
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Review & Submit</h2>
       <p className="text-sm text-gray-500 mb-6">Review your assessment before saving or submitting.</p>
 
-      <div className="space-y-3 bg-gray-50 rounded-xl p-5 border border-gray-200 mb-5">
-        <Row label="Type" value={state.type ? typeLabelMap[state.type] : '—'} />
+      {meta && ReviewIcon && (
+        <div className={cn('relative overflow-hidden rounded-2xl border border-gray-200 mb-4', meta.soft)}>
+          <span className="absolute top-0 left-0 right-0 h-1.5" style={{ background: meta.gradient }} />
+          <div className="p-5 flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: meta.gradient, boxShadow: `0 6px 16px -4px ${meta.glow}` }}
+            >
+              <ReviewIcon className="w-6 h-6 text-white" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Assessment Type</p>
+              <p className="text-base font-bold text-gray-900 truncate">{typeLabelMap[state.type as string]}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3 bg-gray-50 rounded-2xl p-5 border border-gray-200 mb-5">
         <Row label="Title" value={state.title || '—'} />
         <Row
           label="Dates"
@@ -2335,7 +2348,7 @@ export default function NewAssessmentPage() {
           endDate: state.endDate || null,
           config: {
             categories: state.selectedCategories,
-            questions: Object.values(state.competencyQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.competencyQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
@@ -2395,7 +2408,7 @@ export default function NewAssessmentPage() {
           config: {
             isRatingMandatory: state.isRatingMandatory,
             traits: state.personalityTraits,
-            questions: Object.values(state.personalityQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.personalityQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
@@ -2414,7 +2427,7 @@ export default function NewAssessmentPage() {
           endDate: state.endDate || null,
           config: {
             dimensions: state.readinessDimensions,
-            questions: Object.values(state.readinessQuestions).flat().map((q) => ({ ...q, options: q.options.map((o) => o.text) })),
+            questions: Object.values(state.readinessQuestions).flat(),
           },
         });
         const assessmentId = res.data.data.id;
@@ -2446,6 +2459,8 @@ export default function NewAssessmentPage() {
     }
   }
 
+  const HeaderIcon = state.type ? TYPE_META[state.type].icon : null;
+
   return (
     <>
     <div className="max-w-2xl mx-auto">
@@ -2454,16 +2469,29 @@ export default function NewAssessmentPage() {
           onClick={() => (state.step > 1 ? prev() : router.back())}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="w-4 h-4" strokeWidth={2} />
           {state.step > 1 ? `Back to ${steps[state.step - 2].label}` : 'Back'}
         </button>
-        <h1 className="text-2xl font-semibold text-gray-900 mt-2">New Assessment</h1>
+        <div className="flex items-center gap-3 mt-2">
+          {state.type && HeaderIcon && (
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: TYPE_META[state.type].gradient, boxShadow: `0 4px 12px ${TYPE_META[state.type].glow}` }}
+            >
+              <HeaderIcon className="w-4.5 h-4.5 text-white" strokeWidth={1.75} />
+            </div>
+          )}
+          <h1 className="text-2xl font-semibold text-gray-900">New Assessment</h1>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
-        <Stepper current={state.step} steps={steps} />
+        <Stepper
+          current={state.step}
+          steps={steps}
+          accentGradient={state.type ? TYPE_META[state.type].gradient : undefined}
+          accentRing={state.type ? `${TYPE_META[state.type].ring}29` : undefined}
+        />
 
         {state.step === 1 && (
           <StepType selected={state.type} onSelect={(t) => update({ type: t })} />

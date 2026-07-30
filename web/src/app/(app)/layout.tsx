@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Outfit } from 'next/font/google';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import type { AuthResponseDto, UserDto, OrganisationDto } from '@leaderprism/shared';
 
+const outfit = Outfit({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'] });
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { setAuth, setHydrated, isHydrated, accessToken } = useAuthStore();
   const router = useRouter();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (accessToken) {
@@ -40,11 +44,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar />
+    <div className={`flex h-screen overflow-hidden bg-gray-50 ${outfit.className}`}>
+      <Sidebar mobileOpen={mobileSidebarOpen} onCloseMobile={() => setMobileSidebarOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <Header onMenuClick={() => setMobileSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

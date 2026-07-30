@@ -7,10 +7,15 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { Select } from '@/components/ui/Select';
-import { formatDate } from '@/lib/utils';
+import { Avatar } from '@/components/ui/Avatar';
+import { formatDate, cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { UserRole } from '@leaderprism/shared';
 import type { UserDto, DepartmentDto } from '@leaderprism/shared';
+import {
+  Users, UserPlus, Search, CheckCircle2, X, Pencil, Ban, RotateCcw, Trash2,
+  Crown, ShieldCheck, UserCog, User as UserIcon,
+} from 'lucide-react';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -20,18 +25,29 @@ const ROLE_OPTIONS = [
   { value: UserRole.PARTICIPANT, label: 'Participant' },
 ] as const;
 
-const ROLE_LABELS: Record<string, string> = {
-  org_admin: 'Org Admin',
-  hr_manager: 'HR Manager',
-  manager: 'Manager',
-  participant: 'Participant',
-};
-
-const ROLE_BADGE_VARIANT: Record<string, 'info' | 'warning' | 'neutral'> = {
-  org_admin: 'info',
-  hr_manager: 'info',
-  manager: 'warning',
-  participant: 'neutral',
+const ROLE_META: Record<string, {
+  label: string;
+  variant: 'info' | 'warning' | 'neutral' | 'success';
+  icon: typeof Crown;
+  gradient: string;
+  glow: string;
+}> = {
+  org_admin: {
+    label: 'Org Admin', variant: 'info', icon: Crown,
+    gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', glow: 'rgba(168,85,247,0.25)',
+  },
+  hr_manager: {
+    label: 'HR Manager', variant: 'info', icon: ShieldCheck,
+    gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)', glow: 'rgba(70,95,255,0.25)',
+  },
+  manager: {
+    label: 'Manager', variant: 'warning', icon: UserCog,
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', glow: 'rgba(245,158,11,0.22)',
+  },
+  participant: {
+    label: 'Participant', variant: 'neutral', icon: UserIcon,
+    gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', glow: 'rgba(100,116,139,0.2)',
+  },
 };
 
 type FilterRole = 'all' | UserRole;
@@ -499,6 +515,25 @@ function DeleteUserModal({ user, onClose, onDone }: DeactivateModalProps) {
   );
 }
 
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, icon: Icon, gradient, glow }: {
+  label: string; value: number; icon: typeof Users; gradient: string; glow: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      <div
+        className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mb-4"
+        style={{ background: gradient, boxShadow: `0 4px 12px ${glow}` }}
+      >
+        <Icon className="w-5 h-5 text-white" strokeWidth={1.75} />
+      </div>
+      <p className="text-3xl font-bold text-gray-900 tabular-nums tracking-tight">{value}</p>
+      <p className="text-sm text-gray-500 mt-1.5 font-medium">{label}</p>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function UsersSettingsPage() {
@@ -545,53 +580,61 @@ export default function UsersSettingsPage() {
     { key: UserRole.PARTICIPANT, label: 'Participant' },
   ];
 
+  const stats = {
+    total: (users ?? []).length,
+    active: (users ?? []).filter((u) => u.isActive).length,
+    admins: (users ?? []).filter((u) => u.role === UserRole.ORG_ADMIN || u.role === UserRole.HR_MANAGER).length,
+    participants: (users ?? []).filter((u) => u.role === UserRole.PARTICIPANT).length,
+  };
+
   return (
     <div>
       {/* Success banner */}
       {successMsg && (
-        <div className="mb-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
-          <svg className="w-4 h-4 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="mb-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-800">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" strokeWidth={2} />
           <span>{successMsg}</span>
           <button onClick={() => setSuccessMsg('')} className="ml-auto text-green-600 hover:text-green-800">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-4 h-4" strokeWidth={2} />
           </button>
         </div>
       )}
 
       {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage team members, roles, and access.
-          </p>
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', boxShadow: '0 4px 12px rgba(168,85,247,0.25)' }}
+          >
+            <Users className="w-5 h-5 text-white" strokeWidth={1.75} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Users</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Manage team members, roles, and access.</p>
+          </div>
         </div>
         <button
           onClick={() => setAddOpen(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-4 py-2.5 transition-colors flex items-center gap-2"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <UserPlus className="w-4 h-4" strokeWidth={2} />
           Add User
         </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard label="Total Users" value={stats.total} icon={Users} gradient="linear-gradient(135deg, #465fff 0%, #2a31d8 100%)" glow="rgba(70,95,255,0.25)" />
+        <StatCard label="Active" value={stats.active} icon={CheckCircle2} gradient="linear-gradient(135deg, #22c55e 0%, #15803d 100%)" glow="rgba(34,197,94,0.22)" />
+        <StatCard label="Admins & HR" value={stats.admins} icon={ShieldCheck} gradient="linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)" glow="rgba(168,85,247,0.25)" />
+        <StatCard label="Participants" value={stats.participants} icon={UserIcon} gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" glow="rgba(245,158,11,0.22)" />
       </div>
 
       {/* Search + role filter */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <div className="relative w-full sm:w-64">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={2} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -607,14 +650,14 @@ export default function UsersSettingsPage() {
               <button
                 key={tab.key}
                 onClick={() => setRoleFilter(tab.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${roleFilter === tab.key
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap',
+                  roleFilter === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                )}
               >
                 {tab.label}
                 {count > 0 && (
-                  <span className="ml-1 text-gray-400">{count}</span>
+                  <span className={cn('ml-1', roleFilter === tab.key ? 'text-white/70' : 'text-gray-400')}>{count}</span>
                 )}
               </button>
             );
@@ -623,7 +666,7 @@ export default function UsersSettingsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Spinner />
@@ -635,109 +678,103 @@ export default function UsersSettingsPage() {
               : 'No users yet. Add your first team member.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">Email</th>
-                <th className="text-left px-4 py-3">Role</th>
-                <th className="text-left px-4 py-3 hidden md:table-cell">Job Title</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3 hidden lg:table-cell">Created</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u) => {
-                const isSelf = u.id === currentUser?.id;
-                const isAdmin = u.role === UserRole.ORG_ADMIN;
-                return (
-                  <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold shrink-0">
-                          {u.firstName[0]}{u.lastName[0]}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {u.firstName} {u.lastName}
-                            {isSelf && (
-                              <span className="ml-1.5 text-xs text-gray-400">(you)</span>
-                            )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-left px-4 py-3">Email</th>
+                  <th className="text-left px-4 py-3">Role</th>
+                  <th className="text-left px-4 py-3 hidden md:table-cell">Job Title</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3 hidden lg:table-cell">Created</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u) => {
+                  const isSelf = u.id === currentUser?.id;
+                  const isAdmin = u.role === UserRole.ORG_ADMIN;
+                  const roleMeta = ROLE_META[u.role] ?? ROLE_META.participant;
+                  return (
+                    <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar seed={u.id} size="sm" />
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {u.firstName} {u.lastName}
+                              {isSelf && (
+                                <span className="ml-1.5 text-xs text-gray-400">(you)</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={ROLE_BADGE_VARIANT[u.role] ?? 'neutral'}>
-                        {ROLE_LABELS[u.role] ?? u.role}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 hidden md:table-cell">
-                      {u.jobTitle ?? <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={u.isActive ? 'success' : 'neutral'}>
-                        {u.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                      {u.createdAt ? formatDate(u.createdAt) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {!isSelf && !isAdmin && (
-                          <button
-                            onClick={() => setEditUser(u)}
-                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Edit user"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
-                        )}
-                        {!isSelf && !isAdmin && u.isActive && (
-                          <button
-                            onClick={() => setDeactivateUser(u)}
-                            className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                            title="Deactivate user"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                          </button>
-                        )}
-                        {!isSelf && !isAdmin && !u.isActive && (
-                          <button
-                            onClick={() => setReactivateUser(u)}
-                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Reactivate user"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        )}
-                        {!isSelf && !isAdmin && (
-                          <button
-                            onClick={() => setDeleteUser(u)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete user"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1')} style={{ color: '#fff', background: roleMeta.gradient }}>
+                          <roleMeta.icon className="w-3 h-3" strokeWidth={2.25} />
+                          {roleMeta.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 hidden md:table-cell">
+                        {u.jobTitle ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={u.isActive ? 'success' : 'neutral'}>
+                          {u.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
+                        {u.createdAt ? formatDate(u.createdAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {!isSelf && !isAdmin && (
+                            <button
+                              onClick={() => setEditUser(u)}
+                              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Edit user"
+                            >
+                              <Pencil className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          )}
+                          {!isSelf && !isAdmin && u.isActive && (
+                            <button
+                              onClick={() => setDeactivateUser(u)}
+                              className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              title="Deactivate user"
+                            >
+                              <Ban className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          )}
+                          {!isSelf && !isAdmin && !u.isActive && (
+                            <button
+                              onClick={() => setReactivateUser(u)}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Reactivate user"
+                            >
+                              <RotateCcw className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          )}
+                          {!isSelf && !isAdmin && (
+                            <button
+                              onClick={() => setDeleteUser(u)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete user"
+                            >
+                              <Trash2 className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

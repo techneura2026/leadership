@@ -4,12 +4,19 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import {
+  ArrowLeft, Pencil, Send, XCircle, Sparkles, Download,
+  Plus as PlusIcon, Trash2, CheckCircle2, Clock3,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TopCenterToast } from '@/components/ui/TopCenterToast';
+import { Avatar } from '@/components/ui/Avatar';
+import { cn } from '@/lib/utils';
+import { TYPE_META, QUESTION_TYPE_META } from '@/lib/assessmentTypeMeta';
 import {
   AssessmentDto,
   AssessmentStatus,
@@ -48,7 +55,14 @@ interface Participant {
   userId: string;
   user: UserDto;
   status: 'invited' | 'in_progress' | 'completed';
-  completionPercentage: number;
+  completionPercentage?: number;
+}
+
+// The live API doesn't return a granular completionPercentage — fall back to a
+// status-derived estimate so the response-rate bars degrade gracefully.
+function participantCompletion(p: Participant): number {
+  if (typeof p.completionPercentage === 'number') return p.completionPercentage;
+  return p.status === 'completed' ? 100 : p.status === 'in_progress' ? 50 : 0;
 }
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
@@ -279,6 +293,8 @@ function OverviewTab({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const meta = TYPE_META[assessment.assessmentType];
+  const Icon = meta.icon;
 
   function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
     setToast({ message, type });
@@ -312,29 +328,35 @@ function OverviewTab({
         type={toast?.type ?? 'info'}
         onClose={() => setToast(null)}
       />
-      {/* Assessment details */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+      {/* Assessment details — colorful hero */}
+      <div className={cn('relative overflow-hidden rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all', meta.soft)}>
+        <span className="absolute top-0 left-0 right-0 h-1.5" style={{ background: meta.gradient }} />
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{assessment.title}</h2>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="info">
-                {assessment.assessmentType === AssessmentType.FEEDBACK_360
-                  ? '360° Feedback'
-                  : assessment.assessmentType.charAt(0).toUpperCase() +
-                  assessment.assessmentType.slice(1)}
-              </Badge>
-              <Badge variant={STATUS_VARIANT[assessment.status] ?? 'neutral'}>
-                {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
-              </Badge>
+          <div className="flex items-start gap-4 min-w-0">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: meta.gradient, boxShadow: `0 8px 20px -4px ${meta.glow}` }}
+            >
+              <Icon className="w-7 h-7 text-white" strokeWidth={1.75} />
             </div>
-            <div className="mt-3 text-xs text-gray-500 space-y-1">
-              {assessment.startDate && (
-                <p>Start: {format(new Date(assessment.startDate), 'dd MMM yyyy')}</p>
-              )}
-              {assessment.endDate && (
-                <p>End: {format(new Date(assessment.endDate), 'dd MMM yyyy')}</p>
-              )}
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900">{assessment.title}</h2>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className={cn('inline-flex items-center text-xs font-semibold rounded-full px-2.5 py-1 border', meta.chip)}>
+                  {meta.label}
+                </span>
+                <Badge variant={STATUS_VARIANT[assessment.status] ?? 'neutral'}>
+                  {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
+                </Badge>
+              </div>
+              <div className="mt-3 text-xs text-gray-500 space-y-1">
+                {assessment.startDate && (
+                  <p className="flex items-center gap-1.5"><Clock3 className="w-3.5 h-3.5" strokeWidth={2} /> Start: {format(new Date(assessment.startDate), 'dd MMM yyyy')}</p>
+                )}
+                {assessment.endDate && (
+                  <p className="flex items-center gap-1.5"><Clock3 className="w-3.5 h-3.5" strokeWidth={2} /> End: {format(new Date(assessment.endDate), 'dd MMM yyyy')}</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -343,24 +365,26 @@ function OverviewTab({
               <button
                 onClick={sendReminders}
                 disabled={sendingReminders || assessment.status !== AssessmentStatus.ACTIVE}
-                className="text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {sendingReminders ? <Spinner size="sm" /> : null}
+                {sendingReminders ? <Spinner size="sm" /> : <Send className="w-4 h-4" strokeWidth={2} />}
                 Send Reminders
               </button>
             )}
             {assessment.status === AssessmentStatus.ACTIVE && (
               <button
                 onClick={() => setShowCloseConfirm(true)}
-                className="text-sm font-medium border border-red-200 text-red-600 hover:bg-red-50 rounded-lg px-4 py-2.5 transition-colors"
+                className="text-sm font-medium border border-red-200 bg-white text-red-600 hover:bg-red-50 rounded-lg px-4 py-2.5 transition-colors flex items-center gap-2"
               >
+                <XCircle className="w-4 h-4" strokeWidth={2} />
                 Close Assessment
               </button>
             )}
             <button
               onClick={onGoToReports}
-              className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2.5 transition-colors shadow-sm"
+              className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2.5 transition-colors shadow-sm flex items-center gap-2"
             >
+              <Sparkles className="w-4 h-4" strokeWidth={2} />
               Generate Reports
             </button>
           </div>
@@ -368,9 +392,9 @@ function OverviewTab({
       </div>
 
       {/* Response rate */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Response Rate</h3>
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-5">
           <div className="flex-1">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>Overall completion</span>
@@ -378,33 +402,34 @@ function OverviewTab({
             </div>
             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-500 rounded-full transition-all"
-                style={{ width: `${responseRate}%` }}
+                className="h-full rounded-full transition-all"
+                style={{ width: `${responseRate}%`, background: meta.gradient }}
               />
             </div>
           </div>
-          <div className="text-sm font-medium text-gray-700 shrink-0">
+          <div className="text-sm font-semibold text-gray-700 shrink-0 tabular-nums">
             {completedCount}/{totalCount}
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {participants.slice(0, 5).map((p) => (
             <div key={p.id} className="flex items-center gap-3">
-              <div className="w-32 text-xs text-gray-700 truncate">
+              <Avatar seed={p.userId} size="xs" />
+              <div className="w-28 text-xs font-medium text-gray-700 truncate shrink-0">
                 {p.user?.firstName} {p.user?.lastName}
               </div>
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className={cn(
-                    'h-full rounded-full',
-                    p.status === 'completed' ? 'bg-green-500' : 'bg-blue-400',
+                    'h-full rounded-full transition-all',
+                    p.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-400',
                   )}
-                  style={{ width: `${p.completionPercentage}%` }}
+                  style={{ width: `${participantCompletion(p)}%` }}
                 />
               </div>
-              <span className="text-xs text-gray-500 w-10 text-right">
-                {p.completionPercentage}%
+              <span className="text-xs text-gray-500 w-10 text-right tabular-nums">
+                {participantCompletion(p)}%
               </span>
             </div>
           ))}
@@ -427,8 +452,8 @@ function OverviewTab({
                       {q.title || <span className="italic text-gray-400">Untitled question</span>}
                     </p>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">
-                        {QUESTION_TYPE_LABELS[q.type] ?? q.type}
+                      <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', QUESTION_TYPE_META[q.type]?.chip ?? 'bg-blue-50 text-blue-600')}>
+                        {QUESTION_TYPE_META[q.type]?.label ?? QUESTION_TYPE_LABELS[q.type] ?? q.type}
                       </span>
                       {q.required && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">
@@ -567,7 +592,8 @@ function ParticipantsTab({
           onClick={() => setShowAdd(!showAdd)}
             className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
         >
-          + Add Participant
+          <PlusIcon className="w-4 h-4" strokeWidth={2.5} />
+          Add Participant
         </button>
       </div>
 
@@ -627,7 +653,10 @@ function ParticipantsTab({
               {participants.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
-                    {p.user?.firstName} {p.user?.lastName}
+                    <div className="flex items-center gap-2.5">
+                      <Avatar seed={p.userId} size="sm" />
+                      {p.user?.firstName} {p.user?.lastName}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{p.user?.email}</td>
                   <td className="px-4 py-3">
@@ -650,8 +679,9 @@ function ParticipantsTab({
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => removeParticipant(p.id)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                      className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
                     >
+                      <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                       Remove
                     </button>
                   </td>
@@ -717,14 +747,21 @@ function FeedbackGiversTab({
               {nominations.map((n) => (
                 <tr key={n.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{n.raterName ?? 'Unknown'}</p>
-                    <p className="text-xs text-gray-500">{n.raterEmail}</p>
+                    <div className="flex items-center gap-2.5">
+                      <Avatar seed={n.raterEmail} size="sm" />
+                      <div>
+                        <p className="font-medium text-gray-900">{n.raterName ?? 'Unknown'}</p>
+                        <p className="text-xs text-gray-500">{n.raterEmail}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-gray-700">
                     {getParticipantName(n.participantId)}
                   </td>
-                  <td className="px-4 py-3 capitalize text-gray-600">
-                    {n.relationship.replace(/_/g, ' ')}
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center text-xs font-medium capitalize px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/60">
+                      {n.relationship.replace(/_/g, ' ')}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={n.status === 'completed' ? 'success' : 'neutral'}>
@@ -829,7 +866,10 @@ function ReportsTab({
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {p.user?.firstName} {p.user?.lastName}
+                      <div className="flex items-center gap-2.5">
+                        <Avatar seed={p.userId} size="sm" />
+                        {p.user?.firstName} {p.user?.lastName}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {generating === p.id ? (
@@ -864,7 +904,7 @@ function ReportsTab({
                           disabled={downloading === p.id}
                           className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ml-auto"
                         >
-                          {downloading === p.id && <Spinner size="sm" />}
+                          {downloading === p.id ? <Spinner size="sm" /> : <Download className="w-3.5 h-3.5" strokeWidth={2} />}
                           Download PDF
                         </button>
                       ) : (
@@ -873,7 +913,7 @@ function ReportsTab({
                           disabled={generating === p.id}
                           className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ml-auto"
                         >
-                          {generating === p.id && <Spinner size="sm" />}
+                          {generating === p.id ? <Spinner size="sm" /> : <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />}
                           Generate
                         </button>
                       )}
@@ -930,7 +970,8 @@ function ParticipantRadarCard({
 }) {
   if (participant.status !== 'completed') {
     return (
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center min-h-[420px] hover:border-gray-300 transition-colors">
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center min-h-[420px] hover:border-gray-300 transition-colors">
+        <Avatar seed={participant.userId} size="lg" className="mb-4 opacity-60 grayscale" />
         <Badge variant="neutral" className="mb-4">Pending</Badge>
         <p className="text-sm font-semibold text-gray-900">
           {participant.user?.firstName} {participant.user?.lastName}
@@ -946,15 +987,19 @@ function ParticipantRadarCard({
   });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col min-h-[420px]">
+    <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col min-h-[420px]">
+      <span className="absolute top-0 left-0 right-0 h-1" style={{ background: TYPE_META[AssessmentType.PERSONALITY].gradient }} />
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">
-            {participant.user?.firstName} {participant.user?.lastName}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">Completed</p>
+        <div className="flex items-center gap-3">
+          <Avatar seed={participant.userId} size="md" ring />
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {participant.user?.firstName} {participant.user?.lastName}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Completed</p>
+          </div>
         </div>
-        <Badge variant="success" className="shadow-sm">View</Badge>
+        <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" strokeWidth={2} />
       </div>
 
       {!scores ? (
@@ -1027,11 +1072,6 @@ function PersonalityResultsTab({
       )}
     </div>
   );
-}
-
-// ── cn helper (inline to avoid extra import issue) ────────────────────────────
-function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(' ');
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -1111,6 +1151,9 @@ useEffect(() => {
     );
   }
 
+  const headerMeta = TYPE_META[assessment.assessmentType];
+  const HeaderIcon = headerMeta.icon;
+
   return (
     <div>
       <div className="mb-6">
@@ -1118,20 +1161,24 @@ useEffect(() => {
           onClick={() => router.push('/assessments')}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-3 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="w-4 h-4" strokeWidth={2} />
           Assessments
         </button>
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold text-gray-900">{assessment.title}</h1>
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: headerMeta.gradient, boxShadow: `0 4px 12px ${headerMeta.glow}` }}
+            >
+              <HeaderIcon className="w-5 h-5 text-white" strokeWidth={1.75} />
+            </div>
+            <h1 className="text-2xl font-semibold text-gray-900 truncate">{assessment.title}</h1>
+          </div>
           <button
             onClick={() => router.push(`/assessments/${id}/edit`)}
             className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-            </svg>
+            <Pencil className="w-4 h-4" strokeWidth={1.8} />
             Edit
           </button>
         </div>

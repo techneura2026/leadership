@@ -6,8 +6,30 @@ import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { formatDate } from '@/lib/utils';
 import type { DepartmentDto } from '@leaderprism/shared';
+import {
+  Network, Plus, Search, Pencil, Trash2, Power, PowerOff, Building2,
+  CheckCircle2, XCircle, Boxes,
+} from 'lucide-react';
+
+// ── Colour cycle for department icon chips ──────────────────────────────────
+
+const DEPT_COLORS = [
+  { gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)', glow: 'rgba(70,95,255,0.22)' },
+  { gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', glow: 'rgba(168,85,247,0.22)' },
+  { gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)', glow: 'rgba(34,197,94,0.2)' },
+  { gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', glow: 'rgba(245,158,11,0.2)' },
+  { gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', glow: 'rgba(236,72,153,0.22)' },
+  { gradient: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', glow: 'rgba(20,184,166,0.2)' },
+];
+
+function deptColor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return DEPT_COLORS[hash % DEPT_COLORS.length];
+}
 
 // ── Description cell with expand/collapse ──────────────────────────────────
 
@@ -391,6 +413,25 @@ function DeleteModal({ department, onClose, onDeleted }: DeleteModalProps) {
   );
 }
 
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, icon: Icon, gradient, glow }: {
+  label: string; value: number; icon: typeof Boxes; gradient: string; glow: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      <div
+        className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mb-4"
+        style={{ background: gradient, boxShadow: `0 4px 12px ${glow}` }}
+      >
+        <Icon className="w-5 h-5 text-white" strokeWidth={1.75} />
+      </div>
+      <p className="text-3xl font-bold text-gray-900 tabular-nums tracking-tight">{value}</p>
+      <p className="text-sm text-gray-500 mt-1.5 font-medium">{label}</p>
+    </div>
+  );
+}
+
 // ── Main Page ───────────────────────────────────────────────────────────────
 
 export default function DepartmentsPage() {
@@ -409,152 +450,164 @@ export default function DepartmentsPage() {
     return departments.filter((d) => d.name.toLowerCase().includes(q));
   }, [departments, search]);
 
+  const stats = {
+    total: (departments ?? []).length,
+    active: (departments ?? []).filter((d) => d.isActive).length,
+    inactive: (departments ?? []).filter((d) => !d.isActive).length,
+  };
+
   return (
     <div className="space-y-6">
       {/* Header row */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Departments</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Manage your organisation&apos;s departments.</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 12px rgba(245,158,11,0.25)' }}
+          >
+            <Network className="w-5 h-5 text-white" strokeWidth={1.75} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Departments</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Manage your organisation&apos;s departments.</p>
+          </div>
         </div>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus className="w-4 h-4" strokeWidth={2} />
           Add Department
         </button>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <StatCard label="Total Departments" value={stats.total} icon={Boxes} gradient="linear-gradient(135deg, #465fff 0%, #2a31d8 100%)" glow="rgba(70,95,255,0.25)" />
+        <StatCard label="Active" value={stats.active} icon={CheckCircle2} gradient="linear-gradient(135deg, #22c55e 0%, #15803d 100%)" glow="rgba(34,197,94,0.22)" />
+        <StatCard label="Inactive" value={stats.inactive} icon={XCircle} gradient="linear-gradient(135deg, #64748b 0%, #475569 100%)" glow="rgba(100,116,139,0.2)" />
+      </div>
+
       {/* Search */}
       <div className="relative max-w-sm">
-        {!search && (<svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>)}
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" strokeWidth={2} />
         <input
           type="text"
           placeholder="Search departments…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="placeholder:px-5  w-full !pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
+          className="w-full pl-9 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Spinner size="md" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-              <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21H5a2 2 0 0 1-2-2V7l7-4 7 4v12a2 2 0 0 1-2 2z" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-700">
-              {search ? 'No departments match your search' : 'No departments yet'}
-            </p>
-            {!search && (
-              <p className="text-xs text-gray-400 mt-1">Create your first department to get started.</p>
-            )}
-          </div>
+          <EmptyState
+            icon={<Network className="w-7 h-7 text-gray-300" strokeWidth={1.5} />}
+            title={search ? 'No departments match your search' : 'No departments yet'}
+            description={!search ? 'Create your first department to get started.' : undefined}
+            className="border-0"
+          />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Name
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
-                  Description
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Status
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">
-                  Created
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((dept) => (
-                <tr
-                  key={dept.id}
-                  className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="overflow-scroll px-4 py-3 font-medium text-gray-900 max-w-xs">{dept.name}</td>
-                  <td className="overflow-scroll text-wrap px-4 py-3 hidden md:table-cell max-w-xs">
-                    <DescriptionCell text={dept.description} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={dept.isActive ? 'success' : 'neutral'}>
-                      {dept.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                    {dept.createdAt ? formatDate(dept.createdAt) : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Toggle status */}
-                      <button
-                        onClick={() => setToggleTarget(dept)}
-                        title={dept.isActive ? 'Deactivate' : 'Activate'}
-                        className={`p-1.5 rounded-lg transition-colors ${dept.isActive
-                            ? 'text-yellow-600 hover:bg-yellow-50'
-                            : 'text-green-600 hover:bg-green-50'
-                          }`}
-                      >
-                        {dept.isActive ? (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728A9 9 0 0 0 5.636 5.636" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-                          </svg>
-                        )}
-                      </button>
-
-                      {/* Edit */}
-                      <button
-                        onClick={() => setEditTarget(dept)}
-                        title="Edit"
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => setDeleteTarget(dept)}
-                        title="Delete"
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
+                    Description
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Status
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">
+                    Created
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((dept) => {
+                  const color = deptColor(dept.id);
+                  return (
+                    <tr
+                      key={dept.id}
+                      className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-4 py-3 max-w-xs">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: color.gradient, boxShadow: `0 2px 8px ${color.glow}` }}
+                          >
+                            <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
+                          </div>
+                          <span className="font-medium text-gray-900 truncate">{dept.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell max-w-xs">
+                        <DescriptionCell text={dept.description} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={dept.isActive ? 'success' : 'neutral'}>
+                          {dept.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 hidden lg:table-cell">
+                        {dept.createdAt ? formatDate(dept.createdAt) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Toggle status */}
+                          <button
+                            onClick={() => setToggleTarget(dept)}
+                            title={dept.isActive ? 'Deactivate' : 'Activate'}
+                            className={`p-1.5 rounded-lg transition-colors ${dept.isActive
+                                ? 'text-yellow-600 hover:bg-yellow-50'
+                                : 'text-green-600 hover:bg-green-50'
+                              }`}
+                          >
+                            {dept.isActive ? (
+                              <PowerOff className="w-4 h-4" strokeWidth={2} />
+                            ) : (
+                              <Power className="w-4 h-4" strokeWidth={2} />
+                            )}
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            onClick={() => setEditTarget(dept)}
+                            title="Edit"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" strokeWidth={2} />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => setDeleteTarget(dept)}
+                            title="Delete"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" strokeWidth={2} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {/* Footer count */}
