@@ -325,6 +325,12 @@
     opacity: 1;
   }
 
+  /* Icon-left search inputs need a wider left inset than the base 0.75rem —
+     the base rule's padding shorthand is !important, so these need to be too. */
+  input.pl-7 { padding-left: 1.75rem !important; }
+  input.pl-8 { padding-left: 2rem !important; }
+  input.pl-9 { padding-left: 2.25rem !important; }
+
   /* ── Sidebar ─────────────────────────────────────────────────────────── */
   aside.hidden.md\:flex {
     background-color: var(--sidebar-bg) !important;

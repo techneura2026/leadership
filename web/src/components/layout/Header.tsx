@@ -51,18 +51,14 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         </button>
 
         {/* Search */}
-        <div className="hidden sm:flex items-center gap-2 w-full max-w-xs rounded-xl px-3.5 py-2.5" style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)' }}>
-          <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+        <div className="hidden sm:flex relative items-center w-full max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" strokeWidth={2} />
           <input
             type="text"
             placeholder="Search or type command..."
-            className="!border-0 !shadow-none !p-0 bg-transparent w-full text-sm placeholder:text-current"
-            style={{ color: 'var(--text-primary)' }}
+            className="w-full pl-9 pr-12 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
           />
-          <kbd
-            className="hidden lg:flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md shrink-0"
-            style={{ color: 'var(--text-muted)', border: '1px solid var(--border-strong)' }}
-          >
+          <kbd className="hidden lg:flex absolute right-2.5 top-1/2 -translate-y-1/2 items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md text-gray-400 border border-gray-300 pointer-events-none">
             ⌘K
           </kbd>
         </div>
