@@ -365,8 +365,9 @@ function DistributionCharts() {
     const loadData = async () => {
       try {
         const data = await getParticipantActivity();
-        setParticipantTrend(data);
         console.log('Participant activity data loaded:', data);
+        setParticipantTrend(data);
+        
       } catch (err) {
         console.error('Failed to load participant activity', err);
       }

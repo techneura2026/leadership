@@ -86,7 +86,7 @@ export interface ParticipantActivity {
 
 export const getParticipantActivity = async (): Promise<ParticipantActivity[]> => {
   const { data } = await api.get('/analytics/activity/participants');
-  return data;
+  return data.data;
 };
 
 
