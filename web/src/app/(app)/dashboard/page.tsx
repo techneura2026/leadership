@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { getParticipantActivity, ParticipantActivity } from '@/lib/api';
 import { format } from 'date-fns';
 import {
   ClipboardList,
@@ -348,6 +350,21 @@ function ActivityCharts() {
 }
 
 function DistributionCharts() {
+  const [participantTrend, setParticipantTrend] = useState<ParticipantActivity[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await getParticipantActivity();
+        setParticipantTrend(data);
+      } catch (err) {
+        console.error('Failed to load participant activity', err);
+      }
+    };
+
+    loadData();
+  }, []);
+
   const total = MOCK_TYPE_DISTRIBUTION.reduce((sum, d) => sum + d.value, 0);
 
   return (
@@ -402,7 +419,7 @@ function DistributionCharts() {
         <h2 className="text-lg font-bold text-gray-900 mb-1">Participant Growth</h2>
         <p className="text-sm text-gray-500 mb-6">Total participants over the past 7 months</p>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={MOCK_PARTICIPANT_TREND}>
+          <AreaChart data={participantTrend}>
             <defs>
               <linearGradient id="participantGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#a855f7" stopOpacity={0.25} />

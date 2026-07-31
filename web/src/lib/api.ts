@@ -78,3 +78,13 @@ api.interceptors.response.use(
     }
   },
 );
+
+export interface ParticipantActivity {
+  month: string;
+  participants: number;
+}
+
+export const getParticipantActivity = async (): Promise<ParticipantActivity[]> => {
+  const { data } = await api.get('/analytics/activity/participants');
+  return data;
+};
