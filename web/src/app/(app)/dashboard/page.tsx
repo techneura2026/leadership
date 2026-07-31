@@ -2,7 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getParticipantActivity, ParticipantActivity } from '@/lib/api';
+import {
+  getParticipantActivity,
+  getDashboardData,
+  ParticipantActivity,
+  DashboardData,
+} from '@/lib/api';
 import { format } from 'date-fns';
 import {
   ClipboardList,
@@ -357,6 +362,7 @@ function DistributionCharts() {
       try {
         const data = await getParticipantActivity();
         setParticipantTrend(data);
+        console.log('Participant activity data loaded:', data);
       } catch (err) {
         console.error('Failed to load participant activity', err);
       }
@@ -522,6 +528,20 @@ function UserDashboard() {
 
 function AdminDashboard() {
   const router = useRouter();
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+
+useEffect(() => {
+  const loadDashboard = async () => {
+    try {
+      const data = await getDashboardData();
+      setDashboard(data);
+    } catch (err) {
+      console.error('Failed to load dashboard', err);
+    }
+  };
+
+  loadDashboard();
+}, []);
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -570,27 +590,45 @@ function AdminDashboard() {
           </button>
         </div>
 
-        <div className="divide-y divide-gray-100">
-          {MOCK_RECENT_ASSESSMENTS.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
-              onClick={() => router.push(`/assessments/${a.id}`)}
-            >
-              <div className="flex-1 min-w-0 pr-4">
-                <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
-                <p className="text-sm text-gray-500">
-                  {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>
-                  {TYPE_LABELS[a.assessmentType]} <span className="mx-2 text-gray-300">•</span>
-                  {a.participants} participants
-                </p>
-              </div>
-              <Badge variant={STATUS_VARIANT[a.status]}>
-                {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-              </Badge>
-            </div>
-          ))}
+<div className="divide-y divide-gray-100">
+  {dashboard?.recentAssessments?.length ? (
+    dashboard.recentAssessments.map((a) => (
+      <div
+        key={a.id}
+        className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
+        onClick={() => router.push(`/assessments/${a.id}`)}
+      >
+        <div className="flex-1 min-w-0 pr-4">
+          <p className="text-base font-semibold text-gray-900 truncate mb-1">
+            {a.title}
+          </p>
+
+          <p className="text-sm text-gray-500">
+            {format(new Date(a.createdAt), 'dd MMM yyyy')}
+            <span className="mx-2 text-gray-300">•</span>
+
+            {TYPE_LABELS[a.assessmentType as AssessmentType]}
+
+            {a.participants && (
+              <>
+                <span className="mx-2 text-gray-300">•</span>
+                {a.participants} participants
+              </>
+            )}
+          </p>
         </div>
+
+        <Badge variant={STATUS_VARIANT[a.status as AssessmentStatus]}>
+          {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+        </Badge>
+      </div>
+    ))
+  ) : (
+    <div className="px-6 py-8 text-center text-gray-500">
+      No recent assessments found.
+    </div>
+  )}
+</div>
       </div>
     </div>
   );

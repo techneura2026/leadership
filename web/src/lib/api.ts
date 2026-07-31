@@ -88,3 +88,19 @@ export const getParticipantActivity = async (): Promise<ParticipantActivity[]> =
   const { data } = await api.get('/analytics/activity/participants');
   return data;
 };
+
+
+export interface DashboardData {
+  activeAssessments: number;
+  totalParticipants: number;
+  reportsGenerated: number;
+  pendingResponses: number;
+  assessmentsByType: Record<string, number>;
+  assessmentsByStatus: Record<string, number>;
+  recentAssessments: any[];
+}
+
+export const getDashboardData = async (): Promise<DashboardData> => {
+  const response = await api.get('/analytics/dashboard');
+  return response.data.data;
+};
