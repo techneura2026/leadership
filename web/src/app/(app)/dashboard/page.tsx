@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getParticipantActivity, ParticipantActivity } from '@/lib/api';
+import { getParticipantActivity, ParticipantActivity,api } from '@/lib/api';
 import { format } from 'date-fns';
 import {
   ClipboardList,
@@ -31,8 +31,6 @@ import {
   Cell,
 } from 'recharts';
 import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
