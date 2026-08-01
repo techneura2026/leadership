@@ -2,7 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getParticipantActivity, ParticipantActivity,api } from '@/lib/api';
+
+import {
+  getParticipantActivity,
+  getDashboardData,
+  ParticipantActivity,
+  DashboardData,
+  api,
+  getParticipantCompletion,
+   ParticipantCompletion,
+} from '@/lib/api';
+
+
 import { format } from 'date-fns';
 import {
   ClipboardList,
@@ -210,7 +221,27 @@ function StatCard({ stat }: { stat: any }) {
 // ── Completion Rate Gauge ────────────────────────────────────────────────────
 
 function CompletionGauge() {
-  const { rate, completed, inProgress, notStarted } = MOCK_COMPLETION;
+  const [completion, setCompletion] = useState<ParticipantCompletion | null>(null);
+
+useEffect(() => {
+  const loadCompletion = async () => {
+    try {
+      const data = await getParticipantCompletion();
+      setCompletion(data);
+    } catch (err) {
+      console.error('Failed to load completion data', err);
+    }
+  };
+
+  loadCompletion();
+}, []);
+
+const rate = completion?.rate ?? 0;
+const completed = completion?.completed ?? 0;
+const inProgress = completion?.inProgress ?? 0;
+const notStarted = completion?.notStarted ?? 0;
+
+
   const r = 70;
   const c = 2 * Math.PI * r;
   const sweep = 0.75; // 270° arc, open at the bottom
@@ -317,7 +348,9 @@ function DistributionCharts() {
     const loadData = async () => {
       try {
         const data = await getParticipantActivity();
+        console.log('Participant activity data loaded:', data);
         setParticipantTrend(data);
+        
       } catch (err) {
         console.error('Failed to load participant activity', err);
       }
@@ -521,6 +554,20 @@ function AdminDashboard() {
     },
   ]);
   const router = useRouter();
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+
+useEffect(() => {
+  const loadDashboard = async () => {
+    try {
+      const data = await getDashboardData();
+      setDashboard(data);
+    } catch (err) {
+      console.error('Failed to load dashboard', err);
+    }
+  };
+
+  loadDashboard();
+}, []);
 
   useEffect(() => {
     const getDashboardStats = async () => {
@@ -636,27 +683,45 @@ function AdminDashboard() {
           </button>
         </div>
 
-        <div className="divide-y divide-gray-100">
-          {MOCK_RECENT_ASSESSMENTS.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
-              onClick={() => router.push(`/assessments/${a.id}`)}
-            >
-              <div className="flex-1 min-w-0 pr-4">
-                <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
-                <p className="text-sm text-gray-500">
-                  {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>
-                  {TYPE_LABELS[a.assessmentType]} <span className="mx-2 text-gray-300">•</span>
-                  {a.participants} participants
-                </p>
-              </div>
-              <Badge variant={STATUS_VARIANT[a.status]}>
-                {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-              </Badge>
-            </div>
-          ))}
+<div className="divide-y divide-gray-100">
+  {dashboard?.recentAssessments?.length ? (
+    dashboard.recentAssessments.map((a) => (
+      <div
+        key={a.id}
+        className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
+        onClick={() => router.push(`/assessments/${a.id}`)}
+      >
+        <div className="flex-1 min-w-0 pr-4">
+          <p className="text-base font-semibold text-gray-900 truncate mb-1">
+            {a.title}
+          </p>
+
+          <p className="text-sm text-gray-500">
+            {format(new Date(a.createdAt), 'dd MMM yyyy')}
+            <span className="mx-2 text-gray-300">•</span>
+
+            {TYPE_LABELS[a.assessmentType as AssessmentType]}
+
+            {a.participants && (
+              <>
+                <span className="mx-2 text-gray-300">•</span>
+                {a.participants} participants
+              </>
+            )}
+          </p>
         </div>
+
+        <Badge variant={STATUS_VARIANT[a.status as AssessmentStatus]}>
+          {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+        </Badge>
+      </div>
+    ))
+  ) : (
+    <div className="px-6 py-8 text-center text-gray-500">
+      No recent assessments found.
+    </div>
+  )}
+</div>
       </div>
     </div>
   );

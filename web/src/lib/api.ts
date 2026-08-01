@@ -6,6 +6,52 @@ const BASE_URL =
     ? (process.env.INTERNAL_API_URL ?? 'http://localhost:3001') + '/api/v1'
     : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1');
 
+
+
+
+export interface ParticipantActivity {
+  month: string;
+  participants: number;
+}
+
+
+
+export interface DashboardData {
+  activeAssessments: number;
+  totalParticipants: number;
+  reportsGenerated: number;
+  pendingResponses: number;
+  assessmentsByType: Record<string, number>;
+  assessmentsByStatus: Record<string, number>;
+  recentAssessments: any[];
+}
+
+export const getDashboardData = async (): Promise<DashboardData> => {
+  const response = await api.get('/analytics/dashboard');
+  return response.data.data;
+};
+
+
+export interface ParticipantCompletion {
+  rate: number;
+  completed: number;
+  inProgress: number;
+  notStarted: number;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
@@ -79,12 +125,16 @@ api.interceptors.response.use(
   },
 );
 
-export interface ParticipantActivity {
-  month: string;
-  participants: number;
-}
+
 
 export const getParticipantActivity = async (): Promise<ParticipantActivity[]> => {
   const { data } = await api.get('/analytics/activity/participants');
-  return data;
+  return data.data;
+};
+
+
+
+export const getParticipantCompletion = async (): Promise<ParticipantCompletion> => {
+  const { data } = await api.get('/analytics/completion/participants');
+  return data.data;
 };
