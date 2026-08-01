@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
+import { useApi } from '@/hooks/useApi';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import {
@@ -551,35 +552,95 @@ function OverviewTab({
 
 // ── Participants Tab ──────────────────────────────────────────────────────────
 function ParticipantsTab({
+  assessmentId,
   participants,
+  onRefresh,
 }: {
   assessmentId: string;
   participants: Participant[];
   onRefresh: () => void;
 }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [page, setPage] = useState(1);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: departments } = useApi<any[]>('/organisations/me/departments');
+
+  const limit = 10;
+  const url = `/organisations/me/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&departmentId=${selectedDeptId}`;
+  const { data: paginatedResponse, isLoading: usersLoading } = useApi<{ data: UserDto[]; total: number; page: number; limit: number }>(url);
+
+  const participantUserIds = participants.map((p) => p.userId);
+  const dropdownUsers = paginatedResponse?.data.filter(u => !participantUserIds.includes(u.id)) ?? [];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
     setToast({ message, type });
   }
 
-  function addParticipant() {
-    if (!email.trim()) return;
+  async function handleAddParticipant(userId: string) {
     setAdding(true);
-    setTimeout(() => {
-      setAdding(false);
-      setEmail('');
-      setShowAdd(false);
+    try {
+      await api.post(`/assessments/${assessmentId}/participants`, { userId });
       showToast('Participant added.');
-    }, 500);
+      setSearch('');
+      setDropdownOpen(false);
+      onRefresh();
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to add participant.';
+      showToast(msg, 'error');
+    } finally {
+      setAdding(false);
+    }
   }
 
-  function removeParticipant(_participantId: string) {
-    if (!confirm('Remove this participant?')) return;
-    showToast('Participant removed.');
+  async function handleAddByEmail(email: string) {
+    if (!email.includes('@')) {
+      showToast('Please enter a valid email address.', 'error');
+      return;
+    }
+    setAdding(true);
+    try {
+      await api.post(`/assessments/${assessmentId}/participants`, { email });
+      showToast('Participant added.');
+      setSearch('');
+      setDropdownOpen(false);
+      onRefresh();
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to add participant.';
+      showToast(msg, 'error');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function removeParticipant(assessmentId: string, _participantId: string) {
+    // if (!confirm('Remove this participant?')) return;
+    try {
+      const res = await api.post(`/assessments/${assessmentId}/participants/${_participantId}/remove`);
+      if (res?.data) {
+        showToast('Participant removed.');
+        onRefresh();
+      }
+    } catch (error) {
+      console.log(error);
+      showToast('Participant removal failed.', 'error');
+    }
   }
 
   return (
@@ -603,29 +664,134 @@ function ParticipantsTab({
       </div>
 
       {showAdd && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col sm:flex-row gap-3">
-          <input
-            type="email"
-            placeholder="participant@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
-            onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
-          />
-          <button
-            onClick={addParticipant}
-            disabled={adding || !email.trim()}
-            className="bg-blue-600 text-white text-sm font-medium rounded-lg px-6 py-2.5 hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
-          >
-            {adding && <Spinner size="sm" className="border-white border-t-transparent" />}
-            Add
-          </button>
-          <button
-            onClick={() => setShowAdd(false)}
-            className="text-gray-500 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200 transition-colors rounded-lg text-sm px-4 py-2.5"
-          >
-            Cancel
-          </button>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col gap-3 relative" ref={dropdownRef}>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Search by name or enter email…"
+                value={search}
+                onFocus={() => setDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                  setDropdownOpen(true);
+                }}
+                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && search.trim()) {
+                    if (search.includes('@')) {
+                      handleAddByEmail(search.trim());
+                    } else {
+                      showToast('Please select a user from the suggestions or type a valid email.', 'info');
+                    }
+                  }
+                }}
+              />
+            </div>
+            <select
+              value={selectedDeptId}
+              onChange={(e) => {
+                setSelectedDeptId(e.target.value);
+                setPage(1);
+                setDropdownOpen(true);
+              }}
+              className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
+            >
+              <option value="">All Departments</option>
+              {departments?.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => {
+                if (search.trim()) {
+                  handleAddByEmail(search.trim());
+                }
+              }}
+              disabled={adding || !search.trim()}
+              className="bg-blue-600 text-white text-sm font-medium rounded-lg px-6 py-2.5 hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm shrink-0"
+            >
+              {adding && <Spinner size="sm" className="border-white border-t-transparent" />}
+              Add
+            </button>
+            <button
+              onClick={() => {
+                setShowAdd(false);
+                setSearch('');
+              }}
+              className="text-gray-500 hover:bg-white hover:text-gray-900 border border-transparent hover:border-gray-200 transition-colors rounded-lg text-sm px-4 py-2.5 shrink-0"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {dropdownOpen && (
+            <div className="absolute z-20 top-full left-5 right-5 mt-1 border border-gray-200 rounded-xl shadow-xl bg-white overflow-hidden divide-y divide-gray-100 dark:bg-gray-800">
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-6 gap-2">
+                  <Spinner />
+                  <span className="text-sm text-gray-500">Searching...</span>
+                </div>
+              ) : dropdownUsers.length > 0 ? (
+                <>
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                    {dropdownUsers.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleAddParticipant(user.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors"
+                      >
+                        <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+                          {user.firstName[0]}{user.lastName[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                          <p className="text-xs text-gray-400">{user.email}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {paginatedResponse && paginatedResponse.total > limit && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 text-xs text-gray-500">
+                      <span>
+                        Page {page} of {Math.ceil(paginatedResponse.total / limit)} ({paginatedResponse.total} total)
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button
+                          disabled={page <= 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPage((p) => Math.max(1, p - 1));
+                          }}
+                          className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                        >
+                          Prev
+                        </button>
+                        <button
+                          disabled={page >= Math.ceil(paginatedResponse.total / limit)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPage((p) => p + 1);
+                          }}
+                          className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="px-3 py-6 text-center text-sm text-gray-450">
+                  No matching users found.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -683,7 +849,7 @@ function ParticipantsTab({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => removeParticipant(p.id)}
+                      onClick={() => removeParticipant(assessmentId,p.id)}
                       className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
@@ -1111,16 +1277,19 @@ export default function AssessmentDetailPage() {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
 
-  useEffect(() => {
-    const loadParticipants = async () => {
+  const loadParticipants = useCallback(async () => {
+    if (!id) return;
+    try {
       const res = await api.get(`/assessments/${id}/participants`);
       setParticipants(res.data.data);
-    };
-
-    if (id) {
-      loadParticipants();
+    } catch (err) {
+      console.error(err);
     }
   }, [id]);
+
+  useEffect(() => {
+    loadParticipants();
+  }, [loadParticipants]);
   const nominations = MOCK_NOMINATIONS_MAP[id] ?? [];
   const reports = MOCK_REPORTS_MAP[id] ?? [];
 
@@ -1209,7 +1378,7 @@ export default function AssessmentDetailPage() {
         <ParticipantsTab
           assessmentId={id}
           participants={participants}
-          onRefresh={() => { }}
+          onRefresh={loadParticipants}
         />
       )}
 

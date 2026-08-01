@@ -469,4 +469,40 @@ export class EngineService {
       }
     // }
   }
+
+   async removeParticipant(assessmentId: string, participantId: string, orgId: string): Promise<void> {
+      const assessment = await this.findOne(assessmentId, orgId);
+  
+      if (assessment.status === AssessmentStatus.CLOSED || assessment.status === AssessmentStatus.ARCHIVED) {
+        throw new BadRequestException('Cannot remove participants from a closed or archived assessment');
+      }
+  
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+        relations: ['assessment', 'user'],
+      });
+  
+      if (!participant) {
+        throw new NotFoundException('Participant not found');
+      }
+  
+      // Ensure the participant belongs to this assessment and organisation
+      if (participant.assessment?.organisationId !== orgId) {
+        throw new ForbiddenException('Participant does not belong to this organisation');
+      }
+  
+      // Prevent removal of self if user is the creator (self-assessment exception)
+      // if (participant.userId === assessment.creatorId) {
+      //   throw new BadRequestException('You cannot remove yourself from a self-assessment');
+      // }
+  
+      // // soft delete
+      // participant.deletedAt = new Date();
+      // await this.participantRepo.save(participant);
+      //
+      //hard delete
+      await this.participantRepo.delete({ id: participantId, assessmentId });
+  
+      this.logger.log(`Removed participant ${participantId} from assessment ${assessmentId}`);
+    }
 }

@@ -58,7 +58,7 @@ export default function EditAssessmentPage() {
   const isDraft = assessment.status === AssessmentStatus.DRAFT;
 
   return (
-    <div className="max-w-lg">
+    <div className="w-full mx-auto">
       <div className="mb-6">
         <button
           onClick={() => router.push(`/assessments/${id}`)}
