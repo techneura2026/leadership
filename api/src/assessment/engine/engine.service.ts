@@ -461,6 +461,11 @@ export class EngineService {
         };
       } catch (error) {
         // this.logger.error(`Failed to send reminder to ${p.user.email} for assessment ${assessmentId}`, error);
+        console.log("----Error sending reminders",error);
+        return {
+          message: 'Failed to send reminders',
+          assessment:assessmentId ,
+        };
       }
     // }
   }
