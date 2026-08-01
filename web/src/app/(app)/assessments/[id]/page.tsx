@@ -284,11 +284,13 @@ function OverviewTab({
   participants,
   questions,
   onGoToReports,
+  onCloseAssessment,
 }: {
   assessment: AssessmentDto;
   participants: Participant[];
   questions: AssessmentQuestion[];
   onGoToReports: () => void;
+  onCloseAssessment: () => Promise<void>;
 }) {
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -314,14 +316,22 @@ function OverviewTab({
     }
   }
 
-  function closeAssessment() {
+async function closeAssessment() {
+  try {
     setClosing(true);
-    setTimeout(() => {
-      setClosing(false);
-      setShowCloseConfirm(false);
-      showToast('Assessment has been closed.');
-    }, 600);
+
+    await onCloseAssessment();
+
+    setShowCloseConfirm(false);
+
+    showToast('Assessment has been closed.');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to close assessment.', 'error');
+  } finally {
+    setClosing(false);
   }
+}
 
   const completedCount = participants.filter((p) => p.status === 'completed').length;
   const totalCount = participants.length;
@@ -1304,6 +1314,18 @@ export default function AssessmentDetailPage() {
 
 
 
+  const handleCloseAssessment = async () => {
+  try {
+    await api.post(`/assessments/${id}/close`);
+
+    const res = await api.get(`/assessments/${id}`);
+    setAssessment(res.data.data);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -1371,6 +1393,7 @@ export default function AssessmentDetailPage() {
           participants={participants}
           questions={((assessment.config as any)?.questions ?? []) as AssessmentQuestion[]}
           onGoToReports={() => setActiveTab('reports')}
+          onCloseAssessment={handleCloseAssessment}
         />
       )}
 
