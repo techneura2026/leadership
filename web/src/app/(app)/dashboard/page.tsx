@@ -9,6 +9,8 @@ import {
   ParticipantActivity,
   DashboardData,
   api,
+  getParticipantCompletion,
+   ParticipantCompletion,
 } from '@/lib/api';
 
 
@@ -258,7 +260,27 @@ function StatCard({ stat }: { stat: any }) {
 // ── Completion Rate Gauge ────────────────────────────────────────────────────
 
 function CompletionGauge() {
-  const { rate, completed, inProgress, notStarted } = MOCK_COMPLETION;
+  const [completion, setCompletion] = useState<ParticipantCompletion | null>(null);
+
+useEffect(() => {
+  const loadCompletion = async () => {
+    try {
+      const data = await getParticipantCompletion();
+      setCompletion(data);
+    } catch (err) {
+      console.error('Failed to load completion data', err);
+    }
+  };
+
+  loadCompletion();
+}, []);
+
+const rate = completion?.rate ?? 0;
+const completed = completion?.completed ?? 0;
+const inProgress = completion?.inProgress ?? 0;
+const notStarted = completion?.notStarted ?? 0;
+
+
   const r = 70;
   const c = 2 * Math.PI * r;
   const sweep = 0.75; // 270° arc, open at the bottom

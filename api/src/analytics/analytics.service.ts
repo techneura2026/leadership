@@ -55,6 +55,14 @@ export interface SuccessionOverview {
   }>;
 }
 
+
+export interface ParticipantCompletion {
+  rate: number;
+  completed: number;
+  inProgress: number;
+  notStarted: number;
+}
+
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
@@ -499,4 +507,42 @@ export class AnalyticsService {
       participants: Number(r.participants),
     }));
   }
+
+
+
+  async getParticipantCompletion(orgId: string): Promise<ParticipantCompletion> {
+  const raw = await this.participantRepo
+    .createQueryBuilder('p')
+    .innerJoin('p.assessment', 'a')
+    .where('a.organisation_id = :orgId', { orgId })
+    .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+    .select('p.status', 'status')
+    .addSelect('COUNT(*)', 'count')
+    .groupBy('p.status')
+    .getRawMany();
+
+  const completed = Number(
+    raw.find(r => r.status === 'completed')?.count ?? 0,
+  );
+
+  const inProgress = Number(
+    raw.find(r => r.status === 'in_progress')?.count ?? 0,
+  );
+
+  const notStarted = Number(
+    raw.find(r => r.status === 'invited')?.count ?? 0,
+  );
+
+  const total = completed + inProgress + notStarted;
+
+  const rate =
+    total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  return {
+    rate,
+    completed,
+    inProgress,
+    notStarted,
+  };
+}
 }
