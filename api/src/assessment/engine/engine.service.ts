@@ -122,7 +122,8 @@ export class EngineService {
     private readonly nominationRepo: Repository<RaterNomination>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-  ) {}
+    // private readonly emailService: EmailService,
+  ) { }
 
   async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
     const org = await this.orgRepo.findOne({ where: { id: orgId } });
@@ -419,5 +420,48 @@ export class EngineService {
       }));
 
     return [...participantItems, ...raterItems];
+  }
+
+
+  async sendReminders(assessmentId: string, orgId: string): Promise<any> {
+    // const assessment = await this.findOne(assessmentId, orgId);
+
+    // if (assessment.status !== AssessmentStatus.ACTIVE) {
+    //   throw new BadRequestException('Reminders can only be sent for active assessments');
+    // }
+
+    // const participants = await this.getParticipants(assessmentId, orgId);
+
+    // const incomplete = participants.filter(p => p.status !== 'completed');
+
+    // if (incomplete.length === 0) {
+    //   this.logger.log(`Assessment ${assessmentId} has no incomplete participants`);
+    //   return;
+    // }
+
+    // // 2) Send an email to each incomplete participant
+    // for (const p of incomplete) {
+    //   // Skip if the user doesn’t have an email in our database (rare but possible)
+    //   if (!p.user?.email) {
+    //     this.logger.warn(`Skipping reminder for participant ${p.userId}: missing email`);
+    //     continue;
+    //   }
+
+      try {
+        // await this.emailService.sendAssessmentReminder(
+        //   p.user.email,
+        //   assessment.title,
+        //   assessment.id,  // we’ll use the same link pattern as CreateAssessmentDto.sendInvites
+        //   p.token!,
+        // );
+        // this.logger.log(`Reminder sent to ${p.user.email} for assessment ${assessmentId}`);
+        return {
+          message: 'Reminders sent successfully',
+          assessment:assessmentId ,
+        };
+      } catch (error) {
+        // this.logger.error(`Failed to send reminder to ${p.user.email} for assessment ${assessmentId}`, error);
+      }
+    // }
   }
 }

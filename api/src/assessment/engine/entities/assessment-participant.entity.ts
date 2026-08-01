@@ -51,4 +51,7 @@ export class AssessmentParticipant {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // @Column({ name: 'token', type: 'varchar', nullable: true })
+  // token?: string | null;
 }

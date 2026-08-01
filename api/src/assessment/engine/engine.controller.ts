@@ -104,4 +104,11 @@ export class EngineController {
   getResponseRate(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.engineService.getResponseRate(id, req.user.orgId);
   }
+
+  @Post(':id/send-reminders')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send reminders to participants' })
+  sendReminders(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.engineService.sendReminders(id, req.user.orgId);
+  }
 }

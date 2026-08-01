@@ -245,34 +245,34 @@ const MOCK_REPORTS_MAP: Record<string, ReportDto[]> = {
 
 const MOCK_PERSONALITY_SCORES_MAP: Record<string, FactorScore[]> = {
   p6: [
-    { factor: 'openness',           rawScore: 48, tScore: 67, percentile: 84, narrative: 'Highly curious and imaginative; actively seeks novel ideas.' },
-    { factor: 'conscientiousness',  rawScore: 44, tScore: 62, percentile: 76, narrative: 'Organised and reliable; follows through with minimal prompting.' },
-    { factor: 'extraversion',       rawScore: 46, tScore: 65, percentile: 80, narrative: 'Energised by group interactions; assertive communicator.' },
-    { factor: 'agreeableness',      rawScore: 40, tScore: 58, percentile: 70, narrative: 'Cooperative with a balanced approach to conflict.' },
-    { factor: 'emotional_stability',rawScore: 42, tScore: 60, percentile: 73, narrative: 'Generally composed under pressure with good stress recovery.' },
+    { factor: 'openness', rawScore: 48, tScore: 67, percentile: 84, narrative: 'Highly curious and imaginative; actively seeks novel ideas.' },
+    { factor: 'conscientiousness', rawScore: 44, tScore: 62, percentile: 76, narrative: 'Organised and reliable; follows through with minimal prompting.' },
+    { factor: 'extraversion', rawScore: 46, tScore: 65, percentile: 80, narrative: 'Energised by group interactions; assertive communicator.' },
+    { factor: 'agreeableness', rawScore: 40, tScore: 58, percentile: 70, narrative: 'Cooperative with a balanced approach to conflict.' },
+    { factor: 'emotional_stability', rawScore: 42, tScore: 60, percentile: 73, narrative: 'Generally composed under pressure with good stress recovery.' },
   ],
   p7: [
-    { factor: 'openness',           rawScore: 45, tScore: 64, percentile: 79, narrative: 'Open to new methodologies and cross-functional thinking.' },
-    { factor: 'conscientiousness',  rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally diligent; sets high personal standards.' },
-    { factor: 'extraversion',       rawScore: 35, tScore: 48, percentile: 55, narrative: 'Moderately reserved; prefers depth of interaction over breadth.' },
-    { factor: 'agreeableness',      rawScore: 42, tScore: 60, percentile: 73, narrative: 'Collaborative and empathetic in team settings.' },
-    { factor: 'emotional_stability',rawScore: 44, tScore: 62, percentile: 76, narrative: 'Resilient under deadlines; maintains focus during setbacks.' },
+    { factor: 'openness', rawScore: 45, tScore: 64, percentile: 79, narrative: 'Open to new methodologies and cross-functional thinking.' },
+    { factor: 'conscientiousness', rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally diligent; sets high personal standards.' },
+    { factor: 'extraversion', rawScore: 35, tScore: 48, percentile: 55, narrative: 'Moderately reserved; prefers depth of interaction over breadth.' },
+    { factor: 'agreeableness', rawScore: 42, tScore: 60, percentile: 73, narrative: 'Collaborative and empathetic in team settings.' },
+    { factor: 'emotional_stability', rawScore: 44, tScore: 62, percentile: 76, narrative: 'Resilient under deadlines; maintains focus during setbacks.' },
   ],
   p8: [
-    { factor: 'openness',           rawScore: 40, tScore: 58, percentile: 70, narrative: 'Receptive to diverse perspectives and change initiatives.' },
-    { factor: 'conscientiousness',  rawScore: 43, tScore: 61, percentile: 74, narrative: 'Structured approach to work with consistent follow-through.' },
-    { factor: 'extraversion',       rawScore: 47, tScore: 66, percentile: 82, narrative: 'Highly sociable; thrives in people-facing and facilitation roles.' },
-    { factor: 'agreeableness',      rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally empathetic; prioritises harmony and inclusion.' },
-    { factor: 'emotional_stability',rawScore: 45, tScore: 63, percentile: 77, narrative: 'Calm and grounding presence for others during stressful periods.' },
+    { factor: 'openness', rawScore: 40, tScore: 58, percentile: 70, narrative: 'Receptive to diverse perspectives and change initiatives.' },
+    { factor: 'conscientiousness', rawScore: 43, tScore: 61, percentile: 74, narrative: 'Structured approach to work with consistent follow-through.' },
+    { factor: 'extraversion', rawScore: 47, tScore: 66, percentile: 82, narrative: 'Highly sociable; thrives in people-facing and facilitation roles.' },
+    { factor: 'agreeableness', rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally empathetic; prioritises harmony and inclusion.' },
+    { factor: 'emotional_stability', rawScore: 45, tScore: 63, percentile: 77, narrative: 'Calm and grounding presence for others during stressful periods.' },
   ],
 };
 
 function toReportType(type: AssessmentType): ReportData['reportType'] {
   const m: Record<AssessmentType, ReportData['reportType']> = {
     [AssessmentType.FEEDBACK_360]: 'individual_360',
-    [AssessmentType.COMPETENCY]:   'competency',
-    [AssessmentType.PERSONALITY]:  'personality',
-    [AssessmentType.READINESS]:    'readiness',
+    [AssessmentType.COMPETENCY]: 'competency',
+    [AssessmentType.PERSONALITY]: 'personality',
+    [AssessmentType.READINESS]: 'readiness',
   };
   return m[type] ?? 'individual_360';
 }
@@ -300,12 +300,17 @@ function OverviewTab({
     setToast({ message, type });
   }
 
-  function sendReminders() {
+  //this area need to update with real email servers
+  async function sendReminders() {
     setSendingReminders(true);
-    setTimeout(() => {
+    try {
+      const res = await api.post(`/assessments/${assessment.id}/send-reminders`);
+      showToast(res.data?.data?.message);
+    } catch (error) {
+      showToast('Failed to send reminders.', 'error');
+    } finally {
       setSendingReminders(false);
-      showToast('Reminders sent successfully.');
-    }, 600);
+    }
   }
 
   function closeAssessment() {
@@ -590,7 +595,7 @@ function ParticipantsTab({
         </h3>
         <button
           onClick={() => setShowAdd(!showAdd)}
-            className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
+          className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
         >
           <PlusIcon className="w-4 h-4" strokeWidth={2.5} />
           Add Participant
@@ -1082,40 +1087,40 @@ export default function AssessmentDetailPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
 
-const [assessment, setAssessment] = useState<AssessmentDto | null>(null);
-const [loading, setLoading] = useState(true);
+  const [assessment, setAssessment] = useState<AssessmentDto | null>(null);
+  const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const loadAssessment = async () => {
-    try {
-      const res = await api.get(`/assessments/${id}`);
-      setAssessment(res.data.data);
-    } catch (err) {
-      console.error(err);
-      setAssessment(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (id) {
-    loadAssessment();
-  }
-}, [id]);
-
-
-const [participants, setParticipants] = useState<Participant[]>([]);
-
-useEffect(() => {
-    const loadParticipants = async () => {
-        const res = await api.get(`/assessments/${id}/participants`);
-        setParticipants(res.data.data);
+  useEffect(() => {
+    const loadAssessment = async () => {
+      try {
+        const res = await api.get(`/assessments/${id}`);
+        setAssessment(res.data.data);
+      } catch (err) {
+        console.error(err);
+        setAssessment(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if(id){
-        loadParticipants();
+    if (id) {
+      loadAssessment();
     }
-}, [id]);
+  }, [id]);
+
+
+  const [participants, setParticipants] = useState<Participant[]>([]);
+
+  useEffect(() => {
+    const loadParticipants = async () => {
+      const res = await api.get(`/assessments/${id}/participants`);
+      setParticipants(res.data.data);
+    };
+
+    if (id) {
+      loadParticipants();
+    }
+  }, [id]);
   const nominations = MOCK_NOMINATIONS_MAP[id] ?? [];
   const reports = MOCK_REPORTS_MAP[id] ?? [];
 
@@ -1132,11 +1137,11 @@ useEffect(() => {
 
   if (loading) {
     return (
-        <div className="flex justify-center py-10">
-            <Spinner />
-        </div>
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
     );
-}
+  }
 
 
 
@@ -1204,7 +1209,7 @@ useEffect(() => {
         <ParticipantsTab
           assessmentId={id}
           participants={participants}
-          onRefresh={() => {}}
+          onRefresh={() => { }}
         />
       )}
 
