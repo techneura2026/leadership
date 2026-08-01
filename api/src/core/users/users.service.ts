@@ -44,6 +44,7 @@ export class UsersService {
     role: UserRole;
     jobTitle?: string;
     departmentId?: string;
+    avatarUrl?: string;
   }): Promise<User> {
     const existing = await this.userRepo.findOne({
       where: { organisationId: data.organisationId, email: data.email.toLowerCase() },
@@ -72,6 +73,7 @@ export class UsersService {
       jobTitle: string | null;
       departmentId: string | null;
       isActive: boolean;
+      avatarUrl: string | null;
     }>,
   ): Promise<User> {
     const user = await this.findById(id, organisationId);
@@ -123,11 +125,49 @@ export class UsersService {
     await this.sessionRepo.delete({ userId });
   }
 
-  async findAll(organisationId: string): Promise<User[]> {
-    return this.userRepo.find({
-      where: { organisationId },
-      order: { isActive: 'DESC', firstName: 'ASC', lastName: 'ASC' },
-    });
+  async findAll(
+    organisationId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      departmentId?: string;
+    },
+  ): Promise<{ data: User[]; total: number; page: number; limit: number } | User[]> {
+    if (!filters || (!filters.page && !filters.limit && !filters.search && !filters.departmentId)) {
+      return this.userRepo.find({
+        where: { organisationId },
+        order: { isActive: 'DESC', firstName: 'ASC', lastName: 'ASC' },
+      });
+    }
+
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const query = this.userRepo.createQueryBuilder('u')
+      .where('u.organisationId = :organisationId', { organisationId })
+      .orderBy('u.isActive', 'DESC')
+      .addOrderBy('u.firstName', 'ASC')
+      .addOrderBy('u.lastName', 'ASC');
+
+    if (filters.search) {
+      query.andWhere(
+        '(LOWER(u.firstName) LIKE LOWER(:search) OR LOWER(u.lastName) LIKE LOWER(:search) OR LOWER(u.email) LIKE LOWER(:search))',
+        { search: `%${filters.search.toLowerCase()}%` }
+      );
+    }
+
+    if (filters.departmentId) {
+      query.andWhere('u.departmentId = :departmentId', { departmentId: filters.departmentId });
+    }
+
+    const [data, total] = await query
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
   }
 
   async hardDelete(id: string, organisationId: string): Promise<void> {

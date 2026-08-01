@@ -34,45 +34,6 @@ import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared'
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 
-// const dashboardStats = [
-//   {
-//     label: 'Active Assessments',
-//     value: 24,
-//     delta: 12.4,
-//     up: true,
-//     icon: ClipboardList,
-//     gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)',
-//     glow: 'rgba(70,95,255,0.25)',
-//   },
-//   {
-//     label: 'Total Participants',
-//     value: 186,
-//     delta: 8.1,
-//     up: true,
-//     icon: Users,
-//     gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
-//     glow: 'rgba(34,197,94,0.22)',
-//   },
-//   {
-//     label: 'Pending Responses',
-//     value: 37,
-//     delta: 5.6,
-//     up: false,
-//     icon: Clock,
-//     gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-//     glow: 'rgba(245,158,11,0.22)',
-//   },
-//   {
-//     label: 'Reports Generated',
-//     value: 52,
-//     delta: 23.2,
-//     up: true,
-//     icon: FileText,
-//     gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-//     glow: 'rgba(168,85,247,0.22)',
-//   },
-// ];
-
 const MOCK_MONTHLY_ACTIVITY = [
   { month: 'Jan', launched: 14, completed: 10 },
   { month: 'Feb', launched: 18, completed: 15 },

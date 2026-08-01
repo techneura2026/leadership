@@ -77,7 +77,15 @@ export class OrganisationsService {
     await this.deptRepo.remove(dept);
   }
 
-  async getUsers(organisationId: string) {
-    return this.usersService.findAll(organisationId);
+  async getUsers(
+    organisationId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      departmentId?: string;
+    },
+  ) {
+    return this.usersService.findAll(organisationId, filters);
   }
 }

@@ -52,4 +52,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsUUID()
   departmentId?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.jpg' })
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string; 
 }

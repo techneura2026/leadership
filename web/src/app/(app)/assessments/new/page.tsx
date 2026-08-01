@@ -802,8 +802,14 @@ function StepParticipants360({
   onAddRater: (participantUserId: string, rater: RaterEntry) => void;
   onRemoveRater: (participantUserId: string, raterUserId: string) => void;
 }) {
-  const { data: users } = useApi<UserDto[]>('/organisations/me/users');
+  const { data: allUsers } = useApi<UserDto[]>('/organisations/me/users');
+  const { data: departments } = useApi<any[]>('/organisations/me/departments');
   const [participantSearch, setParticipantSearch] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [page, setPage] = useState(1);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [raterSearches, setRaterSearches] = useState<Record<string, string>>({});
   const [raterRelationships, setRaterRelationships] = useState<Record<string, RaterRelationship>>({});
@@ -812,18 +818,17 @@ function StepParticipants360({
 
   const selectedIds = participants360.map((p) => p.userId);
 
-  const filteredForParticipant =
-    users?.filter(
-      (u) =>
-        !selectedIds.includes(u.id) &&
-        `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(participantSearch.toLowerCase()),
-    ) ?? [];
+  const limit = 5;
+  const url = `/organisations/me/users?page=${page}&limit=${limit}&search=${encodeURIComponent(participantSearch)}&departmentId=${selectedDeptId}`;
+  const { data: paginatedResponse, isLoading: usersLoading } = useApi<{ data: UserDto[]; total: number; page: number; limit: number }>(url);
+
+  const dropdownUsers = paginatedResponse?.data.filter(u => !selectedIds.includes(u.id)) ?? [];
 
   function getFilteredRaters(participantId: string, participant: Participant360) {
     const search = (raterSearches[participantId] ?? '').toLowerCase();
     const existingRaterIds = participant.raters.map((r) => r.userId);
     return (
-      users?.filter(
+      allUsers?.filter(
         (u) =>
           u.id !== participantId &&
           !existingRaterIds.includes(u.id) &&
@@ -861,11 +866,15 @@ function StepParticipants360({
       const target = event.target as Node;
       const openParticipantId = Object.keys(relationshipMenuOpen).find((id) => relationshipMenuOpen[id]);
 
-      if (!openParticipantId) return;
+      if (openParticipantId) {
+        const menuWrapper = relationshipMenuRefs.current[openParticipantId];
+        if (menuWrapper && !menuWrapper.contains(target)) {
+          setRelationshipMenuOpen((prev) => ({ ...prev, [openParticipantId]: false }));
+        }
+      }
 
-      const menuWrapper = relationshipMenuRefs.current[openParticipantId];
-      if (menuWrapper && !menuWrapper.contains(target)) {
-        setRelationshipMenuOpen((prev) => ({ ...prev, [openParticipantId]: false }));
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        setDropdownOpen(false);
       }
     }
 
@@ -881,47 +890,112 @@ function StepParticipants360({
       </p>
 
       {/* Add participant search */}
-      <div className="mb-5">
+      <div className="mb-5 relative" ref={dropdownRef}>
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
           Add Participant
         </label>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search users by name or email…"
-            value={participantSearch}
-            onChange={(e) => setParticipantSearch(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
-          />
-          {participantSearch && filteredForParticipant.length > 0 && (
-            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm overflow-hidden max-h-56 overflow-y-auto divide-y divide-gray-100 dark:bg-gray-800/50">
-              {filteredForParticipant.slice(0, 8).map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => {
-                    onAddParticipant(user);
-                    setParticipantSearch('');
-                    setExpandedId(user.id);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors dark:hover:bg-gray-700/50 dark:hover:text-gray-200 rounded-xl dark:bg-gray-800/50"
-                >
-                  <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
-                    {user.firstName[0]}{user.lastName[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
-                    <p className="text-xs text-gray-400">{user.email}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {participantSearch && filteredForParticipant.length === 0 && (
-            <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white/95 backdrop-blur-sm px-3 py-3 bg-gray-50 text-center">
-              <p className="text-sm text-gray-400">No matching users found.</p>
-            </div>
-          )}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search users by name or email…"
+              value={participantSearch}
+              onFocus={() => setDropdownOpen(true)}
+              onChange={(e) => {
+                setParticipantSearch(e.target.value);
+                setPage(1);
+                setDropdownOpen(true);
+              }}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
+            />
+          </div>
+          <select
+            value={selectedDeptId}
+            onChange={(e) => {
+              setSelectedDeptId(e.target.value);
+              setPage(1);
+              setDropdownOpen(true);
+            }}
+            className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
+          >
+            <option value="">All Departments</option>
+            {departments?.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {dropdownOpen && (
+          <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white overflow-hidden divide-y divide-gray-100 dark:bg-gray-800">
+            {usersLoading ? (
+              <div className="flex items-center justify-center py-6 gap-2">
+                <Spinner />
+                <span className="text-sm text-gray-500">Searching...</span>
+              </div>
+            ) : dropdownUsers.length > 0 ? (
+              <>
+                <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  {dropdownUsers.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => {
+                        onAddParticipant(user);
+                        setParticipantSearch('');
+                        setDropdownOpen(false);
+                        setExpandedId(user.id);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+                        {user.firstName[0]}{user.lastName[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                        <p className="text-xs text-gray-400">{user.email}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {paginatedResponse && paginatedResponse.total > limit && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 text-xs text-gray-500">
+                    <span>
+                      Page {page} of {Math.ceil(paginatedResponse.total / limit)} ({paginatedResponse.total} total)
+                    </span>
+                    <div className="flex gap-1.5">
+                      <button
+                        disabled={page <= 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPage((p) => Math.max(1, p - 1));
+                        }}
+                        className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        disabled={page >= Math.ceil(paginatedResponse.total / limit)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPage((p) => p + 1);
+                        }}
+                        className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="px-3 py-6 text-center text-sm text-gray-450">
+                No matching users found.
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Selected participants */}
@@ -1120,59 +1194,182 @@ function StepParticipants360({
 
 // ── Step 4a: Participants (non-360 types) ─────────────────────────────────────
 function StepParticipants({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
-  const { data: users, isLoading } = useApi<UserDto[]>('/organisations/me/users');
+  const { data: allUsers } = useApi<UserDto[]>('/organisations/me/users');
+  const { data: departments } = useApi<any[]>('/organisations/me/departments');
   const [search, setSearch] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [page, setPage] = useState(1);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const filtered =
-    users?.filter((u) =>
-      `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(search.toLowerCase()),
-    ) ?? [];
+  const limit = 5;
+  const url = `/organisations/me/users?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}&departmentId=${selectedDeptId}`;
+  const { data: paginatedResponse, isLoading: usersLoading } = useApi<{ data: UserDto[]; total: number; page: number; limit: number }>(url);
+
+  const dropdownUsers = paginatedResponse?.data ?? [];
+  const selectedUsers = allUsers?.filter((u) => selected.includes(u.id)) ?? [];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Add Participants</h2>
       <p className="text-sm text-gray-500 mb-4">Search and select users to include ({selected.length} selected).</p>
-      <input
-        type="text"
-        placeholder="Search by name or email…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700 mb-4"
-      />
-      {isLoading && (
-        <div className="flex items-center gap-3 py-8 justify-center">
-          <Spinner />
-          <span className="text-sm text-gray-500">Loading users…</span>
+      
+      {/* Dropdown Input / Selector */}
+      <div className="mb-5 relative" ref={dropdownRef}>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search users by name or email…"
+              value={search}
+              onFocus={() => setDropdownOpen(true)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+                setDropdownOpen(true);
+              }}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
+            />
+          </div>
+          <select
+            value={selectedDeptId}
+            onChange={(e) => {
+              setSelectedDeptId(e.target.value);
+              setPage(1);
+              setDropdownOpen(true);
+            }}
+            className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-700"
+          >
+            <option value="">All Departments</option>
+            {departments?.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
-      {!isLoading && (
-        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-          {filtered.map((user) => (
-            <label
-              key={user.id}
-              className={cn(
-                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
-                selected.includes(user.id) ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300',
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(user.id)}
-                onChange={() => onToggle(user.id)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+
+        {dropdownOpen && (
+          <div className="absolute z-20 top-full left-0 right-0 mt-1.5 border border-gray-200 rounded-xl shadow-xl bg-white overflow-hidden divide-y divide-gray-100 dark:bg-gray-800">
+            {usersLoading ? (
+              <div className="flex items-center justify-center py-6 gap-2">
+                <Spinner />
+                <span className="text-sm text-gray-500">Searching...</span>
+              </div>
+            ) : dropdownUsers.length > 0 ? (
+              <>
+                <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+                  {dropdownUsers.map((user) => {
+                    const isSelected = selected.includes(user.id);
+                    return (
+                      <button
+                        key={user.id}
+                        onClick={() => {
+                          onToggle(user.id);
+                        }}
+                        className={cn(
+                          "w-full flex items-center justify-between px-3 py-2.5 hover:bg-blue-50/80 text-left transition-colors",
+                          isSelected && "bg-blue-50/30"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+                            {user.firstName[0]}{user.lastName[0]}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                            <p className="text-xs text-gray-400">{user.email}</p>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <span className="text-xs font-semibold text-blue-600 mr-2 bg-blue-50 px-2 py-0.5 rounded-full">
+                            Selected
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {paginatedResponse && paginatedResponse.total > limit && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50 text-xs text-gray-500">
+                    <span>
+                      Page {page} of {Math.ceil(paginatedResponse.total / limit)} ({paginatedResponse.total} total)
+                    </span>
+                    <div className="flex gap-1.5">
+                      <button
+                        disabled={page <= 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPage((p) => Math.max(1, p - 1));
+                        }}
+                        className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        disabled={page >= Math.ceil(paginatedResponse.total / limit)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPage((p) => p + 1);
+                        }}
+                        className="px-2 py-1 border border-gray-200 rounded bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="px-3 py-6 text-center text-sm text-gray-450">
+                No matching users found.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Selected List */}
+      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+        {selectedUsers.map((user) => (
+          <div
+            key={user.id}
+            className="flex items-center justify-between p-3 rounded-lg border border-blue-150 bg-blue-50/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-750">
+                {user.firstName[0]}{user.lastName[0]}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{user.firstName} {user.lastName}</p>
                 <p className="text-xs text-gray-500 truncate">{user.email}</p>
               </div>
-              <span className="text-xs text-gray-400 capitalize">{user.role.replace('_', ' ')}</span>
-            </label>
-          ))}
-          {filtered.length === 0 && (
-            <p className="text-sm text-gray-500 text-center py-6">No users found.</p>
-          )}
-        </div>
-      )}
+            </div>
+            <button
+              onClick={() => onToggle(user.id)}
+              className="text-xs text-red-500 hover:text-red-700 bg-white hover:bg-red-50 border border-gray-200 hover:border-red-200 px-2.5 py-1.5 rounded-lg font-medium transition-all"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {selected.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-6">
+            No participants selected. Use the search dropdown above to select users.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

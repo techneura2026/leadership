@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -128,7 +129,18 @@ export class OrganisationsController {
 
   @Get('me/users')
   @ApiOperation({ summary: 'List users in the current user\'s organisation' })
-  getMyOrgUsers(@CurrentOrgId() orgId: string) {
-    return this.orgsService.getUsers(orgId);
+  getMyOrgUsers(
+    @CurrentOrgId() orgId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('departmentId') departmentId?: string,
+  ) {
+    return this.orgsService.getUsers(orgId, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      search,
+      departmentId: departmentId || undefined,
+    });
   }
 }

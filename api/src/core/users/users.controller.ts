@@ -40,6 +40,7 @@ export class UsersController {
       role: dto.role as UserRole,
       jobTitle: dto.jobTitle,
       departmentId: dto.departmentId,
+      avatarUrl: dto.avatarUrl,
     });
   }
 
