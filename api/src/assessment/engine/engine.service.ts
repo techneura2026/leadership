@@ -198,9 +198,9 @@ export class EngineService {
   async update(id: string, orgId: string, dto: UpdateAssessmentDto): Promise<Assessment> {
     const assessment = await this.findOne(id, orgId);
 
-    if (assessment.status !== AssessmentStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT assessments can be updated');
-    }
+    if (assessment.status === AssessmentStatus.CLOSED) {
+  throw new BadRequestException('Closed assessments cannot be updated');
+}
 
     if (dto.title !== undefined) assessment.title = dto.title;
     if (dto.config !== undefined) assessment.config = dto.config;
