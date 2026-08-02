@@ -127,13 +127,24 @@ export class Uc2CompetencyService {
     return saved;
   }
 
+  private async assertAssessmentInOrg(assessmentId: string, orgId: string): Promise<void> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+  }
+
   async submitSelfRatings(
+    assessmentId: string,
     caId: string,
     participantId: string,
+    orgId: string,
     ratings: RatingDto[],
   ): Promise<CompetencyAssessment> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const ca = await this.caRepo.findOne({
-      where: { id: caId, participantId, assessorType: 'self' },
+      where: { id: caId, assessmentId, participantId, assessorType: 'self' },
     });
     if (!ca) throw new NotFoundException(`Self-assessment ${caId} not found`);
 
@@ -227,12 +238,16 @@ export class Uc2CompetencyService {
   }
 
   async submitManagerRatings(
+    assessmentId: string,
     caId: string,
     managerId: string,
+    orgId: string,
     ratings: RatingDto[],
   ): Promise<CompetencyAssessment> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const ca = await this.caRepo.findOne({
-      where: { id: caId, assessorId: managerId, assessorType: 'manager' },
+      where: { id: caId, assessmentId, assessorId: managerId, assessorType: 'manager' },
     });
     if (!ca) throw new NotFoundException(`Manager assessment ${caId} not found`);
 

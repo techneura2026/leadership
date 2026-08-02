@@ -6,7 +6,11 @@ export interface RadarAxis {
   key: string;
   label: string;
   value: number; // 0–100
+  /** Distinct participants/assessments behind this average, when known. Axes below MIN_SAMPLE_SIZE render muted with a tooltip — an "aggregate" from too few people is nearly identifiable. */
+  sampleSize?: number;
 }
+
+const MIN_SAMPLE_SIZE = 3;
 
 interface RadarChartProps {
   axes: RadarAxis[];
@@ -135,20 +139,26 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
         strokeLinejoin="round"
       />
 
-      {/* Score dots */}
+      {/* Score dots — muted with a tooltip when the average is based on too few people to be a
+          meaningful aggregate rather than one identifiable individual's actual score */}
       {axes.map((axis, i) => {
         const r = (axis.value / 100) * outerR;
         const p = polarToCartesian(cx, cy, r, (i * 360) / n);
+        const lowSample = axis.sampleSize !== undefined && axis.sampleSize < MIN_SAMPLE_SIZE;
         return (
           <circle
             key={i}
             cx={p.x}
             cy={p.y}
             r={4}
-            fill={COLORS.stroke}
+            fill={lowSample ? theme.axis : COLORS.stroke}
             stroke="white"
             strokeWidth={1.5}
-          />
+          >
+            {lowSample && (
+              <title>{`Based on only ${axis.sampleSize} ${axis.sampleSize === 1 ? 'person' : 'people'} — interpret with caution`}</title>
+            )}
+          </circle>
         );
       })}
 
@@ -167,7 +177,8 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
         if (normAngle > 20 && normAngle <= 160) textAnchor = 'start';
         if (normAngle > 200 && normAngle <= 340) textAnchor = 'end';
 
-        const lines = splitText(axis.label);
+        const lowSample = axis.sampleSize !== undefined && axis.sampleSize < MIN_SAMPLE_SIZE;
+        const lines = splitText(lowSample ? `${axis.label} *` : axis.label);
 
         return (
           <text
@@ -179,7 +190,11 @@ export function RadarChart({ axes, size = 300, className }: RadarChartProps) {
             fontSize={size * 0.042}
             fontWeight={500}
             fill={theme.label}
+            opacity={lowSample ? 0.6 : 1}
           >
+            {lowSample && (
+              <title>{`Based on only ${axis.sampleSize} ${axis.sampleSize === 1 ? 'person' : 'people'} — interpret with caution`}</title>
+            )}
             {lines.map((line, idx) => (
               <tspan
                 key={idx}

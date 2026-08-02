@@ -36,7 +36,11 @@ function LoginForm() {
       const res = await api.post<{ data: AuthResponseDto }>('/auth/login', data);
       const { accessToken, user, organisation } = res.data.data;
       setAuth(accessToken, user, organisation);
-      router.replace(searchParams.get('from') ?? '/dashboard');
+      if (user.mustChangePassword) {
+        router.replace('/change-password');
+      } else {
+        router.replace(searchParams.get('from') ?? '/dashboard');
+      }
     } catch (err: unknown) {
       const msg = (err as any)?.response?.data?.error?.message ?? 'Login failed. Please try again.';
       setServerError(msg);
@@ -73,9 +77,14 @@ function LoginForm() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-            Password
-          </label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
+              Password
+            </label>
+            <Link href="/forgot-password" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}

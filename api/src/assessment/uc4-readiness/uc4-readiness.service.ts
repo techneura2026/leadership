@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ReadinessRating } from '@leaderprism/shared';
+import { ReadinessRating, UserRole } from '@leaderprism/shared';
 import { RoleProfile } from './entities/role-profile.entity';
 import { SjtResponse } from './entities/sjt-response.entity';
 import { LearningAgilityResponse } from './entities/learning-agility-response.entity';
@@ -78,9 +79,17 @@ export class Uc4ReadinessService {
     return saved;
   }
 
+  private async assertAssessmentInOrg(assessmentId: string, orgId: string): Promise<void> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+  }
+
   async getSjtQuestionnaire(
     assessmentId: string,
     participantId: string,
+    orgId: string,
   ): Promise<{
     items: Array<{
       id: string;
@@ -92,6 +101,8 @@ export class Uc4ReadinessService {
     total: number;
     answered: number;
   }> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
@@ -126,9 +137,12 @@ export class Uc4ReadinessService {
   async submitSjtResponse(
     assessmentId: string,
     participantId: string,
+    orgId: string,
     itemId: string,
     selectedOption: number,
   ): Promise<SjtResponse> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
@@ -165,6 +179,7 @@ export class Uc4ReadinessService {
   async getLearningAgilityQuestionnaire(
     assessmentId: string,
     participantId: string,
+    orgId: string,
   ): Promise<{
     items: Array<{
       id: string;
@@ -177,6 +192,8 @@ export class Uc4ReadinessService {
     total: number;
     answered: number;
   }> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
@@ -212,9 +229,12 @@ export class Uc4ReadinessService {
   async submitLearningAgilityResponse(
     assessmentId: string,
     participantId: string,
+    orgId: string,
     itemId: string,
     value: number,
   ): Promise<LearningAgilityResponse> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
@@ -250,10 +270,7 @@ export class Uc4ReadinessService {
     roleProfileId: string | null,
     orgId: string,
   ): Promise<ReadinessScore> {
-    const assessment = await this.assessmentRepo.findOne({
-      where: { id: assessmentId, organisationId: orgId },
-    });
-    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    await this.assertAssessmentInOrg(assessmentId, orgId);
 
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
@@ -276,6 +293,43 @@ export class Uc4ReadinessService {
     );
 
     return score;
+  }
+
+  /**
+   * Participant-facing: their own computed readiness score(s), including 9-box placement.
+   * Previously admin-only (via getSuccessionDashboard) — participants had no way to see their
+   * own result at all (see docs/frontend-backend-gap-remediation-plan.md Tier 0 item 0h).
+   *
+   * Restricted to the participant themselves (or an admin/HR manager) — without this check any
+   * authenticated org member could view any OTHER participant's readiness/9-box placement by
+   * participantId, which is meant to be admin-controlled (see Finding N in the audit).
+   */
+  async getMyReadinessScores(
+    assessmentId: string,
+    participantId: string,
+    orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
+  ): Promise<ReadinessScore[]> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
+    const participant = await this.participantRepo.findOne({
+      where: { id: participantId, assessmentId },
+    });
+    if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+
+    const isOwner = participant.userId === requestingUserId;
+    const isPrivileged =
+      requestingUserRole === UserRole.ORG_ADMIN || requestingUserRole === UserRole.HR_MANAGER;
+    if (!isOwner && !isPrivileged) {
+      throw new ForbiddenException("You can only view your own readiness results.");
+    }
+
+    return this.readinessScoreRepo.find({
+      where: { assessmentId, participantId },
+      relations: ['roleProfile'],
+      order: { calculatedAt: 'DESC' },
+    });
   }
 
   async getSuccessionDashboard(

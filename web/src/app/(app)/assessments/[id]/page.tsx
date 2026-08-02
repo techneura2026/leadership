@@ -26,12 +26,10 @@ import {
   RaterNominationDto,
   ReportDto,
   UserRole,
-  Language,
   RaterRelationship,
-  ReportType,
 } from '@leaderprism/shared';
 import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
-import { generateReportPdf, ReportData } from '@/lib/reportPdf';
+type ReportKind = 'individual_360' | 'competency' | 'personality' | 'readiness';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type QuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'TABLE';
@@ -89,193 +87,32 @@ const TAB_LIST = [
   { key: 'reports', label: 'Reports' },
 ];
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-function makeUser(id: string, firstName: string, lastName: string, email: string, jobTitle: string): UserDto {
-  return {
-    id,
-    organisationId: 'org-demo',
-    departmentId: null,
-    email,
-    firstName,
-    lastName,
-    role: UserRole.PARTICIPANT,
-    jobTitle,
-    avatarUrl: null,
-    languagePref: Language.EN,
-    isActive: true,
-    emailVerified: true,
-    createdAt: '2025-01-01T00:00:00.000Z',
-  };
-}
-
-const RATING_OPTIONS: QuestionOption[] = [
-  { id: 'o1', text: 'Strongly Agree' },
-  { id: 'o2', text: 'Agree' },
-  { id: 'o3', text: 'Neutral' },
-  { id: 'o4', text: 'Disagree' },
-  { id: 'o5', text: 'Strongly Disagree' },
-];
-
-const MOCK_ASSESSMENTS_MAP: Record<string, AssessmentDto> = {
-  '1': {
-    id: '1',
-    organisationId: 'org-demo',
-    title: 'Annual Leadership 360° Review 2025',
-    assessmentType: AssessmentType.FEEDBACK_360,
-    status: AssessmentStatus.ACTIVE,
-    config: {
-      questions: [
-        { id: 'q1', type: 'SINGLE_CHOICE', title: 'This leader communicates clearly and transparently with their team.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q2', type: 'SINGLE_CHOICE', title: 'This leader demonstrates strategic thinking in their decision-making.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q3', type: 'SINGLE_CHOICE', title: 'This leader actively develops and mentors team members.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q4', type: 'SHORT_ANSWER', title: "What are this leader's greatest strengths?", required: false, options: [], tableRows: [], tableColumns: [] },
-      ],
-    } as unknown as AssessmentDto['config'],
-    startDate: '2025-05-01T00:00:00.000Z',
-    endDate: '2025-07-31T00:00:00.000Z',
-    createdAt: '2025-04-15T00:00:00.000Z',
-  },
-  '2': {
-    id: '2',
-    organisationId: 'org-demo',
-    title: 'Q2 Leadership Competency Assessment',
-    assessmentType: AssessmentType.COMPETENCY,
-    status: AssessmentStatus.DRAFT,
-    config: {
-      questions: [
-        { id: 'q1', type: 'SINGLE_CHOICE', title: 'Demonstrates effective conflict resolution and mediation skills.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q2', type: 'TABLE', title: 'Rate the following leadership competencies.', required: true, options: [], tableRows: ['Strategic Vision', 'Emotional Intelligence', 'Decision Making', 'Team Development'], tableColumns: ['Below Expectation', 'Meets Expectation', 'Exceeds Expectation'] },
-      ],
-    } as unknown as AssessmentDto['config'],
-    startDate: '2025-06-01T00:00:00.000Z',
-    endDate: '2025-08-31T00:00:00.000Z',
-    createdAt: '2025-05-20T00:00:00.000Z',
-  },
-  '3': {
-    id: '3',
-    organisationId: 'org-demo',
-    title: 'Big Five Personality Profiling — Cohort 2025',
-    assessmentType: AssessmentType.PERSONALITY,
-    status: AssessmentStatus.CLOSED,
-    config: {
-      questions: [
-        { id: 'q1', type: 'SINGLE_CHOICE', title: 'I enjoy exploring new ideas and unconventional ways of doing things.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q2', type: 'SINGLE_CHOICE', title: 'I plan tasks carefully and follow through on commitments without prompting.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q3', type: 'SINGLE_CHOICE', title: 'I feel energised when interacting with large groups of people.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q4', type: 'SINGLE_CHOICE', title: 'I find it easy to empathise with others and consider their feelings in decisions.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q5', type: 'SINGLE_CHOICE', title: 'I remain calm and composed when faced with stressful or ambiguous situations.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q6', type: 'TABLE', title: 'Rate how accurately each statement describes you.', required: true, options: [], tableRows: ['I adapt quickly to change', 'I set high personal standards', 'I take initiative without being asked', 'I consider multiple perspectives before deciding'], tableColumns: ['Not at all', 'Somewhat', 'Mostly', 'Very Accurately'] },
-        { id: 'q7', type: 'SHORT_ANSWER', title: 'Describe a situation where your personality traits helped you navigate a workplace challenge.', required: false, options: [], tableRows: [], tableColumns: [] },
-      ],
-    } as unknown as AssessmentDto['config'],
-    startDate: '2025-03-01T00:00:00.000Z',
-    endDate: '2025-04-30T00:00:00.000Z',
-    createdAt: '2025-02-15T00:00:00.000Z',
-  },
-  '4': {
-    id: '4',
-    organisationId: 'org-demo',
-    title: 'Leadership Readiness Assessment Q3 2025',
-    assessmentType: AssessmentType.READINESS,
-    status: AssessmentStatus.ACTIVE,
-    config: {
-      questions: [
-        { id: 'q1', type: 'SINGLE_CHOICE', title: 'I am comfortable making high-stakes decisions with incomplete information.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q2', type: 'SINGLE_CHOICE', title: 'I actively seek opportunities to lead cross-functional initiatives.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q3', type: 'SINGLE_CHOICE', title: 'I regularly mentor or develop others within the organisation.', required: true, options: RATING_OPTIONS, tableRows: [], tableColumns: [] },
-        { id: 'q4', type: 'TABLE', title: 'Rate your readiness across the following leadership dimensions.', required: true, options: [], tableRows: ['Strategic Thinking', 'Change Management', 'Stakeholder Influence', 'Executive Presence', 'Business Acumen'], tableColumns: ['Not Ready', 'Developing', 'Ready', 'Highly Ready'] },
-        { id: 'q5', type: 'MULTIPLE_CHOICE', title: 'Which of the following leadership roles are you prepared to step into within the next 12 months?', required: false, options: [{ id: 'o1', text: 'Team Lead' }, { id: 'o2', text: 'Department Head' }, { id: 'o3', text: 'Project Sponsor' }, { id: 'o4', text: 'C-Suite / Executive' }], tableRows: [], tableColumns: [] },
-        { id: 'q6', type: 'SHORT_ANSWER', title: 'What is one leadership capability you are actively working to strengthen, and how?', required: false, options: [], tableRows: [], tableColumns: [] },
-      ],
-    } as unknown as AssessmentDto['config'],
-    startDate: '2025-06-15T00:00:00.000Z',
-    endDate: '2025-09-30T00:00:00.000Z',
-    createdAt: '2025-06-01T00:00:00.000Z',
-  },
-};
-
-const MOCK_PARTICIPANTS_MAP: Record<string, Participant[]> = {
-  '1': [
-    { id: 'p1', userId: 'u1', user: makeUser('u1', 'Sarah', 'Johnson', 'sarah.johnson@company.com', 'Senior Manager'), status: 'completed', completionPercentage: 100 },
-    { id: 'p2', userId: 'u2', user: makeUser('u2', 'Mark', 'Davis', 'mark.davis@company.com', 'Operations Lead'), status: 'in_progress', completionPercentage: 65 },
-    { id: 'p3', userId: 'u3', user: makeUser('u3', 'Emily', 'Chen', 'emily.chen@company.com', 'Team Lead'), status: 'invited', completionPercentage: 0 },
-  ],
-  '2': [
-    { id: 'p4', userId: 'u4', user: makeUser('u4', 'Alex', 'Morgan', 'alex.morgan@company.com', 'Department Head'), status: 'in_progress', completionPercentage: 40 },
-    { id: 'p5', userId: 'u5', user: makeUser('u5', 'Rachel', 'Kim', 'rachel.kim@company.com', 'Strategy Manager'), status: 'invited', completionPercentage: 0 },
-  ],
-  '3': [
-    { id: 'p6', userId: 'u6', user: makeUser('u6', 'Nina', 'Patel', 'nina.patel@company.com', 'Product Director'), status: 'completed', completionPercentage: 100 },
-    { id: 'p7', userId: 'u7', user: makeUser('u7', 'David', 'Okonkwo', 'david.okonkwo@company.com', 'Engineering Manager'), status: 'completed', completionPercentage: 100 },
-    { id: 'p8', userId: 'u8', user: makeUser('u8', 'Priya', 'Sharma', 'priya.sharma@company.com', 'HR Business Partner'), status: 'completed', completionPercentage: 100 },
-  ],
-  '4': [
-    { id: 'p9', userId: 'u9', user: makeUser('u9', 'James', 'Oliveira', 'james.oliveira@company.com', 'Senior Manager'), status: 'completed', completionPercentage: 100 },
-    { id: 'p10', userId: 'u10', user: makeUser('u10', 'Aisha', 'Nakamura', 'aisha.nakamura@company.com', 'Operations Manager'), status: 'in_progress', completionPercentage: 55 },
-    { id: 'p11', userId: 'u11', user: makeUser('u11', 'Chris', 'Fernandez', 'chris.fernandez@company.com', 'Finance Lead'), status: 'in_progress', completionPercentage: 20 },
-    { id: 'p12', userId: 'u12', user: makeUser('u12', 'Yuki', 'Tanaka', 'yuki.tanaka@company.com', 'Marketing Head'), status: 'invited', completionPercentage: 0 },
-  ],
-};
-
-const MOCK_NOMINATIONS_MAP: Record<string, RaterNominationDto[]> = {
-  '1': [
-    { id: 'n1', assessmentId: '1', participantId: 'u1', raterEmail: 'james.wilson@company.com', raterName: 'James Wilson', relationship: RaterRelationship.DIRECT_REPORT, status: 'completed', completedAt: '2025-06-10T08:00:00.000Z' },
-    { id: 'n2', assessmentId: '1', participantId: 'u1', raterEmail: 'lisa.park@company.com', raterName: 'Lisa Park', relationship: RaterRelationship.PEER, status: 'pending', completedAt: null },
-    { id: 'n3', assessmentId: '1', participantId: 'u2', raterEmail: 'tom.brown@company.com', raterName: 'Tom Brown', relationship: RaterRelationship.SUPERVISOR, status: 'completed', completedAt: '2025-06-12T14:30:00.000Z' },
-  ],
-  '2': [],
-  '3': [],
-  '4': [],
-};
-
-const MOCK_REPORTS_MAP: Record<string, ReportDto[]> = {
-  '1': [
-    { id: 'r1', assessmentId: '1', participantId: 'p1', reportType: ReportType.INDIVIDUAL_360, status: 'ready', language: Language.EN, generatedAt: '2025-06-15T10:00:00.000Z' },
-  ],
-  '2': [],
-  '3': [
-    { id: 'r2', assessmentId: '3', participantId: 'p6', reportType: ReportType.INDIVIDUAL_360, status: 'ready', language: Language.EN, generatedAt: '2025-05-05T09:00:00.000Z' },
-    { id: 'r3', assessmentId: '3', participantId: 'p7', reportType: ReportType.INDIVIDUAL_360, status: 'ready', language: Language.EN, generatedAt: '2025-05-05T09:15:00.000Z' },
-    { id: 'r4', assessmentId: '3', participantId: 'p8', reportType: ReportType.INDIVIDUAL_360, status: 'ready', language: Language.EN, generatedAt: '2025-05-05T09:30:00.000Z' },
-  ],
-  '4': [
-    { id: 'r5', assessmentId: '4', participantId: 'p9', reportType: ReportType.INDIVIDUAL_360, status: 'ready', language: Language.EN, generatedAt: '2025-07-01T11:00:00.000Z' },
-  ],
-};
-
-const MOCK_PERSONALITY_SCORES_MAP: Record<string, FactorScore[]> = {
-  p6: [
-    { factor: 'openness', rawScore: 48, tScore: 67, percentile: 84, narrative: 'Highly curious and imaginative; actively seeks novel ideas.' },
-    { factor: 'conscientiousness', rawScore: 44, tScore: 62, percentile: 76, narrative: 'Organised and reliable; follows through with minimal prompting.' },
-    { factor: 'extraversion', rawScore: 46, tScore: 65, percentile: 80, narrative: 'Energised by group interactions; assertive communicator.' },
-    { factor: 'agreeableness', rawScore: 40, tScore: 58, percentile: 70, narrative: 'Cooperative with a balanced approach to conflict.' },
-    { factor: 'emotional_stability', rawScore: 42, tScore: 60, percentile: 73, narrative: 'Generally composed under pressure with good stress recovery.' },
-  ],
-  p7: [
-    { factor: 'openness', rawScore: 45, tScore: 64, percentile: 79, narrative: 'Open to new methodologies and cross-functional thinking.' },
-    { factor: 'conscientiousness', rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally diligent; sets high personal standards.' },
-    { factor: 'extraversion', rawScore: 35, tScore: 48, percentile: 55, narrative: 'Moderately reserved; prefers depth of interaction over breadth.' },
-    { factor: 'agreeableness', rawScore: 42, tScore: 60, percentile: 73, narrative: 'Collaborative and empathetic in team settings.' },
-    { factor: 'emotional_stability', rawScore: 44, tScore: 62, percentile: 76, narrative: 'Resilient under deadlines; maintains focus during setbacks.' },
-  ],
-  p8: [
-    { factor: 'openness', rawScore: 40, tScore: 58, percentile: 70, narrative: 'Receptive to diverse perspectives and change initiatives.' },
-    { factor: 'conscientiousness', rawScore: 43, tScore: 61, percentile: 74, narrative: 'Structured approach to work with consistent follow-through.' },
-    { factor: 'extraversion', rawScore: 47, tScore: 66, percentile: 82, narrative: 'Highly sociable; thrives in people-facing and facilitation roles.' },
-    { factor: 'agreeableness', rawScore: 50, tScore: 72, percentile: 91, narrative: 'Exceptionally empathetic; prioritises harmony and inclusion.' },
-    { factor: 'emotional_stability', rawScore: 45, tScore: 63, percentile: 77, narrative: 'Calm and grounding presence for others during stressful periods.' },
-  ],
-};
-
-function toReportType(type: AssessmentType): ReportData['reportType'] {
-  const m: Record<AssessmentType, ReportData['reportType']> = {
+function toReportType(type: AssessmentType): ReportKind {
+  const m: Record<AssessmentType, ReportKind> = {
     [AssessmentType.FEEDBACK_360]: 'individual_360',
     [AssessmentType.COMPETENCY]: 'competency',
     [AssessmentType.PERSONALITY]: 'personality',
     [AssessmentType.READINESS]: 'readiness',
   };
   return m[type] ?? 'individual_360';
+}
+
+// Shown on non-completed participant/rater rows once the assessment has an end date.
+function DueBadge({ endDate, done }: { endDate: string | null | undefined; done: boolean }) {
+  if (done || !endDate) return null;
+  const due = new Date(endDate);
+  const overdue = due.getTime() < Date.now();
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border',
+        overdue ? 'bg-red-50 text-red-600 border-red-200' : 'bg-gray-50 text-gray-500 border-gray-200',
+      )}
+    >
+      <Clock3 className="w-3 h-3" strokeWidth={2} />
+      {overdue ? 'Overdue' : `Due ${format(due, 'dd MMM')}`}
+    </span>
+  );
 }
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
@@ -303,12 +140,16 @@ function OverviewTab({
     setToast({ message, type });
   }
 
-  //this area need to update with real email servers
   async function sendReminders() {
     setSendingReminders(true);
     try {
-      const res = await api.post(`/assessments/${assessment.id}/send-reminders`);
-      showToast(res.data?.data?.message);
+      const endpoint =
+        assessment.assessmentType === AssessmentType.FEEDBACK_360
+          ? `/assessments/${assessment.id}/360/reminders`
+          : `/assessments/${assessment.id}/send-reminders`;
+      const res = await api.post(endpoint);
+      const sent = res.data?.data?.sent ?? 0;
+      showToast(sent > 0 ? `Reminder sent to ${sent} ${sent === 1 ? 'person' : 'people'}.` : 'Everyone has already responded — no reminders needed.');
     } catch (error) {
       showToast('Failed to send reminders.', 'error');
     } finally {
@@ -377,10 +218,10 @@ async function closeAssessment() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {assessment.assessmentType === AssessmentType.FEEDBACK_360 && (
+            {assessment.status === AssessmentStatus.ACTIVE && (
               <button
                 onClick={sendReminders}
-                disabled={sendingReminders || assessment.status !== AssessmentStatus.ACTIVE}
+                disabled={sendingReminders}
                 className="text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {sendingReminders ? <Spinner size="sm" /> : <Send className="w-4 h-4" strokeWidth={2} />}
@@ -431,7 +272,7 @@ async function closeAssessment() {
         <div className="space-y-3">
           {participants.slice(0, 5).map((p) => (
             <div key={p.id} className="flex items-center gap-3">
-              <Avatar seed={p.userId} size="xs" />
+              <Avatar seed={p.userId} src={p.user?.avatarUrl} size="xs" />
               <div className="w-28 text-xs font-medium text-gray-700 truncate shrink-0">
                 {p.user?.firstName} {p.user?.lastName}
               </div>
@@ -565,13 +406,18 @@ function ParticipantsTab({
   assessmentId,
   participants,
   onRefresh,
+  assessmentStatus,
+  assessmentEndDate,
 }: {
   assessmentId: string;
   participants: Participant[];
   onRefresh: () => void;
+  assessmentStatus: AssessmentStatus;
+  assessmentEndDate: string | null;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [remindingId, setRemindingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [search, setSearch] = useState('');
@@ -650,6 +496,18 @@ function ParticipantsTab({
     } catch (error) {
       console.log(error);
       showToast('Participant removal failed.', 'error');
+    }
+  }
+
+  async function remindParticipant(participantId: string) {
+    setRemindingId(participantId);
+    try {
+      await api.post(`/assessments/${assessmentId}/participants/${participantId}/remind`);
+      showToast('Reminder sent.');
+    } catch (error: any) {
+      showToast(error.response?.data?.message || 'Failed to send reminder.', 'error');
+    } finally {
+      setRemindingId(null);
     }
   }
 
@@ -835,36 +693,51 @@ function ParticipantsTab({
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     <div className="flex items-center gap-2.5">
-                      <Avatar seed={p.userId} size="sm" />
+                      <Avatar seed={p.userId} src={p.user?.avatarUrl} size="sm" />
                       {p.user?.firstName} {p.user?.lastName}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{p.user?.email}</td>
                   <td className="px-4 py-3">
-                    <Badge
-                      variant={
-                        p.status === 'completed'
-                          ? 'success'
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant={
+                          p.status === 'completed'
+                            ? 'success'
+                            : p.status === 'in_progress'
+                              ? 'warning'
+                              : 'neutral'
+                        }
+                      >
+                        {p.status === 'completed'
+                          ? 'Completed'
                           : p.status === 'in_progress'
-                            ? 'warning'
-                            : 'neutral'
-                      }
-                    >
-                      {p.status === 'completed'
-                        ? 'Completed'
-                        : p.status === 'in_progress'
-                          ? 'In Progress'
-                          : 'Invited'}
-                    </Badge>
+                            ? 'In Progress'
+                            : 'Invited'}
+                      </Badge>
+                      <DueBadge endDate={assessmentEndDate} done={p.status === 'completed'} />
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => removeParticipant(assessmentId,p.id)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-                      Remove
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      {p.status !== 'completed' && assessmentStatus === AssessmentStatus.ACTIVE && (
+                        <button
+                          onClick={() => remindParticipant(p.id)}
+                          disabled={remindingId === p.id}
+                          className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {remindingId === p.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
+                          Remind
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeParticipant(assessmentId,p.id)}
+                        className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                        Remove
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -878,21 +751,47 @@ function ParticipantsTab({
 
 // ── Feedback Givers Tab ───────────────────────────────────────────────────────
 function FeedbackGiversTab({
+  assessmentId,
   participants,
   nominations,
+  assessmentStatus,
+  assessmentEndDate,
 }: {
   assessmentId: string;
   participants: Participant[];
   nominations: RaterNominationDto[];
+  assessmentStatus: AssessmentStatus;
+  assessmentEndDate: string | null;
 }) {
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
   function getParticipantName(participantId: string) {
-    const p = participants.find((pt) => pt.userId === participantId);
+    // RaterNominationDto.participantId is the AssessmentParticipant record id, not the userId.
+    const p = participants.find((pt) => pt.id === participantId);
     if (!p) return '—';
     return `${p.user?.firstName ?? ''} ${p.user?.lastName ?? ''}`.trim();
   }
 
+  async function remindNomination(nominationId: string) {
+    setRemindingId(nominationId);
+    try {
+      await api.post(`/assessments/${assessmentId}/360/nominations/${nominationId}/remind`);
+      setToast({ message: 'Reminder sent.', type: 'success' });
+    } catch (error: any) {
+      setToast({ message: error.response?.data?.message || 'Failed to send reminder.', type: 'error' });
+    } finally {
+      setRemindingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">
           Feedback Givers{nominations.length > 0 ? ` — ${nominations.length}` : ''}
@@ -922,10 +821,15 @@ function FeedbackGiversTab({
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Status
                 </th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {nominations.map((n) => (
+              {nominations.map((n) => {
+                const outstanding = n.status !== 'completed' && n.status !== 'declined';
+                return (
                 <tr key={n.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
@@ -945,12 +849,28 @@ function FeedbackGiversTab({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant={n.status === 'completed' ? 'success' : 'neutral'}>
-                      {n.status.charAt(0).toUpperCase() + n.status.slice(1)}
-                    </Badge>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant={n.status === 'completed' ? 'success' : 'neutral'}>
+                        {n.status.charAt(0).toUpperCase() + n.status.slice(1)}
+                      </Badge>
+                      <DueBadge endDate={assessmentEndDate} done={n.status === 'completed'} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {outstanding && assessmentStatus === AssessmentStatus.ACTIVE && (
+                      <button
+                        onClick={() => remindNomination(n.id)}
+                        disabled={remindingId === n.id}
+                        className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {remindingId === n.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
+                        Remind
+                      </button>
+                    )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -973,40 +893,50 @@ function ReportsTab({
   participants: Participant[];
   reports: ReportDto[];
 }) {
-  const [localReports, setLocalReports] = useState<ReportDto[]>(reports);
+  // Polls while any report is still queued/rendering on the BullMQ worker.
+  const { data: liveReports, mutate: mutateReports } = useApi<ReportDto[]>(`/reports?assessmentId=${assessmentId}`, {
+    refreshInterval: (data) =>
+      data?.some((r) => r.status === 'pending' || r.status === 'processing') ? 2000 : 0,
+  });
+  const localReports = liveReports ?? reports;
   const [generating, setGenerating] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
   async function generateReport(participant: Participant) {
     setGenerating(participant.id);
-    await new Promise((r) => setTimeout(r, 1800));
-    setLocalReports((prev) => [
-      ...prev,
-      {
-        id: `r-${participant.id}`,
+    try {
+      // Enqueues a BullMQ job and returns immediately; the polling useApi call above
+      // picks up the 'ready'/'failed' transition once the worker finishes.
+      await api.post('/reports/generate', {
         assessmentId,
         participantId: participant.id,
-        reportType: ReportType.INDIVIDUAL_360,
-        status: 'ready',
-        language: Language.EN,
-        generatedAt: new Date().toISOString(),
-      },
-    ]);
-    setGenerating(null);
+        reportType: toReportType(assessmentType),
+        language: 'en',
+      });
+      await mutateReports();
+    } catch (err) {
+      console.error('Failed to generate report', err);
+    } finally {
+      setGenerating(null);
+    }
   }
 
   async function downloadPdf(participant: Participant) {
+    const report = getReportForParticipant(participant.id);
+    if (!report) return;
     setDownloading(participant.id);
     try {
-      await generateReportPdf({
-        id: participant.id,
-        participantName: `${participant.user?.firstName ?? ''} ${participant.user?.lastName ?? ''}`.trim(),
-        participantRole: participant.user?.jobTitle ?? '',
-        assessmentTitle,
-        reportType: toReportType(assessmentType),
-        generatedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        organisationName: 'LeaderPrism Demo Org',
-      });
+      const res = await api.get(`/reports/${report.id}/download`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${report.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download report', err);
     } finally {
       setDownloading(null);
     }
@@ -1048,7 +978,7 @@ function ReportsTab({
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
                       <div className="flex items-center gap-2.5">
-                        <Avatar seed={p.userId} size="sm" />
+                        <Avatar seed={p.userId} src={p.user?.avatarUrl} size="sm" />
                         {p.user?.firstName} {p.user?.lastName}
                       </div>
                     </td>
@@ -1143,16 +1073,22 @@ function tScoreBandVariant(t: number): 'success' | 'warning' | 'info' {
 }
 
 function ParticipantRadarCard({
+  assessmentId,
   participant,
-  scores,
 }: {
+  assessmentId: string;
   participant: Participant;
-  scores: FactorScore[] | null;
 }) {
+  const { data: scores } = useApi<FactorScore[]>(
+    participant.status === 'completed'
+      ? `/assessments/${assessmentId}/personality/scores/${participant.id}`
+      : null,
+  );
+
   if (participant.status !== 'completed') {
     return (
       <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 flex flex-col items-center justify-center text-center min-h-[420px] hover:border-gray-300 transition-colors">
-        <Avatar seed={participant.userId} size="lg" className="mb-4 opacity-60 grayscale" />
+        <Avatar seed={participant.userId} src={participant.user?.avatarUrl} size="lg" className="mb-4 opacity-60 grayscale" />
         <Badge variant="neutral" className="mb-4">Pending</Badge>
         <p className="text-sm font-semibold text-gray-900">
           {participant.user?.firstName} {participant.user?.lastName}
@@ -1172,7 +1108,7 @@ function ParticipantRadarCard({
       <span className="absolute top-0 left-0 right-0 h-1" style={{ background: TYPE_META[AssessmentType.PERSONALITY].gradient }} />
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <Avatar seed={participant.userId} size="md" ring />
+          <Avatar seed={participant.userId} src={participant.user?.avatarUrl} size="md" ring />
           <div>
             <p className="text-sm font-semibold text-gray-900">
               {participant.user?.firstName} {participant.user?.lastName}
@@ -1244,10 +1180,10 @@ function PersonalityResultsTab({
       {participants.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {completed.map((p) => (
-            <ParticipantRadarCard key={p.id} participant={p} scores={MOCK_PERSONALITY_SCORES_MAP[p.id] ?? null} />
+            <ParticipantRadarCard key={p.id} assessmentId={assessmentId} participant={p} />
           ))}
           {pending.map((p) => (
-            <ParticipantRadarCard key={p.id} participant={p} scores={null} />
+            <ParticipantRadarCard key={p.id} assessmentId={assessmentId} participant={p} />
           ))}
         </div>
       )}
@@ -1300,11 +1236,14 @@ export default function AssessmentDetailPage() {
   useEffect(() => {
     loadParticipants();
   }, [loadParticipants]);
-  const nominations = MOCK_NOMINATIONS_MAP[id] ?? [];
-  const reports = MOCK_REPORTS_MAP[id] ?? [];
 
   const is360 = assessment?.assessmentType === AssessmentType.FEEDBACK_360;
   const isPersonality = assessment?.assessmentType === AssessmentType.PERSONALITY;
+
+  const { data: nominations } = useApi<RaterNominationDto[]>(
+    is360 ? `/assessments/${id}/360/nominations` : null,
+  );
+  const { data: reports } = useApi<ReportDto[]>(`/reports?assessmentId=${id}`);
 
   const visibleTabs = TAB_LIST.filter(
     (t) =>
@@ -1402,11 +1341,19 @@ export default function AssessmentDetailPage() {
           assessmentId={id}
           participants={participants}
           onRefresh={loadParticipants}
+          assessmentStatus={assessment.status}
+          assessmentEndDate={assessment.endDate}
         />
       )}
 
       {activeTab === 'feedback-givers' && is360 && (
-        <FeedbackGiversTab assessmentId={id} participants={participants} nominations={nominations} />
+        <FeedbackGiversTab
+          assessmentId={id}
+          participants={participants}
+          nominations={nominations ?? []}
+          assessmentStatus={assessment.status}
+          assessmentEndDate={assessment.endDate}
+        />
       )}
 
       {activeTab === 'results' && isPersonality && (
@@ -1414,7 +1361,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {activeTab === 'reports' && (
-        <ReportsTab assessmentId={id} assessmentType={assessment.assessmentType} assessmentTitle={assessment.title} participants={participants} reports={reports} />
+        <ReportsTab assessmentId={id} assessmentType={assessment.assessmentType} assessmentTitle={assessment.title} participants={participants} reports={reports ?? []} />
       )}
     </div>
   );

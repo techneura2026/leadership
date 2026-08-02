@@ -920,6 +920,11 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 interface AssessmentParticipant { id: string; userId: string; status: string; }
+interface MyAssessmentSummary {
+  id: string;
+  selfRaterToken?: string;
+  selfNominationStatus?: string;
+}
 
 export default function TakeAssessmentPage() {
   const params = useParams();
@@ -932,6 +937,20 @@ export default function TakeAssessmentPage() {
 
   const { data: participants, isLoading: loadingParticipants } =
     useApi<AssessmentParticipant[]>(assessment ? `/assessments/${id}/participants` : null);
+
+  // Safety net for direct/bookmarked navigation: a 360 assessment's "self" rating is
+  // completed through the same rater-response flow as every other rater (see
+  // EngineService.findMine) — the list page already links there directly, but redirect
+  // here too in case this page is reached without going through the list.
+  const is360Assessment = assessment?.assessmentType === AssessmentType.FEEDBACK_360;
+  const { data: mine } = useApi<MyAssessmentSummary[]>(is360Assessment ? '/assessments/mine' : null);
+  const selfNomination = mine?.find((m) => m.id === id && m.selfRaterToken);
+
+  useEffect(() => {
+    if (selfNomination?.selfRaterToken && selfNomination.selfNominationStatus !== 'completed') {
+      router.replace(`/rater/${selfNomination.selfRaterToken}`);
+    }
+  }, [selfNomination, router]);
 
   const myParticipantRecord = participants?.find((p) => p.userId === currentUser?.id);
 
@@ -960,9 +979,15 @@ export default function TakeAssessmentPage() {
   const loading =
     isLoading ||
     loadingParticipants ||
-    (needsCompetencies && loadingComps);
+    (needsCompetencies && loadingComps) ||
+    (is360Assessment && mine === undefined);
 
   if (loading) return <PageSpinner />;
+
+  if (selfNomination?.selfRaterToken && selfNomination.selfNominationStatus !== 'completed') {
+    // Redirecting via the effect above — avoid flashing the disconnected self-form.
+    return <PageSpinner />;
+  }
 
   if (assessmentError || !assessment) {
     return (

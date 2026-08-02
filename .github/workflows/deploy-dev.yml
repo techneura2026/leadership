@@ -78,7 +78,14 @@ jobs:
             PORT=3001
             NODE_ENV=production
             FQDN=leaderprism-dev-app.centralus.cloudapp.azure.com
+            APP_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+            AZURE_STORAGE_CONTAINER_REPORTS=reports
+            AZURE_STORAGE_CONTAINER_UPLOADS=uploads
+            AZURE_COMMUNICATION_CONNECTION_STRING=${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}
+            EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+            EMAIL_FROM_NAME=LeaderPrism
             EOT
             
             # Stop existing PM2 processes if any

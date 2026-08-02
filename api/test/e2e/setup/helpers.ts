@@ -69,6 +69,19 @@ export async function login(
   const res = await req(app).post('/api/v1/auth/login').send({ email, password }).expect(200);
 
   const { accessToken, user, organisation } = res.body.data;
+
+  // Every admin-created user starts with mustChangePassword=true (see Tier 0 password fix) —
+  // real clients are forced through /auth/change-password before anything else works. Do the
+  // same here (a same-password no-op change) so existing test flows that don't care about this
+  // feature specifically aren't blocked by MustChangePasswordGuard on their next request.
+  if (user.mustChangePassword) {
+    await req(app)
+      .post('/api/v1/auth/change-password')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ currentPassword: password, newPassword: password })
+      .expect(200);
+  }
+
   return {
     accessToken,
     refreshCookie: extractRefreshCookie(res),

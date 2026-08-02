@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { ReportType } from '@leaderprism/shared';
 import { Report } from './report.entity';
@@ -39,9 +41,16 @@ export class ReportingService {
     private readonly uc3Service: Uc3PersonalityService,
     private readonly uc4Service: Uc4ReadinessService,
     private readonly notificationsService: NotificationsService,
+    @InjectQueue('reports')
+    private readonly reportsQueue: Queue,
   ) {}
 
-  async generateReport(
+  /**
+   * Creates the pending report record and enqueues the actual PDF generation as a
+   * BullMQ job — returns immediately so the request doesn't block on Puppeteer.
+   * The worker (ReportProcessor) calls processReport() to do the real work.
+   */
+  async requestReport(
     orgId: string,
     assessmentId: string,
     participantId: string | null,
@@ -54,17 +63,39 @@ export class ReportingService {
     });
     if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
 
-    // Create a pending report record
     const report = this.reportRepo.create({
       organisationId: orgId,
       assessmentId,
       participantId: participantId ?? null,
       reportType,
-      status: 'processing',
+      status: 'pending',
       language,
       generatedBy,
     });
     const savedReport = await this.reportRepo.save(report);
+
+    await this.reportsQueue.add('generate', { reportId: savedReport.id });
+
+    return savedReport;
+  }
+
+  /** Does the actual PDF rendering for an already-created report record. Called by ReportProcessor. */
+  async processReport(reportId: string): Promise<Report> {
+    const savedReport = await this.reportRepo.findOne({ where: { id: reportId } });
+    if (!savedReport) throw new NotFoundException(`Report ${reportId} not found`);
+
+    const orgId = savedReport.organisationId;
+    const assessmentId = savedReport.assessmentId;
+    const participantId = savedReport.participantId;
+    const reportType = savedReport.reportType;
+
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+
+    savedReport.status = 'processing';
+    await this.reportRepo.save(savedReport);
 
     try {
       const generatedDate = new Date().toLocaleDateString('en-GB', {
@@ -122,12 +153,15 @@ export class ReportingService {
           }
 
           const sortedByScore = [...scores].sort((a, b) => a.overallMean - b.overallMean);
-          const developmentAreas = sortedByScore.slice(0, 3).map((s) => ({
-            competencyName: s.competencyName ?? s.competencyId,
-            score: s.overallMean,
-            gap: s.gapVsSelf,
-            suggestion: 'Review behavioural indicators at the next level and seek specific coaching in this area.',
-          }));
+          const developmentAreas = sortedByScore.slice(0, 3).map((s) => {
+            const competencyName = s.competencyName ?? s.competencyId;
+            return {
+              competencyName,
+              score: s.overallMean,
+              gap: s.gapVsSelf,
+              suggestion: this.competencyDevelopmentSuggestion(competencyName, s.overallMean, s.gapVsSelf),
+            };
+          });
 
           localPath = await this.pdfService.generate360Report({
             ...commonData,
@@ -301,5 +335,66 @@ export class ReportingService {
     }
 
     return qb.getMany();
+  }
+
+  /**
+   * Participant-facing: reports where the requesting user is the subject. Previously the
+   * entire /reports resource was ORG_ADMIN/HR_MANAGER-only, so a participant could never
+   * download their own PDF (see docs/frontend-backend-gap-remediation-plan.md Tier 0 item 0h).
+   */
+  async listMyReports(orgId: string, userId: string): Promise<Report[]> {
+    return this.reportRepo
+      .createQueryBuilder('r')
+      .innerJoin('r.participant', 'p')
+      .where('r.organisation_id = :orgId', { orgId })
+      .andWhere('p.user_id = :userId', { userId })
+      .orderBy('r.created_at', 'DESC')
+      .getMany();
+  }
+
+  async getMyDownloadPath(id: string, orgId: string, userId: string): Promise<string> {
+    const report = await this.reportRepo.findOne({
+      where: { id, organisationId: orgId },
+      relations: ['participant'],
+    });
+    if (!report || report.participant?.userId !== userId) {
+      // Same response whether the report doesn't exist or isn't theirs — don't confirm
+      // existence of another participant's report via a 403 vs 404 distinction.
+      throw new NotFoundException(`Report ${id} not found`);
+    }
+
+    if (report.status !== 'ready') {
+      throw new Error(`Report is not ready (status: ${report.status})`);
+    }
+
+    return report.localPath ?? report.blobUrl ?? '';
+  }
+
+  /**
+   * Builds a per-competency development suggestion for the 360 report from the actual
+   * score band and self-vs-others gap, instead of a single generic sentence for every
+   * competency. gapVsSelf = raters' mean − self rating: positive means raters saw them
+   * more favourably than they rated themselves; negative means the reverse.
+   */
+  private competencyDevelopmentSuggestion(
+    competencyName: string,
+    score: number,
+    gap: number | null,
+  ): string {
+    const urgency = score < 2.5 ? 'a foundational development priority' : 'an area with room to grow';
+
+    if (gap === null) {
+      return `${competencyName} is ${urgency} based on rater feedback. Seek specific examples from colleagues on what stronger performance in this area looks like, and agree on one or two concrete behaviours to practise.`;
+    }
+
+    if (gap >= 0.5) {
+      return `Raters rated ${competencyName} noticeably higher than the self-assessment — this is likely a blind spot in the other direction: real capability that isn't being recognised or claimed. Ask a trusted colleague or manager for specific examples of when this showed up well, and build confidence in applying it more visibly.`;
+    }
+
+    if (gap <= -0.5) {
+      return `There is a meaningful gap between the self-assessment and how raters experienced ${competencyName} — self-perception here is running ahead of how others see it. Prioritise asking for specific, behavioural feedback on ${competencyName} to recalibrate, then focus development effort on the gap that surfaces.`;
+    }
+
+    return `${competencyName} is ${urgency}, and self- and rater perceptions are well aligned here. Focus on targeted coaching or a stretch assignment that exercises this competency directly, and track progress against specific behavioural indicators.`;
   }
 }

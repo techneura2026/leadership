@@ -46,15 +46,17 @@ export class Uc4ReadinessController {
   @Get('assessments/:id/sjt/:participantId')
   @ApiOperation({ summary: 'Get SJT questionnaire with progress state' })
   getSjtQuestionnaire(
+    @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
   ) {
-    return this.uc4Service.getSjtQuestionnaire(assessmentId, participantId);
+    return this.uc4Service.getSjtQuestionnaire(assessmentId, participantId, req.user.orgId);
   }
 
   @Post('assessments/:id/sjt/:participantId/responses')
   @ApiOperation({ summary: 'Submit a SJT scenario response' })
   submitSjtResponse(
+    @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
     @Body() body: SubmitSjtResponseDto,
@@ -62,6 +64,7 @@ export class Uc4ReadinessController {
     return this.uc4Service.submitSjtResponse(
       assessmentId,
       participantId,
+      req.user.orgId,
       body.itemId,
       body.selectedOption,
     );
@@ -72,15 +75,17 @@ export class Uc4ReadinessController {
   @Get('assessments/:id/learning-agility/:participantId')
   @ApiOperation({ summary: 'Get learning agility questionnaire' })
   getLearningAgilityQuestionnaire(
+    @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
   ) {
-    return this.uc4Service.getLearningAgilityQuestionnaire(assessmentId, participantId);
+    return this.uc4Service.getLearningAgilityQuestionnaire(assessmentId, participantId, req.user.orgId);
   }
 
   @Post('assessments/:id/learning-agility/:participantId/responses')
   @ApiOperation({ summary: 'Submit a learning agility response' })
   submitLearningAgilityResponse(
+    @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
     @Body() body: SubmitLearningAgilityResponseDto,
@@ -88,6 +93,7 @@ export class Uc4ReadinessController {
     return this.uc4Service.submitLearningAgilityResponse(
       assessmentId,
       participantId,
+      req.user.orgId,
       body.itemId,
       body.value,
     );
@@ -108,6 +114,22 @@ export class Uc4ReadinessController {
       participantId,
       roleProfileId ?? null,
       req.user.orgId,
+    );
+  }
+
+  @Get('assessments/:id/readiness/:participantId/scores')
+  @ApiOperation({ summary: "Get the participant's own readiness score(s), including 9-box placement" })
+  getMyReadinessScores(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) assessmentId: string,
+    @Param('participantId', ParseUUIDPipe) participantId: string,
+  ) {
+    return this.uc4Service.getMyReadinessScores(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
     );
   }
 

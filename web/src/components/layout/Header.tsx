@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, Search, Bell, Sun, Moon, ChevronDown, LogOut } from 'lucide-react';
+import { Menu, Bell, Sun, Moon, ChevronDown, LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { useTheme } from '@/components/ThemeProvider';
@@ -49,19 +49,6 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Search */}
-        <div className="hidden sm:flex relative items-center w-full max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" strokeWidth={2} />
-          <input
-            type="text"
-            placeholder="Search or type command..."
-            className="w-full pl-9 pr-12 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all"
-          />
-          <kbd className="hidden lg:flex absolute right-2.5 top-1/2 -translate-y-1/2 items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md text-gray-400 border border-gray-300 pointer-events-none">
-            ⌘K
-          </kbd>
-        </div>
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">

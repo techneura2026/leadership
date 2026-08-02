@@ -61,6 +61,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       403: ErrorCode.FORBIDDEN,
       404: ErrorCode.NOT_FOUND,
       409: ErrorCode.CONFLICT,
+      429: ErrorCode.RATE_LIMIT_EXCEEDED,
     };
     return map[status] ?? 'INTERNAL_ERROR';
   }

@@ -58,6 +58,7 @@ export interface UserDto {
   languagePref: Language;
   isActive: boolean;
   emailVerified: boolean;
+  mustChangePassword: boolean;
   createdAt: string;
 }
 

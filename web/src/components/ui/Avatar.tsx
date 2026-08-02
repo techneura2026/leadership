@@ -11,28 +11,17 @@ const SIZE_MAP = {
   xl: 'w-16 h-16 text-base',
 } as const;
 
-function hashSeed(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-}
-
-/** Deterministic mock profile-photo URL for a given seed (name/id) — same seed always resolves to the same face. */
-export function avatarUrl(seed: string): string {
-  const n = (hashSeed(seed) % 70) + 1;
-  return `https://i.pravatar.cc/150?img=${n}`;
-}
-
 interface AvatarProps {
+  /** Name/id/email used for the initials fallback and as alt/title text. */
   seed: string;
+  /** Real profile photo URL, if the person has one on file. Falls back to initials when absent or on load failure. */
+  src?: string | null;
   size?: keyof typeof SIZE_MAP;
   className?: string;
   ring?: boolean;
 }
 
-export function Avatar({ seed, size = 'md', className, ring }: AvatarProps) {
+export function Avatar({ seed, src, size = 'md', className, ring }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const initials = seed
     .split(' ')
@@ -41,7 +30,7 @@ export function Avatar({ seed, size = 'md', className, ring }: AvatarProps) {
     .join('')
     .toUpperCase();
 
-  if (failed) {
+  if (!src || failed) {
     return (
       <div
         title={seed}
@@ -61,7 +50,7 @@ export function Avatar({ seed, size = 'md', className, ring }: AvatarProps) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={avatarUrl(seed)}
+      src={src}
       alt={seed}
       title={seed}
       onError={() => setFailed(true)}

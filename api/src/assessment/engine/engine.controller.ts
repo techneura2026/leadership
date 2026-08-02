@@ -107,9 +107,20 @@ export class EngineController {
 
   @Post(':id/send-reminders')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send reminders to participants' })
+  @ApiOperation({ summary: 'Send reminders to all incomplete participants' })
   sendReminders(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.engineService.sendReminders(id, req.user.orgId);
+  }
+
+  @Post(':id/participants/:participantId/remind')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a targeted reminder to a single incomplete participant' })
+  remindParticipant(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('participantId', ParseUUIDPipe) participantId: string,
+  ) {
+    return this.engineService.remindParticipant(id, participantId, req.user.orgId);
   }
 
   @Post(':id/participants/:participantId/remove')

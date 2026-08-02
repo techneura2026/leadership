@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: AccessTokenPayload): Promise<AccessTokenPayload> {
+  async validate(payload: AccessTokenPayload): Promise<AccessTokenPayload & { mustChangePassword: boolean }> {
     if (!payload.sub || !payload.orgId) {
       throw new UnauthorizedException();
     }
@@ -26,6 +26,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || user.organisationId !== payload.orgId || !user.isActive) {
       throw new UnauthorizedException();
     }
-    return payload;
+    // Piggybacks on the lookup above (already needed to re-check isActive on every request)
+    // rather than issuing a second query — see MustChangePasswordGuard for how this is used.
+    return { ...payload, mustChangePassword: user.mustChangePassword };
   }
 }

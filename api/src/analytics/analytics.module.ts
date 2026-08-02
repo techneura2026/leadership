@@ -10,6 +10,8 @@ import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-s
 import { Competency } from '../assessment/items/entities/competency.entity';
 import { RoleProfile } from '../assessment/uc4-readiness/entities/role-profile.entity';
 import { PersonalityScore } from '../assessment/uc3-personality/entities/personality-score.entity';
+import { User } from '../core/users/entities/user.entity';
+import { Department } from '../core/organisations/entities/department.entity';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
 
@@ -26,6 +28,8 @@ import { AnalyticsController } from './analytics.controller';
       Competency,
       RoleProfile,
       PersonalityScore,
+      User,
+      Department,
     ]),
   ],
   providers: [AnalyticsService],

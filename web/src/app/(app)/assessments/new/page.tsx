@@ -115,10 +115,9 @@ const STEPS_360 = [
 const STEPS_COMPETENCY = [
   { n: 1, label: 'Type' },
   { n: 2, label: 'Details' },
-  { n: 3, label: 'Categories' },
-  { n: 4, label: 'Questions' },
-  { n: 5, label: 'Participants' },
-  { n: 6, label: 'Review' },
+  { n: 3, label: 'Competencies' },
+  { n: 4, label: 'Participants' },
+  { n: 5, label: 'Review' },
 ];
 
 const STEPS_PERSONALITY = [
@@ -1984,6 +1983,8 @@ function StepReview({
   const isCompetency = state.type === AssessmentType.COMPETENCY;
   const isPersonality = state.type === AssessmentType.PERSONALITY;
   const isReadiness = state.type === AssessmentType.READINESS;
+  const { data: allCompetencies } = useApi<CompetencyDto[]>(isCompetency ? '/items/competencies' : null);
+  const selectedCompetencyNames = (allCompetencies ?? []).filter((c) => state.competencyIds.includes(c.id));
   const typeLabelMap: Record<string, string> = {
     [AssessmentType.FEEDBACK_360]: '360° Feedback',
     [AssessmentType.COMPETENCY]: 'Competency',
@@ -2069,8 +2070,7 @@ function StepReview({
           </>
         ) : isCompetency ? (
           <>
-            <Row label="Categories" value={state.selectedCategories.length > 0 ? `${state.selectedCategories.length} selected` : 'None selected'} />
-            <Row label="Total Questions" value={String(Object.values(state.competencyQuestions).reduce((sum, qs) => sum + qs.length, 0))} />
+            <Row label="Competencies" value={state.competencyIds.length > 0 ? `${state.competencyIds.length} selected` : 'None selected — all competencies will be included'} />
             <Row label="Participants" value={state.participantIds.length > 0 ? `${state.participantIds.length} selected` : 'None selected'} />
           </>
         ) : isPersonality ? (
@@ -2109,7 +2109,16 @@ function StepReview({
         </div>
       )}
 
-      {isCompetency && <CategorySummaryList ids={state.selectedCategories} qMap={state.competencyQuestions} lookup={COMPETENCY_CATEGORIES} />}
+      {isCompetency && selectedCompetencyNames.length > 0 && (
+        <div className="mb-5 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Selected Competencies</p>
+          {selectedCompetencyNames.map((comp) => (
+            <div key={comp.id} className="flex items-center bg-white border border-gray-200 rounded-lg px-4 py-2.5">
+              <span className="text-sm font-medium text-gray-900">{comp.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {isPersonality && <CategorySummaryList ids={state.personalityTraits} qMap={state.personalityQuestions} lookup={PERSONALITY_TRAITS} />}
       {isReadiness && <CategorySummaryList ids={state.readinessDimensions} qMap={state.readinessQuestions} lookup={READINESS_DIMENSIONS} />}
 
@@ -2306,8 +2315,7 @@ export default function NewAssessmentPage() {
   const isPersonality = state.type === AssessmentType.PERSONALITY;
   const isReadiness = state.type === AssessmentType.READINESS;
   const steps = is360 ? STEPS_360 : isCompetency ? STEPS_COMPETENCY : isPersonality ? STEPS_PERSONALITY : isReadiness ? STEPS_READINESS : STEPS_DEFAULT;
-  const maxStep = is360 ? 5 : 6;
-  const [activeCatForChat, setActiveCatForChat] = useState<string>('');
+  const maxStep = is360 || isCompetency ? 5 : 6;
   const [activeCatForPersonality, setActiveCatForPersonality] = useState<string>('');
   const [activeCatForReadiness, setActiveCatForReadiness] = useState<string>('');
 
@@ -2320,7 +2328,7 @@ export default function NewAssessmentPage() {
       case 1: return state.type !== null;
       case 2: return state.title.trim().length > 0;
       case 3:
-        if (isCompetency) return state.selectedCategories.length > 0;
+        if (isCompetency) return state.competencyIds.length > 0;
         if (isPersonality) return state.personalityTraits.length > 0;
         if (isReadiness) return state.readinessDimensions.length > 0;
         return true;
@@ -2426,73 +2434,6 @@ export default function NewAssessmentPage() {
     setState((prev) => ({ ...prev, questions: [...prev.questions, ...newQuestions] }));
   }
 
-  function addCompetencyQuestion(catId: string, type: QuestionType) {
-    const defaultOptions =
-      type === 'SINGLE_CHOICE' || type === 'MULTIPLE_CHOICE'
-        ? [{ id: crypto.randomUUID(), text: '' }, { id: crypto.randomUUID(), text: '' }]
-        : type === 'TRUE_FALSE'
-        ? [{ id: 'opt-true', text: 'True' }, { id: 'opt-false', text: 'False' }]
-        : [];
-    const newQ: FormQuestion = {
-      id: crypto.randomUUID(),
-      type,
-      title: '',
-      required: false,
-      options: defaultOptions,
-      tableRows: type === 'TABLE' ? ['Row 1', 'Row 2'] : [],
-      tableColumns: type === 'TABLE' ? ['Column 1', 'Column 2'] : [],
-    };
-    setState((prev) => ({
-      ...prev,
-      competencyQuestions: {
-        ...prev.competencyQuestions,
-        [catId]: [...(prev.competencyQuestions[catId] ?? []), newQ],
-      },
-    }));
-  }
-
-  function updateCompetencyQuestion(catId: string, id: string, patch: Partial<FormQuestion>) {
-    setState((prev) => ({
-      ...prev,
-      competencyQuestions: {
-        ...prev.competencyQuestions,
-        [catId]: (prev.competencyQuestions[catId] ?? []).map((q) => (q.id === id ? { ...q, ...patch } : q)),
-      },
-    }));
-  }
-
-  function removeCompetencyQuestion(catId: string, id: string) {
-    setState((prev) => ({
-      ...prev,
-      competencyQuestions: {
-        ...prev.competencyQuestions,
-        [catId]: (prev.competencyQuestions[catId] ?? []).filter((q) => q.id !== id),
-      },
-    }));
-  }
-
-  function insertGeneratedQuestionsToCategory(catId: string, generated: GeneratedQuestion[]) {
-    const newQuestions: FormQuestion[] = generated.map((gq) => ({
-      id: crypto.randomUUID(),
-      type: gq.type,
-      title: gq.title,
-      required: gq.required ?? false,
-      options:
-        gq.type === 'TRUE_FALSE'
-          ? [{ id: 'opt-true', text: 'True' }, { id: 'opt-false', text: 'False' }]
-          : (gq.options ?? []).map((text) => ({ id: crypto.randomUUID(), text })),
-      tableRows: gq.tableRows ?? [],
-      tableColumns: gq.tableColumns ?? [],
-    }));
-    setState((prev) => ({
-      ...prev,
-      competencyQuestions: {
-        ...prev.competencyQuestions,
-        [catId]: [...(prev.competencyQuestions[catId] ?? []), ...newQuestions],
-      },
-    }));
-  }
-
   // ── Personality question management ──────────────────────────────────────────
   function makeCategoryQHandlers(stateKey: 'personalityQuestions' | 'readinessQuestions') {
     function add(catId: string, type: QuestionType) {
@@ -2544,8 +2485,7 @@ export default function NewAssessmentPage() {
           startDate: state.startDate || null,
           endDate: state.endDate || null,
           config: {
-            categories: state.selectedCategories,
-            questions: Object.values(state.competencyQuestions).flat(),
+            competencyIds: state.competencyIds.length ? state.competencyIds : undefined,
           },
         });
         const assessmentId = res.data.data.id;
@@ -2714,16 +2654,10 @@ export default function NewAssessmentPage() {
               onRemoveRater={removeRater}
             />
           ) : isCompetency ? (
-            <StepCompetencyCategories
-              selected={state.selectedCategories}
-              onToggle={(id) =>
-                setState((prev) => ({
-                  ...prev,
-                  selectedCategories: prev.selectedCategories.includes(id)
-                    ? prev.selectedCategories.filter((c) => c !== id)
-                    : [...prev.selectedCategories, id],
-                }))
-              }
+            <StepCompetencies
+              assessmentType={state.type}
+              selected={state.competencyIds}
+              onToggle={(id) => toggleId('competencyIds', id)}
             />
           ) : isPersonality ? (
             <StepCompetencyCategories
@@ -2772,14 +2706,9 @@ export default function NewAssessmentPage() {
               onRemove={removeQuestion}
             />
           ) : isCompetency ? (
-            <StepCompetencyQuestions
-              selectedCategories={state.selectedCategories}
-              questions={state.competencyQuestions}
-              onAddQuestion={addCompetencyQuestion}
-              onUpdateQuestion={updateCompetencyQuestion}
-              onRemoveQuestion={removeCompetencyQuestion}
-              activeCategory={activeCatForChat || state.selectedCategories[0] || ''}
-              onActiveCategoryChange={setActiveCatForChat}
+            <StepParticipants
+              selected={state.participantIds}
+              onToggle={(id) => toggleId('participantIds', id)}
             />
           ) : isPersonality ? (
             <StepCompetencyQuestions
@@ -2814,7 +2743,7 @@ export default function NewAssessmentPage() {
             />
           )
         )}
-        {state.step === 5 && !is360 && (
+        {state.step === 5 && !is360 && !isCompetency && (
           <StepParticipants
             selected={state.participantIds}
             onToggle={(id) => toggleId('participantIds', id)}
@@ -2856,23 +2785,6 @@ export default function NewAssessmentPage() {
         onInsertQuestions={insertGeneratedQuestions}
       />
     )}
-    {isCompetency && state.step === 4 && (() => {
-      const activeCatId = activeCatForChat || state.selectedCategories[0] || '';
-      const activeCatName = COMPETENCY_CATEGORIES.find((c) => c.id === activeCatId)?.name ?? 'this competency';
-      return (
-        <AssessmentChatbot
-          key={activeCatId}
-          context={`Competency Assessment — building questions for: ${activeCatName}. Suggest targeted behavioral assessment questions for this leadership area.`}
-          onInsertQuestions={(qs) => insertGeneratedQuestionsToCategory(activeCatId, qs)}
-          quickPrompts={[
-            `Generate 5 questions for ${activeCatName}`,
-            `Create a rating scale for ${activeCatName}`,
-            `Suggest behavioral indicators for ${activeCatName}`,
-            `What are best practices for assessing ${activeCatName}?`,
-          ]}
-        />
-      );
-    })()}
     {isPersonality && state.step === 4 && (() => {
       const activeId = activeCatForPersonality || state.personalityTraits[0] || '';
       const activeName = PERSONALITY_TRAITS.find((t) => t.id === activeId)?.name ?? 'this trait';

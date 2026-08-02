@@ -12,6 +12,7 @@ import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-s
 import { Competency } from '../assessment/items/entities/competency.entity';
 import { RoleProfile } from '../assessment/uc4-readiness/entities/role-profile.entity';
 import { PersonalityScore } from '../assessment/uc3-personality/entities/personality-score.entity';
+import { Department } from '../core/organisations/entities/department.entity';
 
 export interface DashboardStatMetric {
   count: number;
@@ -38,8 +39,8 @@ export interface HeatmapEntry {
 }
 
 export interface RadarAggregate {
-  competencyRadar: Array<{ key: string; label: string; value: number }>;
-  personalityRadar: Array<{ key: string; label: string; value: number }>;
+  competencyRadar: Array<{ key: string; label: string; value: number; sampleSize: number }>;
+  personalityRadar: Array<{ key: string; label: string; value: number; sampleSize: number }>;
 }
 
 export interface SuccessionOverview {
@@ -62,6 +63,7 @@ export interface ParticipantCompletion {
   inProgress: number;
   notStarted: number;
 }
+
 
 @Injectable()
 export class AnalyticsService {
@@ -393,6 +395,7 @@ export class AnalyticsService {
       .select('domain.id', 'domainId')
       .addSelect('domain.name', 'domainName')
       .addSelect('AVG(cr.level_rated)', 'averageScore')
+      .addSelect('COUNT(DISTINCT ca.assessment_id)', 'sampleSize')
       .groupBy('domain.id')
       .addGroupBy('domain.name')
       .getRawMany();
@@ -401,6 +404,7 @@ export class AnalyticsService {
       key: r.domainId,
       label: r.domainName,
       value: Math.round((parseFloat(r.averageScore) / 4) * 100),
+      sampleSize: parseInt(r.sampleSize, 10),
     }));
 
     const personalityData = await this.personalityScoreRepo
@@ -411,6 +415,7 @@ export class AnalyticsService {
       .andWhere('a.organisation_id = :orgId', { orgId })
       .select('ps.factor', 'factor')
       .addSelect('AVG(ps.percentile)', 'averagePercentile')
+      .addSelect('COUNT(DISTINCT ps.assessment_id)', 'sampleSize')
       .groupBy('ps.factor')
       .getRawMany();
 
@@ -418,12 +423,19 @@ export class AnalyticsService {
       key: r.factor,
       label: r.factor.replace('_', ' '), // e.g. 'emotional_stability' -> 'emotional stability'
       value: Math.round(parseFloat(r.averagePercentile)),
+      sampleSize: parseInt(r.sampleSize, 10),
     }));
 
     return { competencyRadar, personalityRadar };
   }
 
 
+  /**
+   * Org-wide radar averages across all participants. sampleSize (distinct participants behind
+   * each average) is exposed per axis so the frontend can grey out/flag low-N cells — below
+   * MIN_SAMPLE_SIZE, an "aggregate" is nearly indistinguishable from one individual's actual
+   * score.
+   */
   async getOrgAggregateRadar(orgId: string): Promise<RadarAggregate> {
     const competencyData = await this.competencyRatingRepo
       .createQueryBuilder('cr')
@@ -435,6 +447,7 @@ export class AnalyticsService {
       .select('domain.id', 'domainId')
       .addSelect('domain.name', 'domainName')
       .addSelect('AVG(cr.level_rated)', 'averageScore')
+      .addSelect('COUNT(DISTINCT ca.participant_id)', 'sampleSize')
       .groupBy('domain.id')
       .addGroupBy('domain.name')
       .getRawMany();
@@ -443,6 +456,7 @@ export class AnalyticsService {
       key: r.domainId,
       label: r.domainName,
       value: Math.round((parseFloat(r.averageScore) / 4) * 100),
+      sampleSize: parseInt(r.sampleSize, 10),
     }));
 
     const personalityData = await this.personalityScoreRepo
@@ -451,6 +465,7 @@ export class AnalyticsService {
       .where('a.organisation_id = :orgId', { orgId })
       .select('ps.factor', 'factor')
       .addSelect('AVG(ps.percentile)', 'averagePercentile')
+      .addSelect('COUNT(DISTINCT ps.participant_id)', 'sampleSize')
       .groupBy('ps.factor')
       .getRawMany();
 
@@ -458,6 +473,7 @@ export class AnalyticsService {
       key: r.factor,
       label: r.factor.replace('_', ' '),
       value: Math.round(parseFloat(r.averagePercentile)),
+      sampleSize: parseInt(r.sampleSize, 10),
     }));
 
     return { competencyRadar, personalityRadar };
@@ -476,10 +492,6 @@ export class AnalyticsService {
       .addGroupBy('a.status')
       .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
       .getRawMany();
-
-    console.log("---------getMonthlyActivity-----------------\n\n\n\n\n\n/n/n/n/");
-    console.log(raw);
-    console.log("--------------------------");
 
     return raw.map((r) => ({
       month: r.month,
@@ -508,7 +520,24 @@ export class AnalyticsService {
     }));
   }
 
+  /** Distinct participant headcount per department, for the dashboard's department participation chart. */
+  async getDepartmentParticipation(
+    orgId: string,
+  ): Promise<Array<{ department: string; count: number }>> {
+    const raw = await this.participantRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.assessment', 'a')
+      .innerJoin('p.user', 'u')
+      .leftJoin(Department, 'd', 'd.id = u.department_id')
+      .where('a.organisation_id = :orgId', { orgId })
+      .select("COALESCE(d.name, 'Unassigned')", 'department')
+      .addSelect('COUNT(DISTINCT p.user_id)', 'count')
+      .groupBy('d.name')
+      .orderBy('"count"', 'DESC')
+      .getRawMany();
 
+    return raw.map((r) => ({ department: r.department, count: parseInt(r.count, 10) }));
+  }
 
   async getParticipantCompletion(orgId: string): Promise<ParticipantCompletion> {
   const raw = await this.participantRepo

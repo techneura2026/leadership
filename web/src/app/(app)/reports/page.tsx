@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
+import { useApi } from '@/hooks/useApi';
+import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Avatar } from '@/components/ui/Avatar';
@@ -20,162 +22,106 @@ import {
   Info,
   Plus,
 } from 'lucide-react';
-import { AssessmentType } from '@leaderprism/shared';
-import { generateReportPdf, type ReportData } from '@/lib/reportPdf';
+import { AssessmentDto, AssessmentType, ReportDto, ReportType } from '@leaderprism/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ReportStatus = 'ready' | 'processing' | 'pending' | 'failed';
-type ReportType = 'individual_360' | 'competency' | 'personality' | 'readiness';
-
-interface ReportModel {
+interface AssessmentParticipant {
   id: string;
-  assessmentId: string;
-  participantId: string;
-  participantName: string;
-  participantRole: string;
-  reportType: ReportType;
-  status: ReportStatus;
-  generatedAt: string | null;
-  fileSize: string | null;
-  pages: number | null;
+  userId: string;
+  status: string;
+  user?: { firstName: string; lastName: string; jobTitle: string | null; avatarUrl: string | null };
 }
-
-interface MockAssessment {
-  id: string;
-  title: string;
-  assessmentType: AssessmentType;
-}
-
-interface MockParticipant {
-  id: string;
-  firstName: string;
-  lastName: string;
-  jobTitle: string;
-}
-
-// ── Mock Data ─────────────────────────────────────────────────────────────────
-
-const MOCK_ASSESSMENTS: MockAssessment[] = [
-  { id: 'ra1', title: 'Q3 Leadership 360° Review', assessmentType: AssessmentType.FEEDBACK_360 },
-  { id: 'ra2', title: 'Senior Manager Competency Assessment', assessmentType: AssessmentType.COMPETENCY },
-  { id: 'ra3', title: 'Personality Profiling — Cohort C', assessmentType: AssessmentType.PERSONALITY },
-  { id: 'ra4', title: 'Leadership Readiness — Batch 2026-H2', assessmentType: AssessmentType.READINESS },
-  { id: 'ra5', title: 'Engineering Competency Refresh', assessmentType: AssessmentType.COMPETENCY },
-  { id: 'ra6', title: 'Mid-Year 360° Feedback', assessmentType: AssessmentType.FEEDBACK_360 },
-];
-
-const MOCK_PARTICIPANTS_BY_ASSESSMENT: Record<string, MockParticipant[]> = {
-  ra1: [
-    { id: 'p1', firstName: 'Amara', lastName: 'Perera', jobTitle: 'Senior Manager – Strategy' },
-    { id: 'p2', firstName: 'David', lastName: 'Mendis', jobTitle: 'Engineering Lead' },
-    { id: 'p3', firstName: 'Anika', lastName: 'Jayasekara', jobTitle: 'HR Business Partner' },
-  ],
-  ra2: [
-    { id: 'p4', firstName: 'Priya', lastName: 'Kumari', jobTitle: 'Finance Manager' },
-    { id: 'p5', firstName: 'Kasun', lastName: 'Fernando', jobTitle: 'Senior Software Engineer' },
-  ],
-  ra3: [
-    { id: 'p6', firstName: 'Nirosha', lastName: 'Rajapaksa', jobTitle: 'Senior Finance Analyst' },
-    { id: 'p7', firstName: 'Dilshan', lastName: 'Maduwantha', jobTitle: 'Product Designer' },
-    { id: 'p8', firstName: 'Fiona', lastName: 'Krishnaswamy', jobTitle: 'HR Coordinator' },
-  ],
-  ra4: [
-    { id: 'p9', firstName: 'Tom', lastName: 'Wickramasinghe', jobTitle: 'Senior Sales Manager' },
-    { id: 'p10', firstName: 'Ravi', lastName: 'Seneviratne', jobTitle: 'Operations Manager' },
-  ],
-  ra5: [
-    { id: 'p5', firstName: 'Kasun', lastName: 'Fernando', jobTitle: 'Senior Software Engineer' },
-    { id: 'p11', firstName: 'Chamari', lastName: 'De Silva', jobTitle: 'Operations Analyst' },
-  ],
-  ra6: [
-    { id: 'p12', firstName: 'Mark', lastName: 'Silva', jobTitle: 'Sales Account Manager' },
-    { id: 'p13', firstName: 'Sasha', lastName: 'Perera', jobTitle: 'Finance Coordinator' },
-    { id: 'p14', firstName: 'Leo', lastName: 'Bandara', jobTitle: 'Sales Associate' },
-  ],
-};
-
-function makeReport(
-  id: string, assessmentId: string, participantId: string, reportType: ReportType,
-  status: ReportStatus, generatedAt: string | null, fileSize: string | null, pages: number | null,
-): ReportModel {
-  const participant = MOCK_PARTICIPANTS_BY_ASSESSMENT[assessmentId]?.find((p) => p.id === participantId);
-  return {
-    id, assessmentId, participantId,
-    participantName: participant ? `${participant.firstName} ${participant.lastName}` : 'Participant',
-    participantRole: participant?.jobTitle ?? '',
-    reportType, status, generatedAt, fileSize, pages,
-  };
-}
-
-const MOCK_REPORTS_INITIAL: ReportModel[] = [
-  makeReport('r1', 'ra1', 'p1', 'individual_360', 'ready', '2026-07-24T09:12:00Z', '1.4 MB', 9),
-  makeReport('r2', 'ra1', 'p2', 'individual_360', 'ready', '2026-07-24T09:15:00Z', '1.6 MB', 10),
-  makeReport('r3', 'ra1', 'p3', 'individual_360', 'processing', null, null, null),
-  makeReport('r4', 'ra2', 'p4', 'competency', 'ready', '2026-07-20T14:02:00Z', '980 KB', 6),
-  makeReport('r5', 'ra2', 'p5', 'competency', 'failed', null, null, null),
-  makeReport('r6', 'ra3', 'p6', 'personality', 'ready', '2026-07-15T08:45:00Z', '1.1 MB', 7),
-  makeReport('r7', 'ra3', 'p7', 'personality', 'ready', '2026-07-15T08:47:00Z', '1.1 MB', 7),
-  makeReport('r8', 'ra3', 'p8', 'personality', 'ready', '2026-07-15T08:50:00Z', '1.0 MB', 7),
-  makeReport('r9', 'ra4', 'p9', 'readiness', 'ready', '2026-07-05T11:30:00Z', '1.3 MB', 8),
-  makeReport('r10', 'ra4', 'p10', 'readiness', 'processing', null, null, null),
-  makeReport('r11', 'ra5', 'p5', 'competency', 'ready', '2026-06-28T10:00:00Z', '950 KB', 6),
-];
 
 // ── Meta ──────────────────────────────────────────────────────────────────────
 
 const REPORT_TYPE_ASSESSMENT: Record<ReportType, AssessmentType> = {
-  individual_360: AssessmentType.FEEDBACK_360,
-  competency: AssessmentType.COMPETENCY,
-  personality: AssessmentType.PERSONALITY,
-  readiness: AssessmentType.READINESS,
+  [ReportType.INDIVIDUAL_360]: AssessmentType.FEEDBACK_360,
+  [ReportType.COMPETENCY]: AssessmentType.COMPETENCY,
+  [ReportType.PERSONALITY]: AssessmentType.PERSONALITY,
+  [ReportType.READINESS]: AssessmentType.READINESS,
+  [ReportType.ORG_SUMMARY]: AssessmentType.FEEDBACK_360,
 };
 
 const REPORT_TYPE_LABELS: Record<ReportType, string> = {
-  individual_360: '360° Feedback',
-  competency: 'Competency',
-  personality: 'Personality',
-  readiness: 'Readiness',
+  [ReportType.INDIVIDUAL_360]: '360° Feedback',
+  [ReportType.COMPETENCY]: 'Competency',
+  [ReportType.PERSONALITY]: 'Personality',
+  [ReportType.READINESS]: 'Readiness',
+  [ReportType.ORG_SUMMARY]: 'Org Summary',
 };
 
-const STATUS_VARIANT: Record<ReportStatus, 'success' | 'warning' | 'neutral' | 'error'> = {
+const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'neutral' | 'error'> = {
   ready: 'success',
   processing: 'warning',
   pending: 'neutral',
   failed: 'error',
 };
 
-const STATUS_LABELS: Record<ReportStatus, string> = {
+const STATUS_LABELS: Record<string, string> = {
   ready: 'Ready',
   processing: 'Processing',
   pending: 'Pending',
   failed: 'Failed',
 };
 
-type StatusFilter = 'all' | ReportStatus;
+type StatusFilter = 'all' | 'ready' | 'processing' | 'failed' | 'pending';
 
 function reportTypeOf(assessmentType: AssessmentType): ReportType {
   const entry = Object.entries(REPORT_TYPE_ASSESSMENT).find(([, v]) => v === assessmentType);
-  return (entry?.[0] as ReportType) ?? 'individual_360';
+  return (entry?.[0] as ReportType) ?? ReportType.INDIVIDUAL_360;
 }
 
-function randomPages() { return 6 + Math.floor(Math.random() * 5); }
-function randomSize() { return `${(0.8 + Math.random() * 0.9).toFixed(1)} MB`; }
+// ── Participant name resolution (shared cache via SWR across rows) ────────────
+
+function useParticipantName(assessmentId: string, participantId: string | null) {
+  const { data: participants } = useApi<AssessmentParticipant[]>(`/assessments/${assessmentId}/participants`);
+  const participant = participants?.find((p) => p.id === participantId);
+  return {
+    name: participant?.user ? `${participant.user.firstName} ${participant.user.lastName}` : 'Participant',
+    role: participant?.user?.jobTitle ?? '',
+    avatarUrl: participant?.user?.avatarUrl ?? null,
+  };
+}
+
+async function downloadReport(reportId: string) {
+  const res = await api.get(`/reports/${reportId}/download`, { responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `report-${reportId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
   const [selectedAssessment, setSelectedAssessment] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [generating, setGenerating] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
-  const [reports, setReports] = useState<ReportModel[]>(MOCK_REPORTS_INITIAL);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [showAssessmentMenu, setShowAssessmentMenu] = useState(false);
   const assessmentMenuRef = useRef<HTMLDivElement>(null);
 
-  const assessments = MOCK_ASSESSMENTS;
-  const participants = selectedAssessment ? (MOCK_PARTICIPANTS_BY_ASSESSMENT[selectedAssessment] ?? []) : [];
+  const { data: assessmentsPage } = useApi<{ data: AssessmentDto[]; total: number }>('/assessments?limit=100');
+  const assessments = assessmentsPage?.data ?? [];
+
+  const { data: participants } = useApi<AssessmentParticipant[]>(
+    selectedAssessment ? `/assessments/${selectedAssessment}/participants` : null,
+  );
+
+  // Polls while any report is still queued/rendering — report generation runs on a BullMQ
+  // worker, so the list needs to refetch until every in-flight job settles.
+  const { data: reportsData, mutate: mutateReports } = useApi<ReportDto[]>('/reports', {
+    refreshInterval: (data) =>
+      data?.some((r) => r.status === 'pending' || r.status === 'processing') ? 2000 : 0,
+  });
+  const reports = reportsData ?? [];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -200,77 +146,47 @@ export default function ReportsPage() {
     failed: reports.filter((r) => r.status === 'failed').length,
   };
 
-  // Simulate async PDF generation entirely client-side against mock state
-  function completeReport(id: string, delay: number) {
-    setTimeout(() => {
-      setReports((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? { ...r, status: 'ready', generatedAt: new Date().toISOString(), fileSize: randomSize(), pages: randomPages() }
-            : r,
-        ),
-      );
-    }, delay);
-  }
-
-  function queueReport(assessmentId: string, participantId: string) {
+  async function generateFor(assessmentId: string, participantId: string) {
     const asmt = assessments.find((a) => a.id === assessmentId);
     if (!asmt) return;
     const reportType = reportTypeOf(asmt.assessmentType);
-    const id = `r-${assessmentId}-${participantId}-${Date.now()}`;
-
-    setReports((prev) => [
-      makeReport(id, assessmentId, participantId, reportType, 'processing', null, null, null),
-      ...prev.filter((r) => !(r.assessmentId === assessmentId && r.participantId === participantId)),
-    ]);
-
-    completeReport(id, 1600 + Math.random() * 900);
-  }
-
-  // Any reports seeded as "processing" in the initial mock data should still resolve on their own,
-  // as if they were queued moments before the page loaded.
-  useEffect(() => {
-    MOCK_REPORTS_INITIAL.filter((r) => r.status === 'processing').forEach((r, i) => {
-      completeReport(r.id, 2200 + i * 900);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function handleGenerate(participantId: string) {
-    if (!selectedAssessment) return;
-    setGenerating(participantId);
-    queueReport(selectedAssessment, participantId);
-    setTimeout(() => setGenerating(null), 400);
-  }
-
-  async function handleRetry(report: ReportModel) {
-    queueReport(report.assessmentId, report.participantId);
+    setGeneratingId(participantId);
+    try {
+      // Enqueues a BullMQ job and returns immediately (status starts 'pending'); the reports
+      // list above polls until it reaches 'ready'/'failed'.
+      await api.post('/reports/generate', { assessmentId, participantId, reportType, language: 'en' });
+      await mutateReports();
+    } catch (err) {
+      console.error('Failed to generate report', err);
+    } finally {
+      setGeneratingId(null);
+    }
   }
 
   async function handleBulkGenerate() {
-    if (!selectedAssessment || participants.length === 0) return;
+    if (!selectedAssessment || !participants || participants.length === 0) return;
     setBulkGenerating(true);
-    participants.forEach((p) => {
-      const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
-      if (!existing || existing.status === 'failed') queueReport(selectedAssessment, p.id);
-    });
-    setTimeout(() => setBulkGenerating(false), 500);
+    try {
+      for (const p of participants) {
+        const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
+        if (!existing || existing.status === 'failed') {
+          await generateFor(selectedAssessment, p.id);
+        }
+      }
+    } finally {
+      setBulkGenerating(false);
+    }
   }
 
-  async function handleDownload(report: ReportModel) {
-    const asmt = assessments.find((a) => a.id === report.assessmentId);
-    const data: ReportData = {
-      id: report.id,
-      participantName: report.participantName,
-      participantRole: report.participantRole,
-      assessmentTitle: asmt?.title ?? 'Assessment Report',
-      reportType: report.reportType,
-      generatedAt: report.generatedAt
-        ? format(new Date(report.generatedAt), 'dd MMM yyyy')
-        : format(new Date(), 'dd MMM yyyy'),
-      organisationName: 'LeaderPrism Demo Org',
-    };
-    await generateReportPdf(data);
+  async function handleDownload(report: ReportDto) {
+    setDownloadingId(report.id);
+    try {
+      await downloadReport(report.id);
+    } catch (err) {
+      console.error('Failed to download report', err);
+    } finally {
+      setDownloadingId(null);
+    }
   }
 
   const statusTabs: { key: StatusFilter; label: string }[] = [
@@ -295,7 +211,7 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-sm text-gray-500 mt-0.5">Generate and download PDF assessment reports</p>
         </div>
-        {selectedAssessment && participants.length > 0 && (
+        {selectedAssessment && (participants?.length ?? 0) > 0 && (
           <button
             onClick={handleBulkGenerate}
             disabled={bulkGenerating}
@@ -366,7 +282,7 @@ export default function ReportsPage() {
           </button>
 
           {showAssessmentMenu && (
-            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg py-1 max-h-72 overflow-y-auto">
               <button
                 type="button"
                 onClick={() => { setSelectedAssessment(''); setShowAssessmentMenu(false); }}
@@ -408,7 +324,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Generate section — only when an assessment is selected */}
-      {selectedAssessment && participants.length > 0 && (
+      {selectedAssessment && (participants?.length ?? 0) > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
@@ -416,22 +332,22 @@ export default function ReportsPage() {
               <p className="text-xs text-gray-400 mt-0.5">Queue individual PDF reports for participants</p>
             </div>
             <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2.5 py-1 rounded-full">
-              {participants.length} participants
+              {participants!.length} participants
             </span>
           </div>
           <div className="divide-y divide-gray-50">
-            {participants.map((p) => {
+            {participants!.map((p) => {
               const existing = reports.find((r) => r.participantId === p.id && r.assessmentId === selectedAssessment);
-              const isGenerating = generating === p.id;
-              const name = `${p.firstName} ${p.lastName}`;
+              const isGenerating = generatingId === p.id;
+              const name = p.user ? `${p.user.firstName} ${p.user.lastName}` : 'Participant';
 
               return (
                 <div key={p.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <Avatar seed={p.id} size="sm" />
+                    <Avatar seed={p.id} src={p.user?.avatarUrl} size="sm" />
                     <div>
                       <p className="text-sm font-medium text-gray-900">{name}</p>
-                      <p className="text-xs text-gray-400">{p.jobTitle}</p>
+                      <p className="text-xs text-gray-400">{p.user?.jobTitle ?? ''}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -441,10 +357,11 @@ export default function ReportsPage() {
                     {existing?.status === 'ready' ? (
                       <button
                         onClick={() => handleDownload(existing)}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
+                        disabled={downloadingId === existing.id}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
                       >
                         <Download className="w-3.5 h-3.5" strokeWidth={2} />
-                        Download PDF
+                        {downloadingId === existing.id ? 'Downloading…' : 'Download PDF'}
                       </button>
                     ) : existing?.status === 'processing' ? (
                       <span className="text-xs text-yellow-600 font-medium flex items-center gap-1">
@@ -453,11 +370,11 @@ export default function ReportsPage() {
                       </span>
                     ) : (
                       <button
-                        onClick={() => handleGenerate(p.id)}
+                        onClick={() => generateFor(selectedAssessment, p.id)}
                         disabled={isGenerating}
                         className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors flex items-center gap-1.5"
                       >
-                        {isGenerating ? 'Queuing…' : (existing?.status === 'failed' ? 'Retry' : 'Generate')}
+                        {isGenerating ? 'Generating…' : (existing?.status === 'failed' ? 'Retry' : 'Generate')}
                       </button>
                     )}
                   </div>
@@ -519,73 +436,16 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredReports.map((r) => {
-                  const asmt = assessments.find((a) => a.id === r.assessmentId);
-                  const meta = TYPE_META[REPORT_TYPE_ASSESSMENT[r.reportType]];
-                  const TypeIcon = meta.icon;
-
-                  return (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar seed={r.participantId} size="sm" />
-                          <div>
-                            <p className="font-medium text-gray-900">{r.participantName}</p>
-                            <p className="text-xs text-gray-400">{r.participantRole || '—'}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <p className="text-gray-600 max-w-[180px] truncate" title={asmt?.title}>
-                          {asmt?.title ?? r.assessmentId}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border', meta.chip)}>
-                          <TypeIcon className="w-3 h-3" strokeWidth={2} />
-                          {REPORT_TYPE_LABELS[r.reportType]}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          {r.status === 'processing' && (
-                            <span className="inline-block w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-                          )}
-                          <Badge variant={STATUS_VARIANT[r.status]}>{STATUS_LABELS[r.status]}</Badge>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-gray-400 text-xs">
-                        {r.generatedAt ? (
-                          <>
-                            <p>{format(new Date(r.generatedAt), 'dd MMM yyyy, HH:mm')}</p>
-                            {r.pages && r.fileSize && <p className="text-gray-300 mt-0.5">{r.pages} pages · {r.fileSize}</p>}
-                          </>
-                        ) : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {r.status === 'ready' ? (
-                          <button
-                            onClick={() => handleDownload(r)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            <Download className="w-3.5 h-3.5" strokeWidth={2} />
-                            Download
-                          </button>
-                        ) : r.status === 'failed' ? (
-                          <button
-                            onClick={() => handleRetry(r)}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
-                            Retry
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filteredReports.map((r) => (
+                  <ReportRow
+                    key={r.id}
+                    report={r}
+                    assessment={assessments.find((a) => a.id === r.assessmentId)}
+                    downloading={downloadingId === r.id}
+                    onDownload={() => handleDownload(r)}
+                    onRetry={() => r.participantId && generateFor(r.assessmentId, r.participantId)}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
@@ -615,12 +475,85 @@ export default function ReportsPage() {
         <div>
           <p className="text-sm font-medium text-blue-800">About PDF Reports</p>
           <p className="text-xs text-blue-600 mt-0.5">
-            Reports are generated as multi-page PDFs and are typically ready within 30–60 seconds.
-            Processing reports are automatically updated — no need to refresh the page.
-            Generated reports are available for download for 90 days.
+            Reports are generated as multi-page PDFs. Large reports may take a little longer while
+            the request is in flight.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Report Row (resolves participant name via cached per-assessment fetch) ────
+
+function ReportRow({
+  report, assessment, downloading, onDownload, onRetry,
+}: {
+  report: ReportDto;
+  assessment: AssessmentDto | undefined;
+  downloading: boolean;
+  onDownload: () => void;
+  onRetry: () => void;
+}) {
+  const { name, role, avatarUrl } = useParticipantName(report.assessmentId, report.participantId);
+  const meta = TYPE_META[REPORT_TYPE_ASSESSMENT[report.reportType]];
+  const TypeIcon = meta.icon;
+
+  return (
+    <tr className="hover:bg-gray-50 transition-colors">
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <Avatar seed={report.participantId ?? report.id} src={avatarUrl} size="sm" />
+          <div>
+            <p className="font-medium text-gray-900">{name}</p>
+            <p className="text-xs text-gray-400">{role || '—'}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-3.5">
+        <p className="text-gray-600 max-w-[180px] truncate" title={assessment?.title}>
+          {assessment?.title ?? report.assessmentId}
+        </p>
+      </td>
+      <td className="px-5 py-3.5">
+        <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border', meta.chip)}>
+          <TypeIcon className="w-3 h-3" strokeWidth={2} />
+          {REPORT_TYPE_LABELS[report.reportType]}
+        </span>
+      </td>
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-1.5">
+          {report.status === 'processing' && (
+            <span className="inline-block w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+          )}
+          <Badge variant={STATUS_VARIANT[report.status]}>{STATUS_LABELS[report.status]}</Badge>
+        </div>
+      </td>
+      <td className="px-5 py-3.5 text-gray-400 text-xs">
+        {report.generatedAt ? format(new Date(report.generatedAt), 'dd MMM yyyy, HH:mm') : '—'}
+      </td>
+      <td className="px-5 py-3.5">
+        {report.status === 'ready' ? (
+          <button
+            onClick={onDownload}
+            disabled={downloading}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" strokeWidth={2} />
+            {downloading ? 'Downloading…' : 'Download'}
+          </button>
+        ) : report.status === 'failed' ? (
+          <button
+            onClick={onRetry}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
+            Retry
+          </button>
+        ) : (
+          <span className="text-xs text-gray-300">—</span>
+        )}
+      </td>
+    </tr>
   );
 }

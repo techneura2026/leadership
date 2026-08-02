@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -28,11 +29,11 @@ export class Uc1FeedbackController {
 
   @Get('assessments/:id/360/nominations')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @ApiOperation({ summary: 'Get nominations for a participant' })
+  @ApiOperation({ summary: 'Get nominations for a participant (all participants if omitted)' })
   getNominations(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
-    @Body('participantId') participantId: string,
+    @Query('participantId') participantId?: string,
   ) {
     return this.uc1Service.getNominations(assessmentId, participantId, req.user.orgId);
   }
@@ -95,6 +96,18 @@ export class Uc1FeedbackController {
   @ApiOperation({ summary: 'Send reminders to incomplete raters' })
   sendReminders(@Request() req: any, @Param('id', ParseUUIDPipe) assessmentId: string) {
     return this.uc1Service.sendReminders(assessmentId, req.user.orgId);
+  }
+
+  @Post('assessments/:id/360/nominations/:nominationId/remind')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @ApiOperation({ summary: 'Send a targeted reminder to a single outstanding rater' })
+  remindNomination(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) assessmentId: string,
+    @Param('nominationId', ParseUUIDPipe) nominationId: string,
+  ) {
+    return this.uc1Service.remindNomination(assessmentId, nominationId, req.user.orgId);
   }
 
   // ── Public rater endpoints (no JWT) ───────────────────────────────────

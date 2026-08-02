@@ -74,6 +74,22 @@ export class OrganisationsService {
   async deleteDepartment(organisationId: string, id: string): Promise<void> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');
+
+    const assignedUsers = await this.usersService.findAll(organisationId, { departmentId: id, limit: 1 });
+    const userCount = Array.isArray(assignedUsers) ? assignedUsers.length : assignedUsers.total;
+    if (userCount > 0) {
+      throw new ConflictException(
+        `Cannot delete department '${dept.name}': ${userCount} user(s) are still assigned to it. Reassign or remove them first.`,
+      );
+    }
+
+    const childCount = await this.deptRepo.count({ where: { parentId: id } });
+    if (childCount > 0) {
+      throw new ConflictException(
+        `Cannot delete department '${dept.name}': it has ${childCount} sub-department(s). Delete or reassign them first.`,
+      );
+    }
+
     await this.deptRepo.remove(dept);
   }
 

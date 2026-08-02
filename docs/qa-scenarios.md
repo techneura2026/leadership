@@ -1,7 +1,9 @@
 # LeaderPrism — QA Test Scenarios
-**Version:** 1.0 | **Date:** 2026-05-31  
+**Version:** 1.2 | **Date:** 2026-08-02  
 **Scope:** Full platform — API, web frontend, scoring engines, security, data isolation  
 **Environment:** Local dev (Docker Compose: PostgreSQL 16, Redis 7)
+
+> **Update (2026-08-02, later same day):** the remediation plan referenced below has now been implemented — every scenario that was marked `🔴 CURRENTLY FAILING` earlier today has been fixed and re-verified, and is now marked `✅ PASSING`, except the handful tied to Tier 2B/Tier 3/Tier 4 work that's still genuinely not started (see `docs/frontend-backend-gap-remediation-plan.md`'s "Remaining Work" section for the current list). Don't assume a scenario passes just because it's marked that way here without re-running it yourself — but the marks below reflect live verification done as part of this implementation pass, not just a plan.
 
 ---
 
@@ -105,6 +107,18 @@ Scenarios that reference specific thresholds (plan limits, anonymity, scoring fo
 **Expected:**
 - HTTP 401
 - `message` mentions "Trial period has expired"
+
+---
+
+### QA-AUTH-014 · P1 — ✅ PASSING — Expired trial does NOT block token refresh (Tier 0 item 0c)
+**Setup:** User logs in successfully while trial is still active; org's `trialEndsAt` is then manually set to yesterday (simulating trial expiry during an active session)  
+**Steps:**
+1. Log in while trial is valid — obtain access token + refresh cookie
+2. Manually update the org's `trialEndsAt` in the DB to yesterday
+3. POST `/api/v1/auth/refresh` using the still-valid refresh cookie
+
+**Expected:** HTTP 401, same "Trial period has expired" message as login
+**Actual:** Confirmed — `assertOrgIsUsable()` (extracted and shared between `login()` and `refresh()`) now rejects the refresh. Fixed as remediation plan Tier 0 item 0c.
 
 ---
 
@@ -233,6 +247,41 @@ Scenarios that reference specific thresholds (plan limits, anonymity, scoring fo
 
 ---
 
+### QA-TENANT-007 · P1 — ✅ PASSING — Org A cannot read or write Org B's UC3 personality responses (Tier 0 item 0e)
+**Setup:** Org B has an active personality assessment with a known `assessmentId`/`participantId`  
+**Steps:**
+1. Login as Org A (any role), obtain a valid Org A JWT
+2. GET `/api/v1/assessments/<org_b_assessment_id>/personality/questionnaire/<org_b_participant_id>`
+3. POST `/api/v1/assessments/<org_b_assessment_id>/personality/responses` with Org B's participant ID and a fabricated answer
+4. POST `/api/v1/assessments/<org_b_assessment_id>/personality/submit` for Org B's participant
+
+**Expected:** All four → HTTP 403/404 (org mismatch)
+**Actual:** Confirmed — `assertAssessmentInOrg()` added to every listed method; verified live with a cross-org JWT against a known `assessmentId`/`participantId` pair. Fixed as remediation plan Tier 0 item 0e (highest-severity finding in the audit).
+
+---
+
+### QA-TENANT-008 · P1 — ✅ PASSING — Org A cannot read or write Org B's UC4 SJT/Learning Agility responses (Tier 0 item 0e)
+**Setup:** Org B has an active readiness assessment with a known `assessmentId`/`participantId`  
+**Steps:**
+1. Login as Org A, GET `/api/v1/assessments/<org_b_assessment_id>/readiness/sjt/questionnaire/<org_b_participant_id>`
+2. POST a fabricated SJT response for Org B's participant
+3. Repeat steps 1-2 for the learning-agility questionnaire/response endpoints
+
+**Expected:** All → HTTP 403/404
+**Actual:** Confirmed — same fix as QA-TENANT-007, applied to `uc4-readiness.controller.ts`/`uc4-readiness.service.ts`. Fixed as remediation plan Tier 0 item 0e.
+
+---
+
+### QA-TENANT-009 · P2 — ✅ PASSING — Org A cannot write Org B's UC2 competency ratings via a known `caId`
+**Setup:** Org B has a competency assessment in progress; Org A somehow obtains the `caId` (competency-assessment UUID)  
+**Steps:**
+1. Login as Org A, POST self/manager ratings to Org B's `caId` via `uc2-competency`'s submit endpoints
+
+**Expected:** HTTP 403/404
+**Actual:** Confirmed — `assertAssessmentInOrg()` added to `submitSelfRatings`/`submitManagerRatings`, which now also filter by `assessmentId` in addition to `caId`. Fixed as remediation plan Tier 0 item 0e.
+
+---
+
 ### QA-TENANT-006 · P2 — Rater token is not org-scoped but still secure
 **Setup:** Rater nomination exists for Org B with a valid token  
 **Steps:**
@@ -255,6 +304,17 @@ Scenarios that reference specific thresholds (plan limits, anonymity, scoring fo
 4. Attempt GET `/api/v1/analytics/dashboard`
 
 **Expected:** All → HTTP 403 with `FORBIDDEN`
+
+---
+
+### QA-RBAC-005 · P2 — ✅ PASSING — Participant cannot list the full org user directory (Tier 0 item 0d)
+**Setup:** User with role `participant`  
+**Steps:**
+1. Login as participant
+2. GET `/api/v1/organisations/me/users`
+
+**Expected:** HTTP 403 (only `ORG_ADMIN`/`HR_MANAGER` should see the full user directory — emails, names, roles, job titles)
+**Actual:** Confirmed — `@Roles(ORG_ADMIN, HR_MANAGER)` added; verified 403 for a PARTICIPANT-role JWT. Fixed as remediation plan Tier 0 item 0d.
 
 ---
 
@@ -506,6 +566,39 @@ active → closed (close)
 2. Check API logs
 
 **Expected:** Reminder email logged for 1 rater only (the pending one)
+
+---
+
+### QA-360-012 · P1 — ✅ PASSING — Signed-in nominated rater has an in-app path to give feedback (Tier 0 item 0a)
+**Setup:** A registered app user (with their own login) is nominated as a peer rater for a 360 assessment, and the nomination is approved  
+**Steps:**
+1. Log in as the rater (normal app login, not the emailed token link)
+2. Navigate to "My Assessments" in-app
+3. Open the 360 assessment they were nominated for
+
+**Expected:** The rater lands on a questionnaire clearly framed as "give feedback about {reviewee name}," and submitting creates a `RaterResponse` tied to their nomination
+**Actual:** Confirmed live — `take/page.tsx` now checks `EngineService.findMine`'s `isRater`/`raterToken` fields and redirects a nominated rater into the correct rater-perspective flow instead of `FeedbackTaker`'s self-assessment form. Submitting creates a `RaterResponse` tied to the nomination, verified via a live end-to-end script (nominate → log in as rater in-app → submit → confirm DB row). Fixed as remediation plan Tier 0 item 0a.
+
+---
+
+### QA-360-013 · P1 — ✅ PASSING — Reviewee's own results page shows peer/supervisor/direct-report feedback, not just self-rating (Tier 0 item 0a)
+**Setup:** A 360 assessment has met the anonymity threshold (3+ peer responses) and the reviewee wants to see their own results in-app  
+**Steps:**
+1. Log in as the reviewee
+2. Navigate to `/my-assessments/<id>/results`
+
+**Expected:** Results show a per-perspective breakdown (self/supervisor/peer/direct_report) with a self-vs-others gap, matching what `GET /assessments/:id/360/scores/:participantId` (`get360Scores`) computes
+**Actual:** Confirmed — `results/page.tsx` now has a `Feedback360ResultsView` calling the real `get360Scores` endpoint, rendering the full perspective breakdown and gap-vs-self, with the anonymity-not-met 403 handled gracefully. Fixed as remediation plan Tier 0 item 0a (same fix pass as QA-360-012).
+
+---
+
+### QA-360-014 · P2 — ✅ PASSING — Admin's "Feedback Givers" tab shows real nomination status
+**Setup:** A 360 assessment has a mix of completed/pending/not-yet-nominated raters  
+**Steps:**
+1. Log in as admin, open the assessment detail page, view the "Feedback Givers" tab
+
+**Expected:** Real rater names, relationships, and completion status matching the DB
+**Actual:** Confirmed — now fetches real nominations via `GET /assessments/:id/360/nominations`, fixed to take `participantId` as a query param instead of `@Body()` on a GET. Also gained per-row targeted "Remind" actions and a due-date/overdue badge as part of the same pass (see remediation plan item 5). Fixed as remediation plan Tier 0 item 0a.
 
 ---
 
@@ -762,6 +855,29 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 
 ---
 
+### QA-RPT-008 · P3 · ✅ PASSING — 360 report development suggestions are competency-specific, not generic boilerplate
+**Setup:** Generate a 360 report for a participant with gaps in at least two different competencies  
+**Steps:**
+1. Open the generated PDF's "Suggested Development Focus Areas" section
+2. Compare the suggestion text for each flagged competency
+
+**Expected:** Each competency's suggestion references that specific competency and gap direction
+**Actual:** Confirmed — `ReportingService.competencyDevelopmentSuggestion()` now derives text from the competency name, score band, and self-vs-others gap direction, so two competencies with different gaps get genuinely different suggestion text. Fixed as remediation plan Tier 2 item 11i.
+
+---
+
+### QA-RPT-009 · P2 · ✅ PASSING — Participant can download their own report (Tier 0 item 0h)
+**Setup:** A participant has a `ready` report generated about them  
+**Steps:**
+1. Log in as the participant (not an admin)
+2. GET `/api/v1/reports/mine/<their_report_id>/download`
+3. Attempt GET `/api/v1/reports/mine/<a_different_participants_report_id>/download`
+
+**Expected:** Step 2 → success (their own report). Step 3 → 404 (not their report — same response as "doesn't exist," to avoid confirming another participant's report id is valid)
+**Actual:** Confirmed live. Note the route is `/reports/mine/:id/download`, a new participant-scoped endpoint — not the admin `/reports/:id/download` route, which remains `@Roles(ORG_ADMIN, HR_MANAGER)`-only and correctly still 403s a PARTICIPANT (verified both). Fixed as remediation plan Tier 0 item 0h.
+
+---
+
 ## 10. Analytics & Dashboard
 
 ### QA-ANA-001 · P1 — Dashboard metrics are tenant-scoped
@@ -782,6 +898,16 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 - One entry per competency
 - `averageScore` is the mean across all 5 participants
 - Verify manually: (sum of all ratings) / count = returned average
+
+---
+
+### QA-ANA-004 · P2 — ✅ PASSING — Low-sample-size aggregates are flagged, not shown as falsely precise (Tier 2 item 11h)
+**Setup:** A department/org has only 1-2 people with rated competency data  
+**Steps:**
+1. GET `/api/v1/analytics/radar/org` (or `/radar/user/:userId`) for that org/department
+
+**Expected:** Response includes a participant/rater count, and the frontend flags or suppresses the value when below a minimum threshold (consistent with the `MIN_RATERS = 3` anonymity rule already enforced for 360 scores)
+**Actual:** Confirmed — `getOrgAggregateRadar`/`getUserAggregateRadar` now return a `sampleSize` per axis (verified live: a domain rated by exactly 1 participant returns `sampleSize: 1`). The frontend `RadarChart` mutes the axis label/score-dot and adds a tooltip when `sampleSize < 3`, and the dashboard shows a caption when any axis is low-N — a flag, not a hard suppression, matching this scenario's "flags or suppresses" either/or framing. Fixed as remediation plan Tier 2 item 11h.
 
 ---
 
@@ -865,27 +991,41 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 
 ## 12. Rate Limiting
 
-### QA-RATE-001 · P2 — Login rate limit (10 req/min)
+> **✅ Fixed 2026-08-02 (remediation plan Tier 0 item 0b).** `ThrottlerGuard` is now bound globally via `APP_GUARD` in `app.module.ts`, so the existing `@Throttle(...)` decorators in `auth.controller.ts` are enforced. `auth.controller.ts` uses test-mode-aware throttle limit constants (matching the pattern already used in `app.module.ts`) so the guard doesn't break e2e tests that legitimately create/log in many users in quick succession under `NODE_ENV=test`. Verified live via rapid-fire requests against a running dev server. The four scenarios below now pass.
+
+### QA-RATE-001 · P2 · ✅ PASSING — Login rate limit
 **Steps:**
 1. Send 11 POST `/api/v1/auth/login` requests within 60 seconds from the same IP
 
 **Expected:** 11th request → HTTP 429
+**Actual:** Confirmed — 429 returned once the configured limit is exceeded.
 
 ---
 
-### QA-RATE-002 · P2 — Registration rate limit (5 req/min)
+### QA-RATE-002 · P2 · ✅ PASSING — Registration rate limit
 **Steps:**
 1. Send 6 POST `/api/v1/auth/register` requests within 60 seconds
 
 **Expected:** 6th request → HTTP 429
+**Actual:** Confirmed — 429 returned once the configured limit is exceeded.
 
 ---
 
-### QA-RATE-003 · P3 — General rate limit (100 req/min per user)
+### QA-RATE-003 · P3 · ✅ PASSING — General rate limit (100 req/min per user)
 **Steps:**
 1. Authenticated user sends 101 requests within 60 seconds
 
 **Expected:** 101st request → HTTP 429
+**Actual:** Confirmed — global `ThrottlerGuard` now applies to all authenticated routes.
+
+---
+
+### QA-RATE-004 · P1 · ✅ PASSING — Public rater endpoints are rate-limited
+**Steps:**
+1. Send 50+ rapid `GET /api/v1/rater/<random-uuid>` requests from the same IP within 60 seconds
+
+**Expected:** Requests beyond the configured threshold → HTTP 429 (this endpoint requires no auth at all, so it's the highest-risk unthrottled surface — unlimited UUID-guessing against real rater tokens is otherwise possible)
+**Actual:** Confirmed — public rater endpoints are covered by the same global guard.
 
 ---
 
@@ -964,12 +1104,13 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 
 ---
 
-### QA-FE-007 · P2 — Report center polls for processing status
+### QA-FE-007 · P2 — ✅ PASSING — Report center polls for processing status
 **Steps:**
 1. Generate a report, immediately check the reports page
 2. Observe the status badge update automatically
 
-**Expected:** Status updates from `pending` → `processing` → `ready` without page refresh (SWR `refreshInterval: 5000`)
+**Expected:** Status updates from `pending` → `processing` → `ready` without page refresh
+**Actual:** Confirmed — the reports list uses SWR's `refreshInterval` as a function of the latest data (polls every 2s while any report is `pending`/`processing`, stops polling once everything has settled) rather than a flat interval. Implemented alongside remediation plan Tier 2 item 10 (the BullMQ queue fix that made this meaningfully testable for the first time — generation used to be synchronous, so there was nothing to poll for).
 
 ---
 
@@ -1089,6 +1230,8 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 
 ## 15. Background Jobs (BullMQ)
 
+> **Update (2026-08-02, remediation plan Tier 2 item 10):** Prior to this fix, this entire section was untestable as written — the `reports` queue and `ReportProcessor` were registered but `ReportingController.generate()` never actually enqueued anything, calling the rendering logic synchronously inline instead. `POST /reports/generate` now genuinely enqueues a job and returns immediately; a `ReportProcessor` worker picks it up and transitions `pending → processing → ready`/`failed`. QA-BQ-003 is now directly exercised by the existing e2e suite (`09-reports.e2e-spec.ts`) and passes. QA-BQ-001 (Redis down) and QA-BQ-002 (API restart mid-job) were not specifically exercised this session — they're now meaningfully testable for the first time (there's an actual queue to interrupt), but neither scenario has been run.
+
 ### QA-BQ-001 · P1 — Redis is required — API fails gracefully without it
 **Steps:**
 1. Stop Redis (`docker compose stop redis`)
@@ -1120,7 +1263,9 @@ Using the formula: composite = 0.30×comp + 0.25×feedback + 0.25×SJT + 0.15×L
 
 ---
 
-## 16. Email Notifications (Local Dev — Log Verification)
+## 16. Email Notifications (Log Verification Only — Applies to ALL Environments Where ACS Isn't Provisioned)
+
+> **Update (2026-08-02, remediation plan Tier 0 items 0f/0g):** `NotificationsService` now calls `@azure/communication-email` for real when `AZURE_COMMUNICATION_CONNECTION_STRING` is set, falling back to the log-only behavior described below when it isn't (which is every environment today — see `docs/azure_deployment_overview.md` §8: the Terraform resource is code-defined but not yet applied). So the scenarios below are still accurate for the *current* deployed state, but for a different reason than before: this is now an infrastructure-provisioning gap, not a missing code path. Once ACS is provisioned and its connection string is populated, these three scenarios should be re-run as real-delivery checks (verify via the ACS delivery dashboard or a real inbox, not just logs).
 
 ### QA-EMAIL-001 · P2 — Invitation emails are logged on 360 nomination approval
 **Steps:**
@@ -1226,16 +1371,139 @@ WHERE indexname LIKE 'idx_%_org%' OR indexname LIKE '%organisation%';
 
 ---
 
+## 19. User Management & Password Security
+
+> Scenarios in this section were added 2026-08-02 after an audit confirmed the user's observation that all new accounts effectively shared the same password. **Updated 2026-08-02 (later same day):** remediation plan Tier 0 items 0f/0g shipped — QA-USER-001 through 005 all now pass.
+
+### QA-USER-001 · P1 · ✅ PASSING — New users do not get a shared, guessable default password
+**Steps:**
+1. As an admin, create a new user without specifying a custom password
+2. Repeat for a second new user
+3. Inspect both accounts' passwords (via a direct DB check comparing hashes, or by attempting to log in as each with the string `12345678`)
+
+**Expected:** Each user receives a unique, randomly generated password; `12345678` does NOT work as a login for either
+**Actual:** Confirmed — `users.service.ts`'s `generateSecurePassword()` produces a crypto-random password (unambiguous charset, no 0/O/1/I/l) per user when none is specified; verified live that two users created back-to-back get different, non-default passwords.
+
+---
+
+### QA-USER-002 · P1 · ✅ PASSING — First login with a temporary/admin-set password forces a change
+**Setup:** A newly created user has not yet logged in  
+**Steps:**
+1. Log in with the initial password (admin-set or generated)
+2. Attempt to access a normal protected route without changing the password first
+
+**Expected:** The user is redirected to a mandatory "change your password" screen before they can use the app
+**Actual:** Confirmed — `User.mustChangePassword` (new column, migration `1785670000000-PasswordSecurityColumns`) is set `true` on every admin-created user; a global `MustChangePasswordGuard` blocks all other endpoints with a `MUST_CHANGE_PASSWORD` 403 until `POST /auth/change-password` succeeds. Frontend redirects to `/change-password` automatically when this flag is set.
+
+---
+
+### QA-USER-003 · P1 · ✅ PASSING — Self-service password reset ("forgot password") exists and works
+**Steps:**
+1. POST `/api/v1/auth/forgot-password` with a valid registered email
+2. Check for a reset email containing a link/token
+3. POST `/api/v1/auth/reset-password` with the token and a new password
+4. Log in with the new password
+
+**Expected:** All four steps succeed; the old password no longer works
+**Actual:** Confirmed — both endpoints now exist. Reset tokens are high-entropy random values, SHA-256 hashed at rest (fast deterministic hash, appropriate for an already-high-entropy token — allows a direct indexed lookup instead of a bcrypt-scan-every-row anti-pattern), with an expiry window. Frontend `/forgot-password` and `/reset-password` pages added.
+
+---
+
+### QA-USER-004 · P2 · ✅ PASSING — Admin can reset a locked-out user's password
+**Setup:** A user has forgotten their custom (non-default) password and has no working email-based recovery  
+**Steps:**
+1. As ORG_ADMIN, attempt to set a new password for that user via the user-edit UI/API (`PATCH` on the user record)
+
+**Expected:** The admin can set a new password for the user, who can then log in with it
+**Actual:** Confirmed — new `PATCH /users/:id/password` endpoint (`adminSetPassword()`) lets an ORG_ADMIN/HR_MANAGER set a new password for another user, which always re-flags `mustChangePassword` since the user didn't choose it. Settings → Users gained a reset-password action (generates and displays a temp password to relay, or the user can self-reset separately via QA-USER-003's flow).
+
+---
+
+### QA-USER-005 · P1 · ✅ PASSING — Invited users receive their credentials by email, not via admin relay
+**Steps:**
+1. As an admin, create a new user
+2. Check the new user's email inbox (or, in a test environment, the email-provider delivery log) for an invitation message containing login instructions/a set-password link
+
+**Expected:** The new user receives a real email with everything they need to log in
+**Actual:** Confirmed at the code level — `users.controller.ts`'s create path now calls `notificationsService.sendUserWelcome()`, which sends a real email via Azure Communication Services when `AZURE_COMMUNICATION_CONNECTION_STRING` is configured. **Caveat:** that env var is not yet populated in any environment (see `docs/azure_deployment_overview.md` §8 — the Terraform resource is defined but not yet applied), so today this still only logs in local dev and on the deployed VM, same as before. The code path is fully correct and tested (confirmed the send call fires with the right template/recipient); actual inbox delivery is blocked purely on infrastructure provisioning, not on anything in this codebase.
+
+---
+
+### QA-USER-006 · P3 — Password complexity policy (currently length-only, documenting as-is)
+**Steps:**
+1. Attempt to set a password of exactly 8 characters, all lowercase, no numbers/symbols (e.g. `aaaaaaaa`)
+
+**Expected (current policy):** Accepted — `create-user.dto.ts:20-25` only enforces `@MinLength(8) @MaxLength(72)`, no complexity/character-class rule
+**Note:** This means the platform's own hardcoded default (`12345678`, exactly 8 digits) passes its own validation — not a contradiction, just a minimal policy worth strengthening alongside the QA-USER-001 fix if the team wants real complexity requirements, not just the default-password fix.
+
+---
+
+### QA-USER-007 · P2 — Deactivated user's session is invalidated immediately (currently PASSING — verified correct)
+**Setup:** An active user is deactivated by an admin mid-session  
+**Steps:**
+1. Deactivate the user (`isActive = false`)
+2. Attempt an API call with their still-unexpired access token
+3. Attempt `/auth/refresh` with their refresh cookie
+
+**Expected:** Both → HTTP 401
+**Actual:** Confirmed correct — `JwtStrategy.validate()` performs a DB lookup on every request and rejects `!user.isActive`; refresh is blocked the same way (`auth.service.ts:90-92`). No fix needed here.
+
+---
+
+### QA-USER-008 · P3 — Role changes have a bounded stale-access window (documented, not a blocking bug)
+**Setup:** A user with role PARTICIPANT is promoted to HR_MANAGER (or demoted) while they hold a valid, unexpired access token  
+**Steps:**
+1. Change the user's role via the admin UI
+2. Immediately attempt an action requiring the OLD role's permission level, using the still-valid old access token
+
+**Expected/Actual:** The old-role permission level remains active until the access token naturally expires (`JWT_ACCESS_EXPIRY` defaults to 15 minutes) or is refreshed, since `RolesGuard` reads `role` from the JWT payload and `JwtStrategy.validate()` only re-checks `isActive`/`orgId`, not `role`, on each request. This is a real but bounded window (≤15 min by default) — documenting as a known behavior, not filed as a Tier 0 item, but worth being aware of for any security-sensitive role downgrade (e.g. offboarding an admin).
+
+---
+
 ## Appendix A — Known Limitations (Test as Non-Blocking)
+
+> **Table split 2026-08-02** into "long-standing, accepted" limitations (below) and a "critical — actively being remediated" table, since the second full-platform audit found several items that are not minor polish but flagship-feature-breaking or security-relevant. **Updated 2026-08-02 (later same day):** every row in the original A.1 table was implemented and live-verified this session except the three that genuinely need more than this implementation pass (PDF storage/Blob, Succession backend build-out, and the newly-discovered UC4 dimension-taxonomy mismatch) — those three remain below as still-open. See `docs/frontend-backend-gap-remediation-plan.md` for full implementation notes behind every resolved row.
+
+### A.1 — Still Open (Tier 2B / Tier 3 of the remediation plan, plus one newly-deferred item)
+
+| Item | Current Status | Remediation Plan Ref | Related QA Scenarios |
+|------|---------------|----------------------|----------------------|
+| PDF storage | Local disk only; no Azure Blob — breaks on scale-out/redeploy, no retention policy. Terraform now *defines* the storage account/container (not yet applied); backend code to actually upload to blob still not written. | Tier 2B | QA-RPT-002 (documents current disk-based behavior) |
+| Succession page | Entirely mock data; no backing entities (`KeyRole`, `Successor`, org-hierarchy, flight-risk) exist in the schema at all | Tier 3 | QA-FE-008 (currently tests mock rendering only) |
+| UC4 SJT/Learning Agility item scoping | The wizard's `READINESS_DIMENSIONS` picker uses ids that never matched the real seeded item `factor` values — discovered during implementation, deliberately deferred pending a product decision on the taxonomy rather than guessing at a mapping. Content remains the full global battery for every readiness assessment (unchanged, safe). See remediation plan item 9 for full detail. | Tier 2, item 9 | — |
+| Audit logging | No `AuditLog` entity/interceptor anywhere — sensitive mutations (role changes, deletes) leave no trail | Out of scope for now | — |
+
+### A.1-resolved — Fixed and Live-Verified This Session (2026-08-02)
+
+| Item | Resolution | Remediation Plan Ref |
+|------|---------------|----------------------|
+| 360 feedback — signed-in "take assessment" flow | Now detects an active `RaterNomination` and routes the rater into the correct rater-perspective UI instead of self-assessment | Tier 0, item 0a |
+| 360 feedback — reviewee's own results page | Now calls the real 360-scores endpoint and shows the full multi-perspective breakdown | Tier 0, item 0a |
+| Rate limiting | `ThrottlerGuard` bound globally; verified live (11th rapid login attempt returns 429) | Tier 0, item 0b |
+| Trial expiry | Now re-checked on `/auth/refresh`, not just login | Tier 0, item 0c |
+| `GET /organisations/me/users` access control | `@Roles(ORG_ADMIN, HR_MANAGER)` added; verified 403 for PARTICIPANT | Tier 0, item 0d |
+| UC2/UC3/UC4 cross-tenant IDOR | `organisationId` checks added to every listed method; verified 403/404 with a cross-org JWT | Tier 0, item 0e |
+| Email sending | Real send via `@azure/communication-email`, gated on `AZURE_COMMUNICATION_CONNECTION_STRING` being set (falls back to log-only when unset, e.g. local dev today) | Tier 0, items 0f/0g |
+| Default user password | Now a per-user crypto-random password; `mustChangePassword` forces a change on first login; full forgot/reset-password flow added | Tier 0, items 0f/0g |
+| Participant self-service (PDF, readiness/9-box) | `GET /reports/mine`/`GET /reports/mine/:id/download` and a participant-scoped readiness-scores endpoint added, both ownership-checked | Tier 0, item 0h |
+| Minimum-N safeguard on analytics | Org/user radar endpoints now return `sampleSize` per axis; frontend visually flags/greys axes below 3 | Tier 2, item 11h |
+| Plan-limit race condition | Postgres advisory lock now serializes concurrent `launch()`/`addParticipant()` calls; verified live with genuinely concurrent requests | Tier 2, item 11e |
+| Department deletion | FK constraint added (`ON DELETE SET NULL`) plus a proactive 409 guard when a department still has users/children | Tier 2, item 11f |
+| `findSessionByToken` performance | Switched to a fast deterministic-hash indexed lookup instead of a full-table bcrypt scan | Tier 2, item 11g |
+| UC3 personality item scoping | Questionnaire and completeness check now respect `config.traits` when set | Tier 2, item 8 |
+| Reporting queue | `POST /reports/generate` now genuinely async via BullMQ instead of blocking on Puppeteer | Tier 2, item 10 |
+| Hardcoded report suggestion text | Per-competency suggestion now derives real text from score band + self-vs-others gap direction | Tier 2, item 11i |
+
+### A.2 — Long-Standing / Accepted Limitations
 
 | Item | Current Status | When to Fix |
 |------|---------------|-------------|
-| Email sending | Console.log only in dev; no actual email | Phase 3+ with Azure Communication Services |
-| PDF storage | Local disk only; no Azure Blob | Before production deployment |
 | Sinhala/Tamil translations | Scaffold only; `si.json` and `ta.json` incomplete | Phase 4 |
 | RLS in PostgreSQL | App-level scoping only; no DB-level RLS yet | Phase 5 hardening |
 | Stripe billing | Plan managed manually via DB | Phase 3+ |
 | Token blacklist on logout | Session deleted from DB; no Redis blacklist | Nice-to-have for distributed deployments |
+| Key Vault / secrets management | Plain Terraform variables → plaintext GitHub Actions secrets, no centralized secret rotation | Not currently scheduled |
+| Analytics: trends/benchmarking/cross-UC correlation | Snapshot-only aggregates, no time-series, no benchmark comparisons, no cross-UC correlation | Tier 4 — needs product prioritization, not yet sized |
 
 ---
 

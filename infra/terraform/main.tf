@@ -180,3 +180,54 @@ resource "azurerm_static_web_app" "landing" {
   sku_tier            = "Free"
   sku_size            = "Free"
 }
+
+# ── Blob Storage — report PDFs (was local-disk-only; see docs/frontend-backend-gap-remediation-plan.md Tier 2B) ──
+
+resource "azurerm_storage_account" "storage" {
+  name                     = replace("${var.app_name}st${var.environment}", "-", "")
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = azurerm_resource_group.rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  min_tls_version          = "TLS1_2"
+}
+
+resource "azurerm_storage_container" "reports" {
+  name                  = "reports"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_container" "uploads" {
+  name                  = "uploads"
+  storage_account_name  = azurerm_storage_account.storage.name
+  container_access_type = "private"
+}
+
+# ── Azure Communication Services — email (was log-only; see docs/frontend-backend-gap-remediation-plan.md Tier 0f/0g) ──
+
+resource "azurerm_email_communication_service" "email" {
+  name                = "${var.app_name}-email-${var.environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  data_location       = "United States"
+}
+
+# Azure-managed sender domain — no external DNS verification needed, suitable for dev/test.
+# A custom verified domain (e.g. mail.leaderprism.com) can replace this later for production
+# sender reputation without changing any application code — just the EMAIL_FROM env var.
+resource "azurerm_email_communication_service_domain" "email_domain" {
+  name              = "AzureManagedDomain"
+  email_service_id  = azurerm_email_communication_service.email.id
+  domain_management = "AzureManaged"
+}
+
+resource "azurerm_communication_service" "comms" {
+  name                = "${var.app_name}-comms-${var.environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  data_location       = "United States"
+}
+
+resource "azurerm_communication_service_email_domain_association" "comms_email_link" {
+  communication_service_id = azurerm_communication_service.comms.id
+  email_service_domain_id  = azurerm_email_communication_service_domain.email_domain.id
+}

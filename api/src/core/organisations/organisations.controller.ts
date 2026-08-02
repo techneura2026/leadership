@@ -128,6 +128,7 @@ export class OrganisationsController {
   }
 
   @Get('me/users')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
   @ApiOperation({ summary: 'List users in the current user\'s organisation' })
   getMyOrgUsers(
     @CurrentOrgId() orgId: string,

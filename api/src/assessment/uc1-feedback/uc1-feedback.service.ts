@@ -73,7 +73,7 @@ export class Uc1FeedbackService {
 
   async getNominations(
     assessmentId: string,
-    participantId: string,
+    participantId: string | undefined,
     orgId: string,
   ): Promise<RaterNomination[]> {
     // Validate assessment belongs to org
@@ -85,7 +85,8 @@ export class Uc1FeedbackService {
     }
 
     return this.nominationRepo.find({
-      where: { assessmentId, participantId },
+      where: participantId ? { assessmentId, participantId } : { assessmentId },
+      relations: ['participant', 'participant.user'],
       order: { createdAt: 'ASC' },
     });
   }
@@ -606,6 +607,37 @@ export class Uc1FeedbackService {
 
     this.logger.log(`Sent ${sent} reminders for assessment ${assessmentId}`);
     return { sent };
+  }
+
+  /** Reminds a single outstanding rater (targeted, 360 only). */
+  async remindNomination(assessmentId: string, nominationId: string, orgId: string): Promise<{ sent: boolean }> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) {
+      throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+
+    const nomination = await this.nominationRepo.findOne({
+      where: { id: nominationId, assessmentId },
+    });
+    if (!nomination) {
+      throw new NotFoundException(`Nomination ${nominationId} not found`);
+    }
+    if (nomination.status === 'completed' || nomination.status === 'declined') {
+      throw new BadRequestException('Rater has already completed or declined — no reminder needed');
+    }
+
+    await this.notificationsService.sendReminder(
+      nomination.raterEmail,
+      nomination.raterName ?? 'Colleague',
+      assessment.title,
+      assessment.endDate?.toLocaleDateString('en-GB') ?? 'soon',
+      { orgId },
+    );
+
+    this.logger.log(`Sent targeted reminder to nomination ${nominationId} for assessment ${assessmentId}`);
+    return { sent: true };
   }
 
   private groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {

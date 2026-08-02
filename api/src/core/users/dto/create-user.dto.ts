@@ -17,7 +17,7 @@ export class CreateUserDto {
   @IsEmail()
   email: string;
 
-  @ApiPropertyOptional({ example: '12345678', description: 'Defaults to 12345678 when omitted' })
+  @ApiPropertyOptional({ description: 'A secure random password is generated and emailed to the user when omitted' })
   @IsOptional()
   @IsString()
   @MinLength(8)

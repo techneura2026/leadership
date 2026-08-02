@@ -18,6 +18,15 @@ const mockOrgsService = {
   findById: jest.fn(),
 };
 
+const mockNotificationsService = {
+  sendUserWelcome: jest.fn(),
+  sendPasswordReset: jest.fn(),
+  sendInvitation: jest.fn(),
+  sendRaterInvitation: jest.fn(),
+  sendReminder: jest.fn(),
+  sendReportReady: jest.fn(),
+};
+
 const mockJwtService = {
   sign: jest.fn().mockReturnValue('mock.access.token'),
 };
@@ -66,6 +75,7 @@ const fakeUser = {
   updatedAt: new Date(),
   lastLoginAt: null,
   deletedAt: null,
+  mustChangePassword: false,
 };
 
 const fakeReq = { ip: '127.0.0.1', headers: { 'user-agent': 'jest-test' } };
@@ -78,6 +88,7 @@ describe('AuthService', () => {
     service = new AuthService(
       mockUsersService as any,
       mockOrgsService as any,
+      mockNotificationsService as any,
       mockJwtService as any,
       mockConfigService as any,
     );

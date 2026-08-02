@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { PersonalityResponse } from './entities/personality-response.entity';
 import { PersonalityScore } from './entities/personality-score.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
@@ -48,18 +48,44 @@ export class Uc3PersonalityService {
     private readonly bigFiveScoring: BigFiveScoringService,
   ) {}
 
+  private async assertAssessmentInOrg(assessmentId: string, orgId: string): Promise<Assessment> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    return assessment;
+  }
+
+  /**
+   * Big Five trait ids configured for this assessment (config.traits), or null when the
+   * assessment didn't restrict traits — callers should fall back to the full item bank.
+   */
+  private configuredTraits(assessment: Assessment): string[] | null {
+    const traits = (assessment.config as any)?.traits;
+    return Array.isArray(traits) && traits.length > 0 ? traits : null;
+  }
+
   async getQuestionnaire(
     assessmentId: string,
     participantId: string,
+    orgId: string,
     language = 'en',
   ): Promise<QuestionnaireProgress> {
+    const assessment = await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
 
+    const traits = this.configuredTraits(assessment);
     const items = await this.itemRepo.find({
-      where: { module: 'personality', language, isActive: true },
+      where: {
+        module: 'personality',
+        language,
+        isActive: true,
+        ...(traits ? { factor: In(traits) } : {}),
+      },
       order: { createdAt: 'ASC' },
     });
 
@@ -95,9 +121,12 @@ export class Uc3PersonalityService {
   async saveResponse(
     assessmentId: string,
     participantId: string,
+    orgId: string,
     itemId: string,
     value: number,
   ): Promise<PersonalityResponse> {
+    await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
@@ -133,15 +162,23 @@ export class Uc3PersonalityService {
   async submitQuestionnaire(
     assessmentId: string,
     participantId: string,
+    orgId: string,
   ): Promise<FactorScore[]> {
+    const assessment = await this.assertAssessmentInOrg(assessmentId, orgId);
+
     const participant = await this.participantRepo.findOne({
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
 
     // Check all items answered
+    const traits = this.configuredTraits(assessment);
     const totalItems = await this.itemRepo.count({
-      where: { module: 'personality', isActive: true },
+      where: {
+        module: 'personality',
+        isActive: true,
+        ...(traits ? { factor: In(traits) } : {}),
+      },
     });
     const answeredCount = await this.responseRepo.count({
       where: { assessmentId, participantId },
@@ -178,10 +215,7 @@ export class Uc3PersonalityService {
       narrative: string;
     }>
   > {
-    const assessment = await this.assessmentRepo.findOne({
-      where: { id: assessmentId, organisationId: orgId },
-    });
-    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    await this.assertAssessmentInOrg(assessmentId, orgId);
 
     const scores = await this.scoreRepo.find({
       where: { assessmentId, participantId },

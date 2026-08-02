@@ -23,16 +23,18 @@ export class Uc3PersonalityController {
   @Get(':id/personality/questionnaire/:participantId')
   @ApiOperation({ summary: 'Get Big Five questionnaire with progress state' })
   getQuestionnaire(
+    @Request() req: any,
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
     @Query('language') language = 'en',
   ): Promise<QuestionnaireProgress> {
-    return this.uc3Service.getQuestionnaire(assessmentId, participantId, language);
+    return this.uc3Service.getQuestionnaire(assessmentId, participantId, req.user.orgId, language);
   }
 
   @Post(':id/personality/responses/:participantId')
   @ApiOperation({ summary: 'Save a single item response (auto-save)' })
   saveResponse(
+    @Request() req: any,
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
     @Body() body: SaveResponseDto,
@@ -40,6 +42,7 @@ export class Uc3PersonalityController {
     return this.uc3Service.saveResponse(
       assessmentId,
       participantId,
+      req.user.orgId,
       body.itemId,
       body.value,
     );
@@ -48,10 +51,11 @@ export class Uc3PersonalityController {
   @Post(':id/personality/submit/:participantId')
   @ApiOperation({ summary: 'Submit completed questionnaire and trigger scoring' })
   submit(
+    @Request() req: any,
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
   ) {
-    return this.uc3Service.submitQuestionnaire(assessmentId, participantId);
+    return this.uc3Service.submitQuestionnaire(assessmentId, participantId, req.user.orgId);
   }
 
   @Get(':id/personality/scores/:participantId')

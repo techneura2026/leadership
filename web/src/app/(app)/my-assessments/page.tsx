@@ -16,6 +16,8 @@ interface MyAssessmentItem extends AssessmentDto {
   isRater?: boolean;
   raterToken?: string;
   nominationStatus?: 'approved' | 'sent' | 'completed';
+  selfRaterToken?: string;
+  selfNominationStatus?: 'pending' | 'approved' | 'sent' | 'completed' | 'declined';
 }
 
 type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';
@@ -44,6 +46,21 @@ function getCardMeta(item: MyAssessmentItem): {
       badgeVariant: 'info',
       buttonLabel: 'Give Feedback',
       href: `/rater/${item.raterToken}`,
+    };
+  }
+
+  // 360 assessments: the reviewee's own "self" rating is captured via the same
+  // rater-response flow as peers/supervisors (see EngineService.findMine), not a
+  // separate self-assessment form — route there directly when a self nomination exists.
+  if (item.assessmentType === AssessmentType.FEEDBACK_360 && item.selfRaterToken) {
+    if (item.selfNominationStatus === 'completed') {
+      return { statusLabel: 'Self-Rating Given', badgeVariant: 'success', buttonLabel: 'Self-Rating Given', href: null };
+    }
+    return {
+      statusLabel: 'Self-Rating Requested',
+      badgeVariant: 'info',
+      buttonLabel: 'Rate Yourself',
+      href: `/rater/${item.selfRaterToken}`,
     };
   }
 

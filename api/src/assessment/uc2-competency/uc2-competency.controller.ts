@@ -36,10 +36,17 @@ export class Uc2CompetencyController {
   @ApiOperation({ summary: 'Submit self-assessment ratings' })
   submitSelf(
     @Request() req: any,
+    @Param('id') assessmentId: string,
     @Param('caId') caId: string,
     @Body() body: SubmitSelfRatingsDto,
   ) {
-    return this.uc2Service.submitSelfRatings(caId, body.participantId, body.ratings);
+    return this.uc2Service.submitSelfRatings(
+      assessmentId,
+      caId,
+      body.participantId,
+      req.user.orgId,
+      body.ratings,
+    );
   }
 
   @Post(':id/competency/manager')
@@ -63,10 +70,17 @@ export class Uc2CompetencyController {
   @ApiOperation({ summary: 'Submit manager ratings' })
   submitManager(
     @Request() req: any,
+    @Param('id') assessmentId: string,
     @Param('caId') caId: string,
     @Body() body: SubmitManagerRatingsDto,
   ) {
-    return this.uc2Service.submitManagerRatings(caId, req.user.sub, body.ratings);
+    return this.uc2Service.submitManagerRatings(
+      assessmentId,
+      caId,
+      req.user.sub,
+      req.user.orgId,
+      body.ratings,
+    );
   }
 
   @Get(':id/competency/gap/:participantId')

@@ -12,7 +12,7 @@ import type { AuthResponseDto, UserDto, OrganisationDto } from '@leaderprism/sha
 const outfit = Outfit({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'] });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { setAuth, setHydrated, isHydrated, accessToken } = useAuthStore();
+  const { setAuth, setHydrated, isHydrated, accessToken, user } = useAuthStore();
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -34,6 +34,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         router.replace('/login');
       });
   }, []);
+
+  useEffect(() => {
+    // Safety net beyond the login page's own redirect — catches direct navigation/refresh
+    // for an account that still has a forced password change pending.
+    if (isHydrated && user?.mustChangePassword) {
+      router.replace('/change-password');
+    }
+  }, [isHydrated, user?.mustChangePassword]);
 
   if (!isHydrated) {
     return (

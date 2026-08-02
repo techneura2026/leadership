@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { Language, UserRole } from '@leaderprism/shared';
 import { Organisation } from '../../organisations/entities/organisation.entity';
+import { Department } from '../../organisations/entities/department.entity';
 
 @Entity('users')
 @Unique(['organisationId', 'email'])
@@ -29,6 +30,10 @@ export class User {
 
   @Column({ name: 'department_id', nullable: true, type: 'uuid' })
   departmentId: string | null;
+
+  @ManyToOne(() => Department, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'department_id' })
+  department: Department | null;
 
   @Column({ length: 255 })
   email: string;
@@ -62,6 +67,15 @@ export class User {
 
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt: Date | null;
+
+  @Column({ name: 'must_change_password', default: false })
+  mustChangePassword: boolean;
+
+  @Column({ name: 'password_reset_token_hash', type: 'text', select: false, nullable: true })
+  passwordResetTokenHash: string | null;
+
+  @Column({ name: 'password_reset_expires_at', type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

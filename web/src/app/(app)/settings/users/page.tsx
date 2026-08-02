@@ -14,7 +14,7 @@ import { UserRole } from '@leaderprism/shared';
 import type { UserDto, DepartmentDto } from '@leaderprism/shared';
 import {
   Users, UserPlus, Search, CheckCircle2, X, Pencil, Ban, RotateCcw, Trash2,
-  Crown, ShieldCheck, UserCog, User as UserIcon,
+  Crown, ShieldCheck, UserCog, User as UserIcon, KeyRound,
   User,
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -457,6 +457,95 @@ function DeactivateModal({ user, onClose, onDone }: DeactivateModalProps) {
   );
 }
 
+// ── Reset Password Modal ─────────────────────────────────────────────────────
+
+interface ResetPasswordModalProps {
+  user: UserDto | null;
+  onClose: () => void;
+  onDone: (newPassword: string) => void;
+}
+
+function generateTempPassword(): string {
+  const charset = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let out = '';
+  for (let i = 0; i < 14; i++) out += charset[Math.floor(Math.random() * charset.length)];
+  return out;
+}
+
+function ResetPasswordModal({ user, onClose, onDone }: ResetPasswordModalProps) {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (user) setPassword(generateTempPassword());
+  }, [user]);
+
+  async function handleReset() {
+    if (!user) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.patch(`/users/${user.id}/password`, { password });
+      onDone(password);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to reset password.'));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal open={!!user} onClose={onClose} title="Reset Password">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Set a new temporary password for{' '}
+          <span className="font-semibold text-gray-900">{user?.firstName} {user?.lastName}</span>.
+          They&apos;ll be required to change it on their next login. This also signs them out of all
+          existing sessions.
+        </p>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
+            New temporary password
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => setPassword(generateTempPassword())}
+              className="border border-gray-200 rounded-lg px-3 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Regenerate
+            </button>
+          </div>
+        </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={loading || password.length < 8}
+            className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Resetting…' : 'Reset Password'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Reactivate Confirm Modal ───────────────────────────────────────────────────
 
 function ReactivateModal({ user, onClose, onDone }: DeactivateModalProps) {
@@ -590,6 +679,7 @@ export default function UsersSettingsPage() {
   const [deactivateUser, setDeactivateUser] = useState<UserDto | null>(null);
   const [reactivateUser, setReactivateUser] = useState<UserDto | null>(null);
   const [deleteUser, setDeleteUser] = useState<UserDto | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserDto | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
 
   const [search, setSearch] = useState('');
@@ -746,7 +836,7 @@ export default function UsersSettingsPage() {
                     <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <Avatar seed={u.id} size="sm" />
+                          <Avatar seed={u.id} src={u.avatarUrl} size="sm" />
                           <div>
                             <div className="font-medium text-gray-900">
                               {u.firstName} {u.lastName}
@@ -784,6 +874,15 @@ export default function UsersSettingsPage() {
                               title="Edit user"
                             >
                               <Pencil className="w-4 h-4" strokeWidth={2} />
+                            </button>
+                          )}
+                          {!isSelf && u.isActive && (
+                            <button
+                              onClick={() => setResetPasswordUser(u)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Reset password"
+                            >
+                              <KeyRound className="w-4 h-4" strokeWidth={2} />
                             </button>
                           )}
                           {!isSelf && !isAdmin && u.isActive && (
@@ -838,7 +937,7 @@ export default function UsersSettingsPage() {
         onCreated={(fullName) => {
           setAddOpen(false);
           mutate();
-          setSuccessMsg(`${fullName} was added successfully. Temporary password: 12345678`);
+          setSuccessMsg(`${fullName} was added successfully. Their login credentials have been emailed to them.`);
         }}
       />
 
@@ -861,6 +960,17 @@ export default function UsersSettingsPage() {
         user={reactivateUser}
         onClose={() => setReactivateUser(null)}
         onDone={() => { setReactivateUser(null); mutate(); }}
+      />
+
+      <ResetPasswordModal
+        user={resetPasswordUser}
+        onClose={() => setResetPasswordUser(null)}
+        onDone={() => {
+          const name = resetPasswordUser ? `${resetPasswordUser.firstName} ${resetPasswordUser.lastName}` : 'User';
+          setResetPasswordUser(null);
+          mutate();
+          setSuccessMsg(`Password reset for ${name}. They'll be required to set a new password on their next login.`);
+        }}
       />
 
       <DeleteUserModal

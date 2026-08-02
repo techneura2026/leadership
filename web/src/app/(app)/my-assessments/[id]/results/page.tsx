@@ -1,12 +1,58 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
+import { api } from '@/lib/api';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
 import { useAuthStore } from '@/store/auth.store';
-import { AssessmentDto, AssessmentType } from '@leaderprism/shared';
+import { AssessmentDto, AssessmentType, CompetencyDto, RaterRelationship } from '@leaderprism/shared';
+
+interface MyReportDto {
+  id: string;
+  assessmentId: string;
+  status: 'pending' | 'processing' | 'ready' | 'failed';
+}
+
+function DownloadMyReportButton({ assessmentId }: { assessmentId: string }) {
+  const { data: reports } = useApi<MyReportDto[]>('/reports/mine');
+  const [downloading, setDownloading] = useState(false);
+  const report = reports?.find((r) => r.assessmentId === assessmentId && r.status === 'ready');
+
+  if (!report) return null;
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/reports/mine/${report!.id}/download`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${report!.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={downloading}
+      className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
+      {downloading ? 'Downloading…' : 'Download my report (PDF)'}
+    </button>
+  );
+}
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -232,6 +278,242 @@ function CompetencyResultsView({
   );
 }
 
+// ── 360 Feedback Results View (real perspective breakdown, not just self-rating) ──
+
+interface AggregatedScore {
+  competencyId: string;
+  competencyName?: string;
+  byPerspective: Record<string, { mean: number; count: number }>;
+  overallMean: number;
+  gapVsSelf: number | null;
+}
+
+const PERSPECTIVE_LABELS: Record<string, string> = {
+  [RaterRelationship.SELF]: 'Self',
+  [RaterRelationship.SUPERVISOR]: 'Supervisor',
+  [RaterRelationship.PEER]: 'Peers',
+  [RaterRelationship.DIRECT_REPORT]: 'Direct Reports',
+  [RaterRelationship.STAKEHOLDER]: 'Stakeholders',
+};
+const PERSPECTIVE_ORDER = [
+  RaterRelationship.SELF,
+  RaterRelationship.SUPERVISOR,
+  RaterRelationship.PEER,
+  RaterRelationship.DIRECT_REPORT,
+  RaterRelationship.STAKEHOLDER,
+];
+
+function Feedback360ResultsView({
+  assessmentId, participantId,
+}: { assessmentId: string; participantId: string }) {
+  const { data: scores, error, isLoading } = useApi<AggregatedScore[]>(
+    `/assessments/${assessmentId}/360/scores/${participantId}`,
+  );
+  const { data: competencies } = useApi<CompetencyDto[]>('/items/competencies');
+
+  if (isLoading) return <PageSpinner />;
+
+  const status = (error as any)?.response?.status;
+  if (status === 403) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+        Your results aren&apos;t ready yet — feedback is only shown once enough raters in each
+        group have responded, to keep individual responses anonymous.
+      </div>
+    );
+  }
+  if (error || !scores) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        Failed to load your feedback results. Please try again later.
+      </div>
+    );
+  }
+  if (scores.length === 0) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+        No feedback has been submitted for you yet.
+      </div>
+    );
+  }
+
+  const nameFor = (competencyId: string) =>
+    competencies?.find((c) => c.id === competencyId)?.name ?? 'Competency';
+
+  const radarAxes: RadarAxis[] = scores.map((s) => ({
+    key: s.competencyId,
+    label: nameFor(s.competencyId),
+    value: Math.round((s.overallMean / 5) * 100),
+  }));
+
+  return (
+    <div className="space-y-6">
+      {radarAxes.length >= 3 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">360° Feedback Overview</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Average rating across all perspectives, per competency</p>
+            </div>
+            <Badge variant="success">Completed</Badge>
+          </div>
+          <div className="flex justify-center sm:px-6 py-2 [&_svg]:overflow-visible">
+            <RadarChart axes={radarAxes} size={320} />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {scores.map((score) => (
+          <div key={score.competencyId} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+              <h3 className="text-sm font-semibold text-gray-900">{nameFor(score.competencyId)}</h3>
+              {score.gapVsSelf !== null && (
+                <span
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                    score.gapVsSelf > 0
+                      ? 'bg-green-50 text-green-700'
+                      : score.gapVsSelf < 0
+                        ? 'bg-orange-50 text-orange-700'
+                        : 'bg-gray-50 text-gray-600'
+                  }`}
+                  title="How others rated you compared to how you rated yourself — a positive gap means others see you more favourably than you see yourself; a negative gap is a development opportunity worth exploring."
+                >
+                  {score.gapVsSelf > 0 ? '+' : ''}
+                  {score.gapVsSelf} vs self
+                </span>
+              )}
+            </div>
+            <div className="px-5 py-4 space-y-2.5">
+              {PERSPECTIVE_ORDER.filter((p) => score.byPerspective[p]).map((perspective) => {
+                const entry = score.byPerspective[perspective];
+                const pct = Math.round((entry.mean / 5) * 100);
+                return (
+                  <div key={perspective} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-32 shrink-0 font-medium">
+                      {PERSPECTIVE_LABELS[perspective] ?? perspective}
+                    </span>
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-700 w-16 text-right">
+                      {entry.mean.toFixed(1)} ({entry.count})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400 text-center mt-8">
+        Use this feedback as a starting point for development conversations — gaps between how
+        others see you and how you see yourself are opportunities, not verdicts.
+      </p>
+    </div>
+  );
+}
+
+// ── Readiness Results View ────────────────────────────────────────────────────
+
+interface ReadinessScoreDto {
+  id: string;
+  readinessRating: string;
+  compositeScore: number;
+  competencyScore: number;
+  feedbackScore: number;
+  sjtScore: number;
+  learningAgilityScore: number;
+  personalityFitScore: number;
+  gridPerformance: 'high' | 'medium' | 'low';
+  gridPotential: 'high' | 'medium' | 'low';
+  roleProfile: { title: string } | null;
+}
+
+const READINESS_LABELS: Record<string, { label: string; variant: 'success' | 'info' | 'warning' | 'neutral' }> = {
+  ready_now: { label: 'Ready Now', variant: 'success' },
+  '1_2_years': { label: 'Ready in 1–2 Years', variant: 'info' },
+  developing: { label: 'Developing', variant: 'warning' },
+  not_yet_ready: { label: 'Not Yet Ready', variant: 'neutral' },
+};
+
+const READINESS_COMPONENTS: Array<{ key: keyof ReadinessScoreDto; label: string; weight: string }> = [
+  { key: 'competencyScore', label: 'Competency', weight: '30%' },
+  { key: 'feedbackScore', label: '360° Feedback', weight: '25%' },
+  { key: 'sjtScore', label: 'Situational Judgement', weight: '25%' },
+  { key: 'learningAgilityScore', label: 'Learning Agility', weight: '15%' },
+  { key: 'personalityFitScore', label: 'Personality Fit', weight: '5%' },
+];
+
+function ReadinessResultsView({
+  assessmentId, participantId,
+}: { assessmentId: string; participantId: string }) {
+  const { data: scores, isLoading } = useApi<ReadinessScoreDto[]>(
+    `/assessments/${assessmentId}/readiness/${participantId}/scores`,
+  );
+
+  if (isLoading) return <PageSpinner />;
+
+  if (!scores || scores.length === 0) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800">
+        Your readiness results aren&apos;t available yet — your HR team will share them once your
+        assessment has been reviewed.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {scores.map((score) => {
+        const meta = READINESS_LABELS[score.readinessRating] ?? { label: score.readinessRating, variant: 'neutral' as const };
+        return (
+          <div key={score.id} className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  {score.roleProfile?.title ?? 'Overall Readiness'}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Composite score: {score.compositeScore.toFixed(1)} / 100</p>
+              </div>
+              <Badge variant={meta.variant}>{meta.label}</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-50 rounded-xl p-3.5 text-center">
+                <p className="text-xs text-gray-500 mb-1">Performance</p>
+                <p className="text-base font-bold text-gray-900 capitalize">{score.gridPerformance}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3.5 text-center">
+                <p className="text-xs text-gray-500 mb-1">Potential</p>
+                <p className="text-base font-bold text-gray-900 capitalize">{score.gridPotential}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {READINESS_COMPONENTS.map((comp) => {
+                const value = Number(score[comp.key]);
+                return (
+                  <div key={comp.key} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-40 shrink-0 font-medium">
+                      {comp.label} <span className="text-gray-400">({comp.weight})</span>
+                    </span>
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(value, 100)}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-700 w-10 text-right">{value.toFixed(0)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AssessmentResultsPage() {
@@ -289,14 +571,22 @@ export default function AssessmentResultsPage() {
           </svg>
           My Assessments
         </button>
-        <h1 className="text-2xl font-semibold text-gray-900">{assessment.title}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{typeLabel} Assessment — Your Results</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">{assessment.title}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{typeLabel} Assessment — Your Results</p>
+          </div>
+          <DownloadMyReportButton assessmentId={assessmentId} />
+        </div>
       </div>
 
-      {(assessment.assessmentType === AssessmentType.COMPETENCY ||
-        assessment.assessmentType === AssessmentType.FEEDBACK_360) && (
-          <CompetencyResultsView assessmentId={assessmentId} participantId={myRecord.id} />
-        )}
+      {assessment.assessmentType === AssessmentType.COMPETENCY && (
+        <CompetencyResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+      )}
+
+      {assessment.assessmentType === AssessmentType.FEEDBACK_360 && (
+        <Feedback360ResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+      )}
 
       {assessment.assessmentType === AssessmentType.PERSONALITY && (
         <PersonalityResultsView
@@ -307,9 +597,7 @@ export default function AssessmentResultsPage() {
       )}
 
       {assessment.assessmentType === AssessmentType.READINESS && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-800">
-          Readiness results are reviewed by your HR team and will be shared with you once available.
-        </div>
+        <ReadinessResultsView assessmentId={assessmentId} participantId={myRecord.id} />
       )}
     </div>
   );

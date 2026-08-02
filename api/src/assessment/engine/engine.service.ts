@@ -7,15 +7,16 @@ import {
 } from '@nestjs/common';
 import { IsEnum, IsNotEmpty, IsOptional, IsObject, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AssessmentStatus, AssessmentType, Plan } from '@leaderprism/shared';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { AssessmentStatus, AssessmentType, Plan, RaterRelationship } from '@leaderprism/shared';
 import type { AssessmentConfig, PlanLimits } from '@leaderprism/shared';
 import { Assessment } from './entities/assessment.entity';
 import { AssessmentParticipant } from './entities/assessment-participant.entity';
 import { Organisation } from '../../core/organisations/entities/organisation.entity';
 import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entity';
 import { User } from '../../core/users/entities/user.entity';
+import { NotificationsService } from '../../core/notifications/notifications.service';
 
 // Plan limits map
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -122,8 +123,23 @@ export class EngineService {
     private readonly nominationRepo: Repository<RaterNomination>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    // private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) { }
+
+  /**
+   * Serializes concurrent plan-limit-checking mutations for one org via a Postgres advisory
+   * lock scoped to the transaction — held until commit/rollback. Without this, two concurrent
+   * launch()/addParticipant() calls can both read the same "under the limit" count and both
+   * proceed, pushing the org over its plan's active-assessment/participant cap.
+   */
+  private async withOrgLock<T>(orgId: string, work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [orgId]);
+      return work(manager);
+    });
+  }
 
   async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
     const org = await this.orgRepo.findOne({ where: { id: orgId } });
@@ -217,50 +233,55 @@ export class EngineService {
   }
 
   async launch(id: string, orgId: string): Promise<Assessment> {
-    const assessment = await this.findOne(id, orgId);
+    await this.findOne(id, orgId); // existence/ownership check
 
-    if (assessment.status !== AssessmentStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT assessments can be launched');
-    }
+    return this.withOrgLock(orgId, async (manager) => {
+      const assessment = await manager.findOne(Assessment, { where: { id, organisationId: orgId } });
+      if (!assessment) throw new NotFoundException(`Assessment ${id} not found`);
 
-    const participantCount = await this.participantRepo.count({
-      where: { assessmentId: id },
+      if (assessment.status !== AssessmentStatus.DRAFT) {
+        throw new BadRequestException('Only DRAFT assessments can be launched');
+      }
+
+      const participantCount = await manager.count(AssessmentParticipant, {
+        where: { assessmentId: id },
+      });
+
+      if (participantCount === 0) {
+        throw new BadRequestException('Cannot launch assessment with no participants');
+      }
+
+      // Validate plan participant limits
+      const org = await manager.findOne(Organisation, { where: { id: orgId } });
+      if (!org) throw new NotFoundException('Organisation not found');
+      const limits = PLAN_LIMITS[org.plan] ?? PLAN_LIMITS[Plan.TRIAL];
+
+      if (participantCount > limits.maxParticipants) {
+        throw new ForbiddenException(
+          `Participant count (${participantCount}) exceeds plan limit (${limits.maxParticipants})`,
+        );
+      }
+
+      // Check active assessment count
+      const activeCount = await manager.count(Assessment, {
+        where: { organisationId: orgId, status: AssessmentStatus.ACTIVE },
+      });
+
+      if (activeCount >= limits.maxActiveAssessments) {
+        throw new ForbiddenException(
+          `Plan limit reached: maximum ${limits.maxActiveAssessments} active assessments`,
+        );
+      }
+
+      assessment.status = AssessmentStatus.ACTIVE;
+      if (!assessment.startDate) {
+        assessment.startDate = new Date();
+      }
+
+      const saved = await manager.save(assessment);
+      this.logger.log(`Launched assessment ${id} org=${orgId} participants=${participantCount}`);
+      return saved;
     });
-
-    if (participantCount === 0) {
-      throw new BadRequestException('Cannot launch assessment with no participants');
-    }
-
-    // Validate plan participant limits
-    const org = await this.orgRepo.findOne({ where: { id: orgId } });
-    if (!org) throw new NotFoundException('Organisation not found');
-    const limits = PLAN_LIMITS[org.plan] ?? PLAN_LIMITS[Plan.TRIAL];
-
-    if (participantCount > limits.maxParticipants) {
-      throw new ForbiddenException(
-        `Participant count (${participantCount}) exceeds plan limit (${limits.maxParticipants})`,
-      );
-    }
-
-    // Check active assessment count
-    const activeCount = await this.assessmentRepo.count({
-      where: { organisationId: orgId, status: AssessmentStatus.ACTIVE },
-    });
-
-    if (activeCount >= limits.maxActiveAssessments) {
-      throw new ForbiddenException(
-        `Plan limit reached: maximum ${limits.maxActiveAssessments} active assessments`,
-      );
-    }
-
-    assessment.status = AssessmentStatus.ACTIVE;
-    if (!assessment.startDate) {
-      assessment.startDate = new Date();
-    }
-
-    const saved = await this.assessmentRepo.save(assessment);
-    this.logger.log(`Launched assessment ${id} org=${orgId} participants=${participantCount}`);
-    return saved;
   }
 
   async close(id: string, orgId: string): Promise<Assessment> {
@@ -299,37 +320,39 @@ export class EngineService {
       userId = user.id;
     }
 
-    // Check for existing participant
-    const existing = await this.participantRepo.findOne({
-      where: { assessmentId, userId },
-    });
-    if (existing) {
-      throw new BadRequestException(`User is already a participant in this assessment`);
-    }
-
-    // Plan limits check (only checked during addParticipant for active/non-draft assessments)
-    if (assessment.status !== AssessmentStatus.DRAFT) {
-      const org = await this.orgRepo.findOne({ where: { id: orgId } });
-      if (!org) throw new NotFoundException('Organisation not found');
-      const limits = PLAN_LIMITS[org.plan] ?? PLAN_LIMITS[Plan.TRIAL];
-
-      const currentCount = await this.participantRepo.count({ where: { assessmentId } });
-      if (currentCount >= limits.maxParticipants) {
-        throw new ForbiddenException(
-          `Participant limit (${limits.maxParticipants}) reached for plan ${org.plan}`,
-        );
+    return this.withOrgLock(orgId, async (manager) => {
+      // Check for existing participant
+      const existing = await manager.findOne(AssessmentParticipant, {
+        where: { assessmentId, userId },
+      });
+      if (existing) {
+        throw new BadRequestException(`User is already a participant in this assessment`);
       }
-    }
 
-    const participant = this.participantRepo.create({
-      assessmentId,
-      userId,
-      status: 'invited',
+      // Plan limits check (only checked during addParticipant for active/non-draft assessments)
+      if (assessment.status !== AssessmentStatus.DRAFT) {
+        const org = await manager.findOne(Organisation, { where: { id: orgId } });
+        if (!org) throw new NotFoundException('Organisation not found');
+        const limits = PLAN_LIMITS[org.plan] ?? PLAN_LIMITS[Plan.TRIAL];
+
+        const currentCount = await manager.count(AssessmentParticipant, { where: { assessmentId } });
+        if (currentCount >= limits.maxParticipants) {
+          throw new ForbiddenException(
+            `Participant limit (${limits.maxParticipants}) reached for plan ${org.plan}`,
+          );
+        }
+      }
+
+      const participant = manager.create(AssessmentParticipant, {
+        assessmentId,
+        userId,
+        status: 'invited',
+      });
+
+      const saved = await manager.save(participant);
+      this.logger.log(`Added participant ${userId} to assessment ${assessmentId}`);
+      return saved;
     });
-
-    const saved = await this.participantRepo.save(participant);
-    this.logger.log(`Added participant ${userId} to assessment ${assessmentId}`);
-    return saved;
   }
 
   async getParticipants(assessmentId: string, orgId: string): Promise<AssessmentParticipant[]> {
@@ -368,6 +391,8 @@ export class EngineService {
         isRater?: boolean;
         raterToken?: string;
         nominationStatus?: string;
+        selfRaterToken?: string;
+        selfNominationStatus?: string;
       }
     >
   > {
@@ -377,18 +402,45 @@ export class EngineService {
       order: { createdAt: 'DESC' },
     });
 
-    const participantItems = participations
-      .filter(
-        (p) =>
-          p.assessment &&
-          p.assessment.organisationId === orgId &&
-          p.assessment.status === AssessmentStatus.ACTIVE,
-      )
-      .map((p) => ({
+    const activeParticipations = participations.filter(
+      (p) =>
+        p.assessment &&
+        p.assessment.organisationId === orgId &&
+        p.assessment.status === AssessmentStatus.ACTIVE,
+    );
+
+    // For 360 assessments, the reviewee's own "self" perspective is captured via a
+    // SELF-relationship RaterNomination (same mechanism as every other rater), not the
+    // generic participant-responses endpoint. Look these up so the frontend can route the
+    // reviewee straight into the rater-response flow instead of a dead-end self form.
+    const feedback360ParticipantIds = activeParticipations
+      .filter((p) => p.assessment.assessmentType === AssessmentType.FEEDBACK_360)
+      .map((p) => p.id);
+
+    const selfNominationByParticipantId = new Map<string, RaterNomination>();
+    if (feedback360ParticipantIds.length > 0) {
+      const selfNominations = await this.nominationRepo.find({
+        where: { participantId: In(feedback360ParticipantIds), relationship: RaterRelationship.SELF },
+      });
+      for (const nomination of selfNominations) {
+        selfNominationByParticipantId.set(nomination.participantId, nomination);
+      }
+    }
+
+    const participantItems = activeParticipations.map((p) => {
+      const selfNomination = selfNominationByParticipantId.get(p.id);
+      return {
         ...p.assessment,
         participantStatus: p.status as any,
         completionPercentage: p.status === 'completed' ? 100 : p.status === 'in_progress' ? 50 : 0,
-      }));
+        ...(selfNomination
+          ? {
+              selfRaterToken: selfNomination.token,
+              selfNominationStatus: selfNomination.status,
+            }
+          : {}),
+      };
+    });
 
     // Also return 360 feedback assessments where user is a nominated rater
     const nominations = await this.nominationRepo.find({
@@ -423,51 +475,69 @@ export class EngineService {
   }
 
 
-  async sendReminders(assessmentId: string, orgId: string): Promise<any> {
-    // const assessment = await this.findOne(assessmentId, orgId);
+  /**
+   * Reminds every incomplete participant. For FEEDBACK_360 assessments the
+   * relevant "incomplete" people are the raters, not the reviewee — use
+   * Uc1FeedbackService.sendReminders for those instead.
+   */
+  async sendReminders(assessmentId: string, orgId: string): Promise<{ sent: number }> {
+    const assessment = await this.findOne(assessmentId, orgId);
 
-    // if (assessment.status !== AssessmentStatus.ACTIVE) {
-    //   throw new BadRequestException('Reminders can only be sent for active assessments');
-    // }
+    if (assessment.status !== AssessmentStatus.ACTIVE) {
+      throw new BadRequestException('Reminders can only be sent for active assessments');
+    }
 
-    // const participants = await this.getParticipants(assessmentId, orgId);
+    const participants = await this.getParticipants(assessmentId, orgId);
+    const incomplete = participants.filter((p) => p.status !== 'completed' && p.status !== 'withdrawn');
 
-    // const incomplete = participants.filter(p => p.status !== 'completed');
-
-    // if (incomplete.length === 0) {
-    //   this.logger.log(`Assessment ${assessmentId} has no incomplete participants`);
-    //   return;
-    // }
-
-    // // 2) Send an email to each incomplete participant
-    // for (const p of incomplete) {
-    //   // Skip if the user doesn’t have an email in our database (rare but possible)
-    //   if (!p.user?.email) {
-    //     this.logger.warn(`Skipping reminder for participant ${p.userId}: missing email`);
-    //     continue;
-    //   }
-
-      try {
-        // await this.emailService.sendAssessmentReminder(
-        //   p.user.email,
-        //   assessment.title,
-        //   assessment.id,  // we’ll use the same link pattern as CreateAssessmentDto.sendInvites
-        //   p.token!,
-        // );
-        // this.logger.log(`Reminder sent to ${p.user.email} for assessment ${assessmentId}`);
-        return {
-          message: 'Reminders sent successfully',
-          assessment:assessmentId ,
-        };
-      } catch (error) {
-        // this.logger.error(`Failed to send reminder to ${p.user.email} for assessment ${assessmentId}`, error);
-        console.log("----Error sending reminders",error);
-        return {
-          message: 'Failed to send reminders',
-          assessment:assessmentId ,
-        };
+    let sent = 0;
+    for (const p of incomplete) {
+      if (!p.user?.email) {
+        this.logger.warn(`Skipping reminder for participant ${p.userId}: missing email`);
+        continue;
       }
-    // }
+      await this.notificationsService.sendReminder(
+        p.user.email,
+        p.user.firstName,
+        assessment.title,
+        assessment.endDate?.toLocaleDateString('en-GB') ?? 'soon',
+        { orgId },
+      );
+      sent++;
+    }
+
+    this.logger.log(`Sent ${sent} reminders for assessment ${assessmentId}`);
+    return { sent };
+  }
+
+  /** Reminds a single incomplete participant (targeted, non-360). */
+  async remindParticipant(assessmentId: string, participantId: string, orgId: string): Promise<{ sent: boolean }> {
+    const assessment = await this.findOne(assessmentId, orgId);
+
+    const participant = await this.participantRepo.findOne({
+      where: { id: participantId, assessmentId },
+      relations: ['user'],
+    });
+    if (!participant) {
+      throw new NotFoundException(`Participant ${participantId} not found`);
+    }
+    if (participant.status === 'completed' || participant.status === 'withdrawn') {
+      throw new BadRequestException('Participant has already completed or withdrawn — no reminder needed');
+    }
+    if (!participant.user?.email) {
+      throw new BadRequestException('Participant has no email on file');
+    }
+
+    await this.notificationsService.sendReminder(
+      participant.user.email,
+      participant.user.firstName,
+      assessment.title,
+      assessment.endDate?.toLocaleDateString('en-GB') ?? 'soon',
+      { orgId },
+    );
+
+    this.logger.log(`Sent targeted reminder to participant ${participantId} for assessment ${assessmentId}`);
+    return { sent: true };
   }
 
    async removeParticipant(assessmentId: string, participantId: string, orgId: string): Promise<void> {

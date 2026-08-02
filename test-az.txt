@@ -1,0 +1,16 @@
+{
+  "environmentName": "AzureCloud",
+  "homeTenantId": "e587ae02-b30e-4a2a-880a-f0e5cf1f32d8",
+  "id": "a9c17b61-74a0-4f5c-bc7b-86e5f55d2d40",
+  "isDefault": true,
+  "managedByTenants": [],
+  "name": "Leadership subscription",
+  "state": "Enabled",
+  "tenantDefaultDomain": "devtechneura252.onmicrosoft.com",
+  "tenantDisplayName": "Default Directory",
+  "tenantId": "e587ae02-b30e-4a2a-880a-f0e5cf1f32d8",
+  "user": {
+    "name": "dev@techneura.ai",
+    "type": "user"
+  }
+}

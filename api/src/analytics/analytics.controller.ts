@@ -76,4 +76,11 @@ export class AnalyticsController {
 getParticipantCompletion(@Request() req: any) {
   return this.analyticsService.getParticipantCompletion(req.user.orgId);
 }
+
+  @Get('participation/departments')
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @ApiOperation({ summary: 'Get distinct participant headcount per department' })
+  getDepartmentParticipation(@Request() req: any) {
+    return this.analyticsService.getDepartmentParticipation(req.user.orgId);
+  }
 }
