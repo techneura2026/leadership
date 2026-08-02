@@ -13,11 +13,16 @@ import { Competency } from '../assessment/items/entities/competency.entity';
 import { RoleProfile } from '../assessment/uc4-readiness/entities/role-profile.entity';
 import { PersonalityScore } from '../assessment/uc3-personality/entities/personality-score.entity';
 
+export interface DashboardStatMetric {
+  count: number;
+  percentage_change: number;
+}
+
 export interface OrgDashboardData {
-  activeAssessments: number;
-  totalParticipants: number;
-  reportsGenerated: number;
-  pendingResponses: number;
+  active_assessments: DashboardStatMetric;
+  total_participants: DashboardStatMetric;
+  pending_responses: DashboardStatMetric;
+  reports_generated: DashboardStatMetric;
   assessmentsByType: Record<string, number>;
   assessmentsByStatus: Record<string, number>;
   recentAssessments: Assessment[];
@@ -50,6 +55,14 @@ export interface SuccessionOverview {
   }>;
 }
 
+
+export interface ParticipantCompletion {
+  rate: number;
+  completed: number;
+  inProgress: number;
+  notStarted: number;
+}
+
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
@@ -77,16 +90,41 @@ export class AnalyticsService {
     private readonly personalityScoreRepo: Repository<PersonalityScore>,
   ) { }
 
+  /** Compute percentage change: ((current - previous) / previous) * 100, rounded to 1 decimal. */
+  private pctChange(current: number, previous: number): number {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 1000) / 10;
+  }
+
   /**
    * Returns key organisational dashboard metrics.
    */
   async getOrgDashboard(orgId: string): Promise<OrgDashboardData> {
-    // Active assessments
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    // ── Active assessments (current count + change based on recently launched) ──
     const activeAssessments = await this.assessmentRepo.count({
       where: { organisationId: orgId, status: AssessmentStatus.ACTIVE },
     });
 
-    // Total unique participants across all assessments
+    const activeLaunchedRecent = await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+      .andWhere('a.start_date >= :since', { since: thirtyDaysAgo })
+      .getCount();
+
+    const activeLaunchedPrev = await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+      .andWhere('a.start_date >= :from', { from: sixtyDaysAgo })
+      .andWhere('a.start_date < :to', { to: thirtyDaysAgo })
+      .getCount();
+
+    // ── Total unique participants ──
     const totalParticipants = await this.participantRepo
       .createQueryBuilder('p')
       .innerJoin('p.assessment', 'a')
@@ -95,12 +133,26 @@ export class AnalyticsService {
       .getRawOne()
       .then((r) => parseInt(r?.count ?? '0', 10));
 
-    // Reports generated this org
-    const reportsGenerated = await this.reportRepo.count({
-      where: { organisationId: orgId, status: 'ready' },
-    });
+    const participantsRecent = await this.participantRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('p.created_at >= :since', { since: thirtyDaysAgo })
+      .select('COUNT(DISTINCT p.user_id)', 'count')
+      .getRawOne()
+      .then((r) => parseInt(r?.count ?? '0', 10));
 
-    // Pending rater responses (approved nominations not completed)
+    const participantsPrev = await this.participantRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('p.created_at >= :from', { from: sixtyDaysAgo })
+      .andWhere('p.created_at < :to', { to: thirtyDaysAgo })
+      .select('COUNT(DISTINCT p.user_id)', 'count')
+      .getRawOne()
+      .then((r) => parseInt(r?.count ?? '0', 10));
+
+    // ── Pending rater responses ──
     const pendingResponses = await this.nominationRepo
       .createQueryBuilder('n')
       .innerJoin('n.assessment', 'a')
@@ -108,7 +160,44 @@ export class AnalyticsService {
       .andWhere("n.status IN ('approved', 'sent')")
       .getCount();
 
-    // Assessments by type
+    const pendingRecent = await this.nominationRepo
+      .createQueryBuilder('n')
+      .innerJoin('n.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere("n.status IN ('approved', 'sent')")
+      .andWhere('n.created_at >= :since', { since: thirtyDaysAgo })
+      .getCount();
+
+    const pendingPrev = await this.nominationRepo
+      .createQueryBuilder('n')
+      .innerJoin('n.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere("n.status IN ('approved', 'sent')")
+      .andWhere('n.created_at >= :from', { from: sixtyDaysAgo })
+      .andWhere('n.created_at < :to', { to: thirtyDaysAgo })
+      .getCount();
+
+    // ── Reports generated ──
+    const reportsGenerated = await this.reportRepo.count({
+      where: { organisationId: orgId, status: 'ready' },
+    });
+
+    const reportsRecent = await this.reportRepo
+      .createQueryBuilder('r')
+      .where('r.organisation_id = :orgId', { orgId })
+      .andWhere('r.status = :status', { status: 'ready' })
+      .andWhere('r.generated_at >= :since', { since: thirtyDaysAgo })
+      .getCount();
+
+    const reportsPrev = await this.reportRepo
+      .createQueryBuilder('r')
+      .where('r.organisation_id = :orgId', { orgId })
+      .andWhere('r.status = :status', { status: 'ready' })
+      .andWhere('r.generated_at >= :from', { from: sixtyDaysAgo })
+      .andWhere('r.generated_at < :to', { to: thirtyDaysAgo })
+      .getCount();
+
+    // ── Assessments by type ──
     const byTypeRaw = await this.assessmentRepo
       .createQueryBuilder('a')
       .where('a.organisation_id = :orgId', { orgId })
@@ -121,7 +210,7 @@ export class AnalyticsService {
       byTypeRaw.map((r) => [r.type, parseInt(r.count, 10)]),
     );
 
-    // Assessments by status
+    // ── Assessments by status ──
     const byStatusRaw = await this.assessmentRepo
       .createQueryBuilder('a')
       .where('a.organisation_id = :orgId', { orgId })
@@ -141,10 +230,22 @@ export class AnalyticsService {
     });
 
     return {
-      activeAssessments,
-      totalParticipants,
-      reportsGenerated,
-      pendingResponses,
+      active_assessments: {
+        count: activeAssessments,
+        percentage_change: this.pctChange(activeLaunchedRecent, activeLaunchedPrev),
+      },
+      total_participants: {
+        count: totalParticipants,
+        percentage_change: this.pctChange(participantsRecent, participantsPrev),
+      },
+      pending_responses: {
+        count: pendingResponses,
+        percentage_change: this.pctChange(pendingRecent, pendingPrev),
+      },
+      reports_generated: {
+        count: reportsGenerated,
+        percentage_change: this.pctChange(reportsRecent, reportsPrev),
+      },
       assessmentsByType,
       assessmentsByStatus,
       recentAssessments,
@@ -369,18 +470,21 @@ export class AnalyticsService {
       .where('a.organisation_id = :orgId', { orgId })
       .andWhere('a.created_at >= NOW() - INTERVAL \'12 months\'')
       .select("TO_CHAR(a.created_at, 'YYYY-MM')", 'month')
+      .addSelect('a.status', 'status')
       .addSelect('COUNT(*)', 'count')
       .groupBy("TO_CHAR(a.created_at, 'YYYY-MM')")
+      .addGroupBy('a.status')
       .orderBy("TO_CHAR(a.created_at, 'YYYY-MM')")
       .getRawMany();
 
-    console.log("---------getMonthlyActivity-----------------");
+    console.log("---------getMonthlyActivity-----------------\n\n\n\n\n\n/n/n/n/");
     console.log(raw);
     console.log("--------------------------");
 
     return raw.map((r) => ({
       month: r.month,
       count: parseInt(r.count, 10),
+      status: r.status,
     }));
   }
 
@@ -403,4 +507,42 @@ export class AnalyticsService {
       participants: Number(r.participants),
     }));
   }
+
+
+
+  async getParticipantCompletion(orgId: string): Promise<ParticipantCompletion> {
+  const raw = await this.participantRepo
+    .createQueryBuilder('p')
+    .innerJoin('p.assessment', 'a')
+    .where('a.organisation_id = :orgId', { orgId })
+    .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+    .select('p.status', 'status')
+    .addSelect('COUNT(*)', 'count')
+    .groupBy('p.status')
+    .getRawMany();
+
+  const completed = Number(
+    raw.find(r => r.status === 'completed')?.count ?? 0,
+  );
+
+  const inProgress = Number(
+    raw.find(r => r.status === 'in_progress')?.count ?? 0,
+  );
+
+  const notStarted = Number(
+    raw.find(r => r.status === 'invited')?.count ?? 0,
+  );
+
+  const total = completed + inProgress + notStarted;
+
+  const rate =
+    total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  return {
+    rate,
+    completed,
+    inProgress,
+    notStarted,
+  };
+}
 }

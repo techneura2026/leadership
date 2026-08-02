@@ -68,4 +68,12 @@ export class AnalyticsController {
   getParticipantActivity(@Request() req: any): Promise<any> {
     return this.analyticsService.getParticipantActivity(req.user.orgId);
   }
+
+
+
+  @Get('completion/participants')
+@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+getParticipantCompletion(@Request() req: any) {
+  return this.analyticsService.getParticipantCompletion(req.user.orgId);
+}
 }

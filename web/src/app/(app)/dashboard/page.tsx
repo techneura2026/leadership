@@ -1,6 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import {
+  getParticipantActivity,
+  getDashboardData,
+  ParticipantActivity,
+  DashboardData,
+  api,
+  getParticipantCompletion,
+   ParticipantCompletion,
+} from '@/lib/api';
+
+
 import { format } from 'date-fns';
 import {
   ClipboardList,
@@ -31,45 +44,6 @@ import {
 import { AssessmentStatus, AssessmentType, UserRole } from '@leaderprism/shared';
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
-
-const MOCK_STATS = [
-  {
-    label: 'Active Assessments',
-    value: 24,
-    delta: 12.4,
-    up: true,
-    icon: ClipboardList,
-    gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)',
-    glow: 'rgba(70,95,255,0.25)',
-  },
-  {
-    label: 'Total Participants',
-    value: 186,
-    delta: 8.1,
-    up: true,
-    icon: Users,
-    gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
-    glow: 'rgba(34,197,94,0.22)',
-  },
-  {
-    label: 'Pending Responses',
-    value: 37,
-    delta: 5.6,
-    up: false,
-    icon: Clock,
-    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    glow: 'rgba(245,158,11,0.22)',
-  },
-  {
-    label: 'Reports Generated',
-    value: 52,
-    delta: 23.2,
-    up: true,
-    icon: FileText,
-    gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
-    glow: 'rgba(168,85,247,0.22)',
-  },
-];
 
 const MOCK_MONTHLY_ACTIVITY = [
   { month: 'Jan', launched: 14, completed: 10 },
@@ -215,7 +189,7 @@ function RadarViews({
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 
-function StatCard({ stat }: { stat: (typeof MOCK_STATS)[number] }) {
+function StatCard({ stat }: { stat: any }) {
   const Icon = stat.icon;
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
@@ -247,7 +221,27 @@ function StatCard({ stat }: { stat: (typeof MOCK_STATS)[number] }) {
 // ── Completion Rate Gauge ────────────────────────────────────────────────────
 
 function CompletionGauge() {
-  const { rate, completed, inProgress, notStarted } = MOCK_COMPLETION;
+  const [completion, setCompletion] = useState<ParticipantCompletion | null>(null);
+
+useEffect(() => {
+  const loadCompletion = async () => {
+    try {
+      const data = await getParticipantCompletion();
+      setCompletion(data);
+    } catch (err) {
+      console.error('Failed to load completion data', err);
+    }
+  };
+
+  loadCompletion();
+}, []);
+
+const rate = completion?.rate ?? 0;
+const completed = completion?.completed ?? 0;
+const inProgress = completion?.inProgress ?? 0;
+const notStarted = completion?.notStarted ?? 0;
+
+
   const r = 70;
   const c = 2 * Math.PI * r;
   const sweep = 0.75; // 270° arc, open at the bottom
@@ -348,6 +342,23 @@ function ActivityCharts() {
 }
 
 function DistributionCharts() {
+  const [participantTrend, setParticipantTrend] = useState<ParticipantActivity[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await getParticipantActivity();
+        console.log('Participant activity data loaded:', data);
+        setParticipantTrend(data);
+        
+      } catch (err) {
+        console.error('Failed to load participant activity', err);
+      }
+    };
+
+    loadData();
+  }, []);
+
   const total = MOCK_TYPE_DISTRIBUTION.reduce((sum, d) => sum + d.value, 0);
 
   return (
@@ -402,7 +413,7 @@ function DistributionCharts() {
         <h2 className="text-lg font-bold text-gray-900 mb-1">Participant Growth</h2>
         <p className="text-sm text-gray-500 mb-6">Total participants over the past 7 months</p>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={MOCK_PARTICIPANT_TREND}>
+          <AreaChart data={participantTrend}>
             <defs>
               <linearGradient id="participantGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#a855f7" stopOpacity={0.25} />
@@ -504,7 +515,126 @@ function UserDashboard() {
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
+  const [dashboardStats, setDashboardStats] = useState([
+    {
+      label: 'Active Assessments',
+      value: 0,
+      delta: 0,
+      up: true,
+      icon: ClipboardList,
+      gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)',
+      glow: 'rgba(70,95,255,0.25)',
+    },
+    {
+      label: 'Total Participants',
+      value: 0,
+      delta: 0,
+      up: true,
+      icon: Users,
+      gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+      glow: 'rgba(34,197,94,0.22)',
+    },
+    {
+      label: 'Pending Responses',
+      value: 0,
+      delta: 0,
+      up: false,
+      icon: Clock,
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      glow: 'rgba(245,158,11,0.22)',
+    },
+    {
+      label: 'Reports Generated',
+      value: 0,
+      delta: 0,
+      up: true,
+      icon: FileText,
+      gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+      glow: 'rgba(168,85,247,0.22)',
+    },
+  ]);
   const router = useRouter();
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+
+useEffect(() => {
+  const loadDashboard = async () => {
+    try {
+      const data = await getDashboardData();
+      setDashboard(data);
+    } catch (err) {
+      console.error('Failed to load dashboard', err);
+    }
+  };
+
+  loadDashboard();
+}, []);
+
+  useEffect(() => {
+    const getDashboardStats = async () => {
+      try {
+        const res = await api.get("analytics/dashboard")
+        if (res?.status === 200) {
+          const { active_assessments, total_participants, pending_responses, reports_generated } = res.data.data;
+          const updatedStats = [
+            {
+              label: 'Active Assessments',
+              value: active_assessments.count,
+              delta: active_assessments.percentage_change,
+              up: active_assessments.percentage_change > 0,
+              icon: ClipboardList,
+              gradient: 'linear-gradient(135deg, #465fff 0%, #2a31d8 100%)',
+              glow: 'rgba(70,95,255,0.25)',
+            },
+            {
+              label: 'Total Participants',
+              value: total_participants.count,
+              delta: total_participants.percentage_change,
+              up: total_participants.percentage_change > 0,
+              icon: Users,
+              gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
+              glow: 'rgba(34,197,94,0.22)',
+            },
+            {
+              label: 'Pending Responses',
+              value: pending_responses.count,
+              delta: pending_responses.percentage_change,
+              up: pending_responses.percentage_change > 0,
+              icon: Clock,
+              gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              glow: 'rgba(245,158,11,0.22)',
+            },
+            {
+              label: 'Reports Generated',
+              value: reports_generated.count,
+              delta: reports_generated.percentage_change,
+              up: reports_generated.percentage_change > 0,
+              icon: FileText,
+              gradient: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+              glow: 'rgba(168,85,247,0.22)',
+            },
+          ];
+          setDashboardStats(updatedStats);
+        }
+      } catch (error) {
+        console.error('Error on fetching dashboard stats', error)
+      }
+    }
+
+    const getMonthlyActivity = async () => {
+      try {
+        const res = await api.get("analytics/activity/monthly")
+        if (res?.status === 200) {
+          //this is need to be update after some assessments are completed,
+          console.log(res)
+        }
+      } catch (error) {
+        console.error('Error on fetching dashboard stats', error)
+      }
+    }
+
+    getMonthlyActivity()
+    getDashboardStats()
+  }, [])
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -524,7 +654,7 @@ function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        {MOCK_STATS.map((s) => (
+        {dashboardStats.map((s) => (
           <StatCard key={s.label} stat={s} />
         ))}
       </div>
@@ -553,27 +683,45 @@ function AdminDashboard() {
           </button>
         </div>
 
-        <div className="divide-y divide-gray-100">
-          {MOCK_RECENT_ASSESSMENTS.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
-              onClick={() => router.push(`/assessments/${a.id}`)}
-            >
-              <div className="flex-1 min-w-0 pr-4">
-                <p className="text-base font-semibold text-gray-900 truncate mb-1">{a.title}</p>
-                <p className="text-sm text-gray-500">
-                  {format(new Date(a.createdAt), 'dd MMM yyyy')} <span className="mx-2 text-gray-300">•</span>
-                  {TYPE_LABELS[a.assessmentType]} <span className="mx-2 text-gray-300">•</span>
-                  {a.participants} participants
-                </p>
-              </div>
-              <Badge variant={STATUS_VARIANT[a.status]}>
-                {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
-              </Badge>
-            </div>
-          ))}
+<div className="divide-y divide-gray-100">
+  {dashboard?.recentAssessments?.length ? (
+    dashboard.recentAssessments.map((a) => (
+      <div
+        key={a.id}
+        className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors gap-4"
+        onClick={() => router.push(`/assessments/${a.id}`)}
+      >
+        <div className="flex-1 min-w-0 pr-4">
+          <p className="text-base font-semibold text-gray-900 truncate mb-1">
+            {a.title}
+          </p>
+
+          <p className="text-sm text-gray-500">
+            {format(new Date(a.createdAt), 'dd MMM yyyy')}
+            <span className="mx-2 text-gray-300">•</span>
+
+            {TYPE_LABELS[a.assessmentType as AssessmentType]}
+
+            {a.participants && (
+              <>
+                <span className="mx-2 text-gray-300">•</span>
+                {a.participants} participants
+              </>
+            )}
+          </p>
         </div>
+
+        <Badge variant={STATUS_VARIANT[a.status as AssessmentStatus]}>
+          {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+        </Badge>
+      </div>
+    ))
+  ) : (
+    <div className="px-6 py-8 text-center text-gray-500">
+      No recent assessments found.
+    </div>
+  )}
+</div>
       </div>
     </div>
   );

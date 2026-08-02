@@ -122,7 +122,8 @@ export class EngineService {
     private readonly nominationRepo: Repository<RaterNomination>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-  ) {}
+    // private readonly emailService: EmailService,
+  ) { }
 
   async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
     const org = await this.orgRepo.findOne({ where: { id: orgId } });
@@ -197,9 +198,9 @@ export class EngineService {
   async update(id: string, orgId: string, dto: UpdateAssessmentDto): Promise<Assessment> {
     const assessment = await this.findOne(id, orgId);
 
-    if (assessment.status !== AssessmentStatus.DRAFT) {
-      throw new BadRequestException('Only DRAFT assessments can be updated');
-    }
+    if (assessment.status === AssessmentStatus.CLOSED) {
+  throw new BadRequestException('Closed assessments cannot be updated');
+}
 
     if (dto.title !== undefined) assessment.title = dto.title;
     if (dto.config !== undefined) assessment.config = dto.config;
@@ -420,4 +421,88 @@ export class EngineService {
 
     return [...participantItems, ...raterItems];
   }
+
+
+  async sendReminders(assessmentId: string, orgId: string): Promise<any> {
+    // const assessment = await this.findOne(assessmentId, orgId);
+
+    // if (assessment.status !== AssessmentStatus.ACTIVE) {
+    //   throw new BadRequestException('Reminders can only be sent for active assessments');
+    // }
+
+    // const participants = await this.getParticipants(assessmentId, orgId);
+
+    // const incomplete = participants.filter(p => p.status !== 'completed');
+
+    // if (incomplete.length === 0) {
+    //   this.logger.log(`Assessment ${assessmentId} has no incomplete participants`);
+    //   return;
+    // }
+
+    // // 2) Send an email to each incomplete participant
+    // for (const p of incomplete) {
+    //   // Skip if the user doesn’t have an email in our database (rare but possible)
+    //   if (!p.user?.email) {
+    //     this.logger.warn(`Skipping reminder for participant ${p.userId}: missing email`);
+    //     continue;
+    //   }
+
+      try {
+        // await this.emailService.sendAssessmentReminder(
+        //   p.user.email,
+        //   assessment.title,
+        //   assessment.id,  // we’ll use the same link pattern as CreateAssessmentDto.sendInvites
+        //   p.token!,
+        // );
+        // this.logger.log(`Reminder sent to ${p.user.email} for assessment ${assessmentId}`);
+        return {
+          message: 'Reminders sent successfully',
+          assessment:assessmentId ,
+        };
+      } catch (error) {
+        // this.logger.error(`Failed to send reminder to ${p.user.email} for assessment ${assessmentId}`, error);
+        console.log("----Error sending reminders",error);
+        return {
+          message: 'Failed to send reminders',
+          assessment:assessmentId ,
+        };
+      }
+    // }
+  }
+
+   async removeParticipant(assessmentId: string, participantId: string, orgId: string): Promise<void> {
+      const assessment = await this.findOne(assessmentId, orgId);
+  
+      if (assessment.status === AssessmentStatus.CLOSED || assessment.status === AssessmentStatus.ARCHIVED) {
+        throw new BadRequestException('Cannot remove participants from a closed or archived assessment');
+      }
+  
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+        relations: ['assessment', 'user'],
+      });
+  
+      if (!participant) {
+        throw new NotFoundException('Participant not found');
+      }
+  
+      // Ensure the participant belongs to this assessment and organisation
+      if (participant.assessment?.organisationId !== orgId) {
+        throw new ForbiddenException('Participant does not belong to this organisation');
+      }
+  
+      // Prevent removal of self if user is the creator (self-assessment exception)
+      // if (participant.userId === assessment.creatorId) {
+      //   throw new BadRequestException('You cannot remove yourself from a self-assessment');
+      // }
+  
+      // // soft delete
+      // participant.deletedAt = new Date();
+      // await this.participantRepo.save(participant);
+      //
+      //hard delete
+      await this.participantRepo.delete({ id: participantId, assessmentId });
+  
+      this.logger.log(`Removed participant ${participantId} from assessment ${assessmentId}`);
+    }
 }

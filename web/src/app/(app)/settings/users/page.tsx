@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
@@ -15,8 +15,9 @@ import type { UserDto, DepartmentDto } from '@leaderprism/shared';
 import {
   Users, UserPlus, Search, CheckCircle2, X, Pencil, Ban, RotateCcw, Trash2,
   Crown, ShieldCheck, UserCog, User as UserIcon,
+  User,
 } from 'lucide-react';
-
+import imageCompression from 'browser-image-compression';
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const ROLE_OPTIONS = [
@@ -96,9 +97,23 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
   const [departmentId, setDepartmentId] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [loading, setLoading] = useState(false);
+  const [avatarURL, setAvatarURL] = useState('');
   const [error, setError] = useState('');
 
   const { data: departments } = useApi<DepartmentDto[]>(open ? '/organisations/me/departments' : null);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    let file = event.target.files?.[0];
+    if (file) {
+      const options = { maxSizeMB: 1, maxWidthOrHeight: 800, useWebWorker: true };
+      file = await imageCompression(file, options);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarURL(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const deptOptions = [
     { value: '', label: 'No department' },
@@ -121,6 +136,8 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
     onClose();
   }
 
+  ///
+  ///Need to update with real images daving  URL
   async function handleSubmit() {
     setError('');
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
@@ -134,6 +151,7 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         lastName: lastName.trim(),
         email: email.trim().toLowerCase(),
         role,
+        avatarUrl: avatarURL,
         ...(departmentId ? { departmentId } : {}),
         ...(jobTitle.trim() ? { jobTitle: jobTitle.trim() } : {}),
       });
@@ -151,6 +169,34 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
   return (
     <Modal open={open} onClose={handleClose} title="Add User">
       <div className="space-y-4">
+        <div className='h-40 w-full border-0  flex justify-center'>
+          <div className='h-40 w-40 border-4 border-gray-100 bg-gray-200 rounded-full relative'>
+
+            {avatarURL ? (
+              <img src={avatarURL} alt="Avatar" className='w-full h-full rounded-full object-cover' />
+            ) :
+              <div className='w-full h-full flex justify-center items-center'>
+                <User className="h-20 w-20 text-gray-400" />
+              </div>
+            }
+
+            {!avatarURL ? <label htmlFor="avatar" className='absolute -bottom-1 -right-2 w-10 flex justify-center items-center bg-gray-400 h-10 border-1 rounded-full cursor-pointer hover:bg-gray-300'>
+              <Pencil size={20} />
+            </label> : <span onClick={() => {
+              setAvatarURL('');
+              const fileInput = document.getElementById('avatar') as HTMLInputElement;
+              if (fileInput) {
+                fileInput.value = '';
+              }
+            }} className='absolute -bottom-1 -right-2 w-10 flex justify-center items-center bg-red-400 h-10 border-1 rounded-full cursor-pointer hover:bg-red-300'>
+              <X size={20} />
+            </span>}
+
+
+            <input type="file" onChange={handleFileChange} accept="image/*" name="avatar" id="avatar" className='hidden' />
+          </div>
+
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="First name" required>
             <input

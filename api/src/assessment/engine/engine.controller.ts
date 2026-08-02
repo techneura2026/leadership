@@ -104,4 +104,18 @@ export class EngineController {
   getResponseRate(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
     return this.engineService.getResponseRate(id, req.user.orgId);
   }
+
+  @Post(':id/send-reminders')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send reminders to participants' })
+  sendReminders(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.engineService.sendReminders(id, req.user.orgId);
+  }
+
+  @Post(':id/participants/:participantId/remove')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove a participant from an assessment' })
+  removeParticipant(@Request() req: any, @Param('id', ParseUUIDPipe) id: string, @Param('participantId', ParseUUIDPipe) participantId: string) {
+    return this.engineService.removeParticipant(id, participantId, req.user.orgId);
+  }
 }
