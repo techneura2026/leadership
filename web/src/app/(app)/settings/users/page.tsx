@@ -675,6 +675,12 @@ function DeleteUserModal({ user, onClose, onDone }: DeactivateModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Reset stale error/loading state from a previous delete attempt when reopened for a different user
+  useEffect(() => {
+    setError('');
+    setLoading(false);
+  }, [user?.id]);
+
   async function handleDelete() {
     if (!user) return;
     setLoading(true);
@@ -1049,7 +1055,12 @@ export default function UsersSettingsPage() {
       <DeleteUserModal
         user={deleteUser}
         onClose={() => setDeleteUser(null)}
-        onDone={() => { setDeleteUser(null); mutate(); }}
+        onDone={() => {
+          const name = deleteUser ? `${deleteUser.firstName} ${deleteUser.lastName}` : 'User';
+          setDeleteUser(null);
+          mutate();
+          setSuccessMsg(`${name} was permanently deleted.`);
+        }}
       />
     </div>
   );
