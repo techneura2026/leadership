@@ -16,6 +16,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
     "seed": "ts-node src/database/seeds/run-seeds.ts",
+    "seed:thrivehive": "ts-node src/database/seeds/run-thrivehive-seed.ts",
     "test:e2e": "jest --config jest.e2e.config.js --runInBand --forceExit",
     "test:e2e:watch": "jest --config jest.e2e.config.js --runInBand --watch"
   },
