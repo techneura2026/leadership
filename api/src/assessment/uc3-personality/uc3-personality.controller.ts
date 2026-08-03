@@ -12,10 +12,13 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Uc3PersonalityService, QuestionnaireProgress } from './uc3-personality.service';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { UserRole } from '@leaderprism/shared';
 import { SaveResponseDto } from './dto/save-response.dto';
 
 @ApiTags('Personality Assessment — Big Five (UC3)')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
 @Controller('assessments')
 export class Uc3PersonalityController {
   constructor(private readonly uc3Service: Uc3PersonalityService) {}
@@ -28,7 +31,14 @@ export class Uc3PersonalityController {
     @Param('participantId') participantId: string,
     @Query('language') language = 'en',
   ): Promise<QuestionnaireProgress> {
-    return this.uc3Service.getQuestionnaire(assessmentId, participantId, req.user.orgId, language);
+    return this.uc3Service.getQuestionnaire(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+      language,
+    );
   }
 
   @Post(':id/personality/responses/:participantId')
@@ -45,6 +55,8 @@ export class Uc3PersonalityController {
       req.user.orgId,
       body.itemId,
       body.value,
+      req.user.sub,
+      req.user.role,
     );
   }
 
@@ -55,7 +67,13 @@ export class Uc3PersonalityController {
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
   ) {
-    return this.uc3Service.submitQuestionnaire(assessmentId, participantId, req.user.orgId);
+    return this.uc3Service.submitQuestionnaire(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Get(':id/personality/scores/:participantId')
@@ -65,6 +83,12 @@ export class Uc3PersonalityController {
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
   ) {
-    return this.uc3Service.getScores(assessmentId, participantId, req.user.orgId);
+    return this.uc3Service.getScores(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 }

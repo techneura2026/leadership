@@ -37,6 +37,11 @@ export class UpdateUserDto {
   @IsUUID()
   departmentId?: string;
 
+  @ApiPropertyOptional({ description: 'Manager UUID — the user this person reports to. Send null to clear.' })
+  @IsOptional()
+  @IsUUID()
+  managerId?: string | null;
+
   @ApiPropertyOptional({ description: 'Set false to deactivate the user' })
   @IsOptional()
   @IsBoolean()

@@ -13,21 +13,21 @@ export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('dashboard')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get key organisational metrics dashboard' })
   getDashboard(@Request() req: any): Promise<OrgDashboardData> {
     return this.analyticsService.getOrgDashboard(req.user.orgId);
   }
 
   @Get('heatmap')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get average competency scores heatmap for an assessment' })
   getHeatmap(@Request() req: any, @Query('assessmentId') assessmentId: string): Promise<HeatmapEntry[]> {
     return this.analyticsService.getCompetencyHeatmap(req.user.orgId, assessmentId);
   }
 
   @Get('succession')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get succession pipeline overview by readiness rating and role' })
   getSuccession(@Request() req: any): Promise<SuccessionOverview> {
     return this.analyticsService.getSuccessionOverview(req.user.orgId);
@@ -41,14 +41,14 @@ export class AnalyticsController {
   }
 
   @Get('radar/org')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get aggregate radar chart data for the organisation' })
   getOrgRadar(@Request() req: any): Promise<RadarAggregate> {
     return this.analyticsService.getOrgAggregateRadar(req.user.orgId);
   }
 
   @Get('radar/user/:userId')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get aggregate radar chart data for a specific user' })
   getUserRadar(@Request() req: any, @Param('userId') userId: string): Promise<RadarAggregate> {
     return this.analyticsService.getUserAggregateRadar(req.user.orgId, userId);
@@ -56,14 +56,14 @@ export class AnalyticsController {
 
 
   @Get('activity/monthly')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get monthly activity metrics for the organisation' })
   getMonthlyActivity(@Request() req: any): Promise<any> {
     return this.analyticsService.getMonthlyActivity(req.user.orgId);
   }
 
   @Get('activity/participants')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get participant activity metrics for the organisation' })
   getParticipantActivity(@Request() req: any): Promise<any> {
     return this.analyticsService.getParticipantActivity(req.user.orgId);
@@ -72,13 +72,13 @@ export class AnalyticsController {
 
 
   @Get('completion/participants')
-@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
 getParticipantCompletion(@Request() req: any) {
   return this.analyticsService.getParticipantCompletion(req.user.orgId);
 }
 
   @Get('participation/departments')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get distinct participant headcount per department' })
   getDepartmentParticipation(@Request() req: any) {
     return this.analyticsService.getDepartmentParticipation(req.user.orgId);

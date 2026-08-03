@@ -13,6 +13,7 @@ import { PdfService } from './pdf.service';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../assessment/engine/entities/assessment-participant.entity';
 import { User } from '../core/users/entities/user.entity';
+import { Organisation } from '../core/organisations/entities/organisation.entity';
 import { Uc1FeedbackService } from '../assessment/uc1-feedback/uc1-feedback.service';
 import { Uc2CompetencyService } from '../assessment/uc2-competency/uc2-competency.service';
 import { Uc3PersonalityService } from '../assessment/uc3-personality/uc3-personality.service';
@@ -33,6 +34,8 @@ export class ReportingService {
     private readonly participantRepo: Repository<AssessmentParticipant>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Organisation)
+    private readonly organisationRepo: Repository<Organisation>,
     @InjectRepository(ReadinessScore)
     private readonly readinessScoreRepo: Repository<ReadinessScore>,
     private readonly pdfService: PdfService,
@@ -120,11 +123,13 @@ export class ReportingService {
         ? `${participantUser.firstName} ${participantUser.lastName}`
         : 'Participant';
 
+      const organisation = await this.organisationRepo.findOne({ where: { id: orgId } });
+
       const commonData = {
         participantName,
         jobTitle: participantUser?.jobTitle ?? '',
         assessmentTitle: assessment.title,
-        organisationName: orgId,
+        organisationName: organisation?.name ?? '',
         generatedDate,
       };
 

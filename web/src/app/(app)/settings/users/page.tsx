@@ -95,12 +95,14 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string>(UserRole.PARTICIPANT);
   const [departmentId, setDepartmentId] = useState('');
+  const [managerId, setManagerId] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [avatarURL, setAvatarURL] = useState('');
   const [error, setError] = useState('');
 
   const { data: departments } = useApi<DepartmentDto[]>(open ? '/organisations/me/departments' : null);
+  const { data: allUsers } = useApi<UserDto[]>(open ? '/users' : null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     let file = event.target.files?.[0];
@@ -120,12 +122,18 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
     ...(departments ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name })),
   ];
 
+  const managerOptions = [
+    { value: '', label: 'No manager' },
+    ...(allUsers ?? []).filter((u) => u.isActive).map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })),
+  ];
+
   function reset() {
     setFirstName('');
     setLastName('');
     setEmail('');
     setRole(UserRole.PARTICIPANT);
     setDepartmentId('');
+    setManagerId('');
     setJobTitle('');
     setError('');
     setLoading(false);
@@ -153,6 +161,7 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         role,
         avatarUrl: avatarURL,
         ...(departmentId ? { departmentId } : {}),
+        ...(managerId ? { managerId } : {}),
         ...(jobTitle.trim() ? { jobTitle: jobTitle.trim() } : {}),
       });
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
@@ -244,14 +253,23 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
           </Field>
         </div>
 
-        <Field label="Job title">
-          <input
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-            className={inputCls}
-            placeholder="e.g. Senior Manager"
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Job title">
+            <input
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              className={inputCls}
+              placeholder="e.g. Senior Manager"
+            />
+          </Field>
+          <Field label="Reports to">
+            <Select
+              value={managerId}
+              onChange={setManagerId}
+              options={managerOptions}
+            />
+          </Field>
+        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
@@ -292,8 +310,13 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
   const [lastName, setLastName] = useState(user?.lastName ?? '');
   const [role, setRole] = useState(user?.role ?? UserRole.PARTICIPANT);
   const [jobTitle, setJobTitle] = useState(user?.jobTitle ?? '');
+  const [departmentId, setDepartmentId] = useState(user?.departmentId ?? '');
+  const [managerId, setManagerId] = useState(user?.managerId ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { data: departments } = useApi<DepartmentDto[]>(user ? '/organisations/me/departments' : null);
+  const { data: allUsers } = useApi<UserDto[]>(user ? '/users' : null);
 
   // Sync state when user prop changes (modal reopened for different user)
   useEffect(() => {
@@ -302,8 +325,22 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
     setLastName(user.lastName);
     setRole(user.role);
     setJobTitle(user.jobTitle ?? '');
+    setDepartmentId(user.departmentId ?? '');
+    setManagerId(user.managerId ?? '');
     setError('');
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deptOptions = [
+    { value: '', label: 'No department' },
+    ...(departments ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name })),
+  ];
+
+  const managerOptions = [
+    { value: '', label: 'No manager' },
+    ...(allUsers ?? [])
+      .filter((u) => u.isActive && u.id !== user?.id)
+      .map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })),
+  ];
 
   async function handleSave() {
     if (!user) return;
@@ -319,6 +356,8 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
         lastName: lastName.trim(),
         role,
         jobTitle: jobTitle.trim() || null,
+        departmentId: departmentId || null,
+        managerId: managerId || null,
       });
       onSaved();
     } catch (err: any) {
@@ -372,6 +411,23 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
             placeholder="e.g. Senior Manager"
           />
         </Field>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Department">
+            <Select
+              value={departmentId}
+              onChange={setDepartmentId}
+              options={deptOptions}
+            />
+          </Field>
+          <Field label="Reports to">
+            <Select
+              value={managerId}
+              onChange={setManagerId}
+              options={managerOptions}
+            />
+          </Field>
+        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">

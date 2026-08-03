@@ -12,6 +12,7 @@ import { ReadinessRating } from '@leaderprism/shared';
 import { Assessment } from '../../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../../engine/entities/assessment-participant.entity';
 import { RoleProfile } from './role-profile.entity';
+import { User } from '../../../core/users/entities/user.entity';
 
 @Entity('readiness_scores')
 @Unique(['assessmentId', 'participantId', 'roleProfileId'])
@@ -69,6 +70,29 @@ export class ReadinessScore {
   @Column({ name: 'grid_potential', length: 20, default: 'medium' })
   gridPotential: 'high' | 'medium' | 'low';
 
+  @Column({ name: 'manual_grid_performance', type: 'varchar', length: 20, nullable: true })
+  manualGridPerformance: 'high' | 'medium' | 'low' | null;
+
+  @Column({ name: 'manual_performance_note', type: 'text', nullable: true })
+  manualPerformanceNote: string | null;
+
+  @Column({ name: 'manual_performance_set_by_id', type: 'uuid', nullable: true })
+  manualPerformanceSetById: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'manual_performance_set_by_id' })
+  manualPerformanceSetBy: User | null;
+
+  @Column({ name: 'manual_performance_set_at', type: 'timestamptz', nullable: true })
+  manualPerformanceSetAt: Date | null;
+
   @CreateDateColumn({ name: 'calculated_at' })
   calculatedAt: Date;
+}
+
+/** Single source of truth for "what performance placement should the 9-box actually use" — every consumer (dashboard, succession candidates, PDF exports) imports this instead of duplicating the `??` fallback. */
+export function effectiveGridPerformance(
+  s: Pick<ReadinessScore, 'gridPerformance' | 'manualGridPerformance'>,
+): 'high' | 'medium' | 'low' {
+  return s.manualGridPerformance ?? s.gridPerformance;
 }

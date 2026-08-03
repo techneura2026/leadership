@@ -29,17 +29,25 @@ export class Uc1FeedbackController {
 
   @Get('assessments/:id/360/nominations')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get nominations for a participant (all participants if omitted)' })
   getNominations(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Query('participantId') participantId?: string,
   ) {
-    return this.uc1Service.getNominations(assessmentId, participantId, req.user.orgId);
+    return this.uc1Service.getNominations(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Post('assessments/:id/360/nominations')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Nominate raters (participant nominates)' })
   nominateRaters(
     @Request() req: any,
@@ -51,12 +59,14 @@ export class Uc1FeedbackController {
       body.participantId,
       body.raters,
       req.user.orgId,
+      req.user.sub,
+      req.user.role,
     );
   }
 
   @Post('assessments/:id/360/nominations/approve')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin approves all pending nominations and sends invitations' })
   approveNominations(@Request() req: any, @Param('id', ParseUUIDPipe) assessmentId: string) {
     return this.uc1Service.approveNominations(assessmentId, req.user.orgId, req.user.sub);
@@ -64,17 +74,25 @@ export class Uc1FeedbackController {
 
   @Get('assessments/:id/360/scores/:participantId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get aggregated 360 scores per competency per perspective' })
   get360Scores(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
   ): Promise<AggregatedScore[]> {
-    return this.uc1Service.get360Scores(assessmentId, participantId, req.user.orgId);
+    return this.uc1Service.get360Scores(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Post('assessments/:id/360/participant-responses/:participantId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit custom question responses for a 360 feedback assessment' })
   saveParticipantResponses(
     @Request() req: any,
@@ -87,12 +105,14 @@ export class Uc1FeedbackController {
       participantId,
       req.user.orgId,
       body.responses,
+      req.user.sub,
+      req.user.role,
     );
   }
 
   @Post('assessments/:id/360/reminders')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Send reminders to incomplete raters' })
   sendReminders(@Request() req: any, @Param('id', ParseUUIDPipe) assessmentId: string) {
     return this.uc1Service.sendReminders(assessmentId, req.user.orgId);
@@ -100,7 +120,7 @@ export class Uc1FeedbackController {
 
   @Post('assessments/:id/360/nominations/:nominationId/remind')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Send a targeted reminder to a single outstanding rater' })
   remindNomination(
     @Request() req: any,

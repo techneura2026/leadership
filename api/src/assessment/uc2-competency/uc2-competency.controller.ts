@@ -23,16 +23,24 @@ export class Uc2CompetencyController {
   constructor(private readonly uc2Service: Uc2CompetencyService) {}
 
   @Post(':id/competency/self')
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Start self-assessment (creates CA record)' })
   startSelf(
     @Request() req: any,
     @Param('id') assessmentId: string,
     @Body('participantId') participantId: string,
   ) {
-    return this.uc2Service.startSelfAssessment(assessmentId, participantId, req.user.orgId);
+    return this.uc2Service.startSelfAssessment(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Post(':id/competency/self/:caId/submit')
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit self-assessment ratings' })
   submitSelf(
     @Request() req: any,
@@ -46,11 +54,13 @@ export class Uc2CompetencyController {
       body.participantId,
       req.user.orgId,
       body.ratings,
+      req.user.sub,
+      req.user.role,
     );
   }
 
   @Post(':id/competency/manager')
-  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Start manager assessment' })
   startManager(
     @Request() req: any,
@@ -62,11 +72,12 @@ export class Uc2CompetencyController {
       req.user.sub,
       participantId,
       req.user.orgId,
+      req.user.role,
     );
   }
 
   @Post(':id/competency/manager/:caId/submit')
-  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @Roles(UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit manager ratings' })
   submitManager(
     @Request() req: any,
@@ -80,26 +91,41 @@ export class Uc2CompetencyController {
       req.user.sub,
       req.user.orgId,
       body.ratings,
+      req.user.role,
     );
   }
 
   @Get(':id/competency/gap/:participantId')
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get self vs manager gap analysis per competency' })
   getGapAnalysis(
     @Request() req: any,
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
   ): Promise<GapResult[]> {
-    return this.uc2Service.getGapAnalysis(assessmentId, participantId, req.user.orgId);
+    return this.uc2Service.getGapAnalysis(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 
   @Get(':id/competency/profile/:participantId')
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get full competency profile with domain summaries' })
   getProfile(
     @Request() req: any,
     @Param('id') assessmentId: string,
     @Param('participantId') participantId: string,
   ): Promise<CompetencyProfileResult[]> {
-    return this.uc2Service.getCompetencyProfile(assessmentId, participantId, req.user.orgId);
+    return this.uc2Service.getCompetencyProfile(
+      assessmentId,
+      participantId,
+      req.user.orgId,
+      req.user.sub,
+      req.user.role,
+    );
   }
 }

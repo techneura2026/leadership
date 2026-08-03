@@ -6,6 +6,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
@@ -34,6 +35,16 @@ export class User {
   @ManyToOne(() => Department, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'department_id' })
   department: Department | null;
+
+  @Column({ name: 'manager_id', nullable: true, type: 'uuid' })
+  managerId: string | null;
+
+  @ManyToOne(() => User, (u) => u.directReports, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'manager_id' })
+  manager: User | null;
+
+  @OneToMany(() => User, (u) => u.manager)
+  directReports: User[];
 
   @Column({ length: 255 })
   email: string;

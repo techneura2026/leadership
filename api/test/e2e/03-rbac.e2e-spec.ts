@@ -178,6 +178,12 @@ describe('[QA-RBAC] Role-Based Access Control', () => {
     ).expect(200);
     const apId: string = participantsRes.body.data[0].id;
 
+    // Manager-scoped competency ratings require the manager to actually be this
+    // participant's manager (see User.managerId) — establish that relationship first.
+    await authPatch(app, adminSession, `/api/v1/users/${participantUserId}`, {
+      managerId: managerUserId,
+    }).expect(200);
+
     // Manager starts a manager assessment for that participant — should be allowed
     const startRes = await authPost(
       app,

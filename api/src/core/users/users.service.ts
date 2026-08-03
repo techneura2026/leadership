@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -59,6 +64,7 @@ export class UsersService {
     role: UserRole;
     jobTitle?: string;
     departmentId?: string;
+    managerId?: string;
     avatarUrl?: string;
     /** True for admin-invited users — forces a password change before they can use the app. False for self-registration (the org admin already knows the password they just chose). */
     mustChangePassword?: boolean;
@@ -68,6 +74,10 @@ export class UsersService {
       withDeleted: true,
     });
     if (existing) throw new ConflictException('Email already in use within this organisation');
+
+    if (data.managerId) {
+      await this.assertManagerAssignmentValid(null, data.managerId, data.organisationId);
+    }
 
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
     const passwordHash = await bcrypt.hash(data.password, rounds);
@@ -90,13 +100,59 @@ export class UsersService {
       role: UserRole;
       jobTitle: string | null;
       departmentId: string | null;
+      managerId: string | null;
       isActive: boolean;
       avatarUrl: string | null;
     }>,
   ): Promise<User> {
     const user = await this.findById(id, organisationId);
+
+    if (data.managerId) {
+      await this.assertManagerAssignmentValid(id, data.managerId, organisationId);
+    }
+
     Object.assign(user, data);
     return this.userRepo.save(user);
+  }
+
+  /**
+   * Guards against a manager assignment that would create a cycle (A manages B manages A).
+   * Walks the proposed manager's existing chain and rejects if it loops back to the user
+   * being updated. `userId` is null when creating a brand-new user — no existing chain to
+   * loop back into, so only the proposed manager's existence/org membership is checked.
+   */
+  private async assertManagerAssignmentValid(
+    userId: string | null,
+    proposedManagerId: string,
+    organisationId: string,
+  ): Promise<void> {
+    if (userId && proposedManagerId === userId) {
+      throw new BadRequestException('A user cannot be their own manager.');
+    }
+
+    const manager = await this.userRepo.findOne({
+      where: { id: proposedManagerId, organisationId },
+    });
+    if (!manager) {
+      throw new NotFoundException('Proposed manager not found in this organisation.');
+    }
+
+    if (!userId) return;
+
+    let cursor: string | null = manager.managerId;
+    let hops = 0;
+    const MAX_HOPS = 100; // defensive bound against runaway loops on already-corrupt data
+    while (cursor && hops < MAX_HOPS) {
+      if (cursor === userId) {
+        throw new BadRequestException('This assignment would create a management cycle.');
+      }
+      const next: Pick<User, 'managerId'> | null = await this.userRepo.findOne({
+        where: { id: cursor },
+        select: ['id', 'managerId'],
+      });
+      cursor = next?.managerId ?? null;
+      hops++;
+    }
   }
 
   async updateLastLogin(userId: string): Promise<void> {

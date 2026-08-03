@@ -20,12 +20,12 @@ import { UserRole, type OrganisationDto } from '@leaderprism/shared';
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; roles: UserRole[] | null }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: null },
-  { href: '/assessments', label: 'Assessments', icon: ClipboardList, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER] },
+  { href: '/assessments', label: 'Assessments', icon: ClipboardList, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN] },
   { href: '/my-assessments', label: 'My Assessments', icon: ClipboardCheck, roles: [UserRole.PARTICIPANT, UserRole.MANAGER] },
-  { href: '/reports', label: 'Reports', icon: BarChart3, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER] },
-  { href: '/competency-library', label: 'Competency Library', icon: BookOpen, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER] },
-  { href: '/succession', label: 'Succession', icon: Network, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER] },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, roles: [UserRole.ORG_ADMIN] },
+  { href: '/reports', label: 'Reports', icon: BarChart3, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN] },
+  { href: '/competency-library', label: 'Competency Library', icon: BookOpen, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN] },
+  { href: '/succession', label: 'Succession', icon: Network, roles: [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN] },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon, roles: [UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN] },
 ];
 
 function SidebarContent({

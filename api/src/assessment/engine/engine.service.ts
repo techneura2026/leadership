@@ -9,7 +9,7 @@ import { IsEnum, IsNotEmpty, IsOptional, IsObject, IsString } from 'class-valida
 import { ApiProperty } from '@nestjs/swagger';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { AssessmentStatus, AssessmentType, Plan, RaterRelationship } from '@leaderprism/shared';
+import { AssessmentStatus, AssessmentType, Plan, RaterRelationship, UserRole } from '@leaderprism/shared';
 import type { AssessmentConfig, PlanLimits } from '@leaderprism/shared';
 import { Assessment } from './entities/assessment.entity';
 import { AssessmentParticipant } from './entities/assessment-participant.entity';
@@ -198,7 +198,11 @@ export class EngineService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string, orgId: string): Promise<Assessment> {
+  async findOne(
+    id: string,
+    orgId: string,
+    requestingUser?: { sub: string; role: UserRole },
+  ): Promise<Assessment> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id, organisationId: orgId },
       relations: ['participants', 'participants.user'],
@@ -206,6 +210,16 @@ export class EngineService {
 
     if (!assessment) {
       throw new NotFoundException(`Assessment ${id} not found`);
+    }
+
+    // A PARTICIPANT may only view assessments they're actually enrolled in — previously any
+    // authenticated org member could view any assessment's details/roster by id. MANAGER/
+    // HR_MANAGER/ORG_ADMIN remain unrestricted org-wide, matching existing precedent elsewhere.
+    if (requestingUser?.role === UserRole.PARTICIPANT) {
+      const isEnrolled = assessment.participants?.some((p) => p.userId === requestingUser.sub);
+      if (!isEnrolled) {
+        throw new NotFoundException(`Assessment ${id} not found`);
+      }
     }
 
     return assessment;
@@ -355,8 +369,12 @@ export class EngineService {
     });
   }
 
-  async getParticipants(assessmentId: string, orgId: string): Promise<AssessmentParticipant[]> {
-    await this.findOne(assessmentId, orgId); // Validate ownership
+  async getParticipants(
+    assessmentId: string,
+    orgId: string,
+    requestingUser?: { sub: string; role: UserRole },
+  ): Promise<AssessmentParticipant[]> {
+    await this.findOne(assessmentId, orgId, requestingUser); // Validate ownership
 
     return this.participantRepo.find({
       where: { assessmentId },

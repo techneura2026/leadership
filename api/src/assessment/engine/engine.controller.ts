@@ -27,7 +27,7 @@ import { UserRole } from '@leaderprism/shared';
 
 @ApiTags('Assessments')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
 @Controller('assessments')
 export class EngineController {
   constructor(private readonly engineService: EngineService) {}
@@ -45,17 +45,17 @@ export class EngineController {
   }
 
   @Get('mine')
-  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get active assessments the current user is a participant in' })
   findMine(@Request() req: any) {
     return this.engineService.findMine(req.user.sub, req.user.orgId, req.user.email);
   }
 
   @Get(':id')
-  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get assessment by ID' })
   findOne(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
-    return this.engineService.findOne(id, req.user.orgId);
+    return this.engineService.findOne(id, req.user.orgId, { sub: req.user.sub, role: req.user.role });
   }
 
   @Patch(':id')
@@ -93,10 +93,13 @@ export class EngineController {
   }
 
   @Get(':id/participants')
-  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all participants with completion status' })
   getParticipants(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
-    return this.engineService.getParticipants(id, req.user.orgId);
+    return this.engineService.getParticipants(id, req.user.orgId, {
+      sub: req.user.sub,
+      role: req.user.role,
+    });
   }
 
   @Get(':id/response-rate')

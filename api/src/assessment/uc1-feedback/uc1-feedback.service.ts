@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
-import { RaterRelationship } from '@leaderprism/shared';
+import { RaterRelationship, UserRole } from '@leaderprism/shared';
+import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 import { RaterNomination } from './entities/rater-nomination.entity';
 import { RaterResponse } from './entities/rater-response.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
@@ -75,6 +76,8 @@ export class Uc1FeedbackService {
     assessmentId: string,
     participantId: string | undefined,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<RaterNomination[]> {
     // Validate assessment belongs to org
     const assessment = await this.assessmentRepo.findOne({
@@ -82,6 +85,22 @@ export class Uc1FeedbackService {
     });
     if (!assessment) {
       throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+
+    const isPrivileged = [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN].includes(
+      requestingUserRole,
+    );
+    if (!isPrivileged) {
+      // A non-privileged caller (PARTICIPANT) must specify their own participantId — omitting
+      // it would otherwise return every participant's nominations org-wide.
+      if (!participantId) {
+        throw new ForbiddenException('participantId is required.');
+      }
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+      });
+      if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+      assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
     }
 
     return this.nominationRepo.find({
@@ -96,6 +115,8 @@ export class Uc1FeedbackService {
     participantId: string,
     raters: NominateRaterDto[],
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<RaterNomination[]> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
@@ -110,6 +131,7 @@ export class Uc1FeedbackService {
     if (!participant) {
       throw new NotFoundException(`Participant ${participantId} not found`);
     }
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     // Load existing nominations to check for duplicates
     const existing = await this.nominationRepo.find({
@@ -438,10 +460,17 @@ export class Uc1FeedbackService {
     return { nominationId: nomination.id };
   }
 
+  /**
+   * requestingUserId/requestingUserRole are optional: omitted when called internally by the
+   * report-generation worker (no per-request caller), required (and enforced) when called
+   * from the controller on behalf of a real user.
+   */
   async get360Scores(
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
   ): Promise<AggregatedScore[]> {
     // Validate ownership
     const assessment = await this.assessmentRepo.findOne({
@@ -449,6 +478,14 @@ export class Uc1FeedbackService {
     });
     if (!assessment) {
       throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+
+    if (requestingUserId && requestingUserRole) {
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+      });
+      if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+      assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
     }
 
     const nominations = await this.nominationRepo.find({
@@ -555,6 +592,8 @@ export class Uc1FeedbackService {
     participantId: string,
     orgId: string,
     responses: Record<string, any>,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<void> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
@@ -569,6 +608,7 @@ export class Uc1FeedbackService {
     if (!participant) {
       throw new NotFoundException(`Participant ${participantId} not found`);
     }
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     participant.responses = responses;
     participant.status = 'completed';

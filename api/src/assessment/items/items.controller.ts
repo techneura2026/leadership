@@ -35,14 +35,14 @@ export class ItemsController {
   }
 
   @Post('competencies')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create an org-specific competency' })
   createCompetency(@Request() req: any, @Body() dto: CreateCompetencyDto) {
     return this.itemsService.createCompetency(req.user.orgId, dto);
   }
 
   @Patch('competencies/:id')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update an org-specific competency' })
   updateCompetency(
     @Request() req: any,

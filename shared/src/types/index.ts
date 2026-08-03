@@ -49,6 +49,7 @@ export interface UserDto {
   id: string;
   organisationId: string;
   departmentId: string | null;
+  managerId: string | null;
   email: string;
   firstName: string;
   lastName: string;

@@ -290,6 +290,12 @@ describe('[QA-USR] User Management', () => {
    * Manager is authenticated with a session obtained by logging in with the API-created credentials.
    */
   it('QA-USR-009 | P1 — manager submits ratings for participant; managerCaId set and submittedAt populated', async () => {
+    // Manager-scoped competency ratings require the manager to actually be this
+    // participant's manager (see User.managerId) — establish that relationship first.
+    await authPatch(app, adminSession, `/api/v1/users/${participantUserId}`, {
+      managerId: managerUserId,
+    }).expect(200);
+
     const startRes = await authPost(
       app,
       managerSession,

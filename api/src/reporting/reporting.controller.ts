@@ -20,7 +20,7 @@ import { Roles } from '../shared/decorators/roles.decorator';
 
 @ApiTags('Reports')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+@Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
 @Controller('reports')
 export class ReportingController {
   constructor(private readonly reportingService: ReportingService) {}
@@ -56,14 +56,14 @@ export class ReportingController {
   // ── Participant self-service (registered before :id so "mine" isn't captured as an id) ──
 
   @Get('mine')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.MANAGER, UserRole.PARTICIPANT)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.MANAGER, UserRole.PARTICIPANT, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List reports where the current user is the subject' })
   listMyReports(@Request() req: any) {
     return this.reportingService.listMyReports(req.user.orgId, req.user.sub);
   }
 
   @Get('mine/:id/download')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.MANAGER, UserRole.PARTICIPANT)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.MANAGER, UserRole.PARTICIPANT, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Download own report PDF (only if the current user is its subject)' })
   async downloadMine(@Request() req: any, @Param('id') id: string, @Res() res: Response) {
     const filePath = await this.reportingService.getMyDownloadPath(id, req.user.orgId, req.user.sub);

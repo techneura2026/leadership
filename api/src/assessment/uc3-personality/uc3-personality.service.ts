@@ -12,6 +12,8 @@ import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Item } from '../items/entities/item.entity';
 import { BigFiveScoringService, FactorScore } from './big-five-scoring.service';
+import { UserRole } from '@leaderprism/shared';
+import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 
 export interface ItemWithProgress {
   id: string;
@@ -69,6 +71,8 @@ export class Uc3PersonalityService {
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
     language = 'en',
   ): Promise<QuestionnaireProgress> {
     const assessment = await this.assertAssessmentInOrg(assessmentId, orgId);
@@ -77,6 +81,7 @@ export class Uc3PersonalityService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const traits = this.configuredTraits(assessment);
     const items = await this.itemRepo.find({
@@ -124,6 +129,8 @@ export class Uc3PersonalityService {
     orgId: string,
     itemId: string,
     value: number,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<PersonalityResponse> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -131,6 +138,7 @@ export class Uc3PersonalityService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const item = await this.itemRepo.findOne({ where: { id: itemId, module: 'personality' } });
     if (!item) throw new NotFoundException(`Item ${itemId} not found`);
@@ -163,6 +171,8 @@ export class Uc3PersonalityService {
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<FactorScore[]> {
     const assessment = await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -170,6 +180,7 @@ export class Uc3PersonalityService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     // Check all items answered
     const traits = this.configuredTraits(assessment);
@@ -202,10 +213,18 @@ export class Uc3PersonalityService {
     return scores;
   }
 
+  /**
+   * requestingUserId/requestingUserRole are optional: omitted when called internally by the
+   * report-generation worker (no per-request caller — the Report row's own creation was
+   * already authorized), required (and enforced) when called from the controller on behalf
+   * of a real user.
+   */
   async getScores(
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
   ): Promise<
     Array<{
       factor: string;
@@ -216,6 +235,14 @@ export class Uc3PersonalityService {
     }>
   > {
     await this.assertAssessmentInOrg(assessmentId, orgId);
+
+    if (requestingUserId && requestingUserRole) {
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+      });
+      if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+      assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
+    }
 
     const scores = await this.scoreRepo.find({
       where: { assessmentId, participantId },

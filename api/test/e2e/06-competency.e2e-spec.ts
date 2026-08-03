@@ -15,6 +15,7 @@ import {
   login,
   authGet,
   authPost,
+  authPatch,
   createDraftAssessment,
   addParticipant,
   launchAssessment,
@@ -102,6 +103,12 @@ describe('[QA-COMP] Competency Assessment (UC2)', () => {
       USERS.manager.email.replace('@', `+${sfx}@`),
       USERS.manager.password,
     );
+
+    // Manager-scoped competency ratings require the manager to actually be this
+    // participant's manager (see User.managerId) — establish that relationship.
+    await authPatch(app, adminSession, `/api/v1/users/${participantUserId}`, {
+      managerId: managerUserId,
+    }).expect(200);
 
     // Create and launch the competency assessment
     assessmentId = await createDraftAssessment(app, adminSession, {

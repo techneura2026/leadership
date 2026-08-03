@@ -53,8 +53,13 @@ export class CreateUserDto {
   @IsUUID()
   departmentId?: string;
 
+  @ApiPropertyOptional({ description: 'Manager UUID — the user this person reports to' })
+  @IsOptional()
+  @IsUUID()
+  managerId?: string;
+
   @ApiPropertyOptional({ example: 'https://example.com/image.jpg' })
   @IsOptional()
   @IsString()
-  avatarUrl?: string; 
+  avatarUrl?: string;
 }

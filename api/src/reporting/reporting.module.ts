@@ -5,6 +5,7 @@ import { Report } from './report.entity';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../assessment/engine/entities/assessment-participant.entity';
 import { User } from '../core/users/entities/user.entity';
+import { Organisation } from '../core/organisations/entities/organisation.entity';
 import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-score.entity';
 import { ReportingService } from './reporting.service';
 import { ReportingController } from './reporting.controller';
@@ -18,7 +19,7 @@ import { NotificationsModule } from '../core/notifications/notifications.module'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Report, Assessment, AssessmentParticipant, User, ReadinessScore]),
+    TypeOrmModule.forFeature([Report, Assessment, AssessmentParticipant, User, Organisation, ReadinessScore]),
     BullModule.registerQueue({ name: 'reports' }),
     Uc1FeedbackModule,
     Uc2CompetencyModule,

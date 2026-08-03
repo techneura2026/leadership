@@ -1,17 +1,21 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UserRole } from '@leaderprism/shared';
 import { CompetencyAssessment } from './entities/competency-assessment.entity';
 import { CompetencyRating } from './entities/competency-rating.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Competency } from '../items/entities/competency.entity';
 import { CompetencyDomain } from '../items/entities/competency-domain.entity';
+import { User } from '../../core/users/entities/user.entity';
+import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 
 interface RatingDto {
   competencyId: string;
@@ -62,12 +66,55 @@ export class Uc2CompetencyService {
     private readonly competencyRepo: Repository<Competency>,
     @InjectRepository(CompetencyDomain)
     private readonly domainRepo: Repository<CompetencyDomain>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
+
+  /**
+   * Can `requestingUserId`/`requestingUserRole` view/act on a participant's competency data?
+   * Owner and HR/ORG_ADMIN/SUPER_ADMIN are always allowed; a MANAGER is allowed only for their
+   * own direct reports (via User.managerId), not org-wide — the manager-scoping fix that
+   * `User.managerId` (added for succession hierarchy) makes possible for the first time.
+   */
+  private async assertCanAccessParticipant(
+    participantUserId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
+  ): Promise<void> {
+    if (
+      participantUserId === requestingUserId ||
+      [UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN].includes(requestingUserRole)
+    ) {
+      return;
+    }
+
+    if (requestingUserRole === UserRole.MANAGER) {
+      const reportUser = await this.userRepo.findOne({ where: { id: participantUserId } });
+      if (reportUser?.managerId === requestingUserId) return;
+    }
+
+    throw new ForbiddenException('You do not have access to this participant\'s data.');
+  }
+
+  /** Restricts a MANAGER caller to their own direct reports; HR/ORG_ADMIN/SUPER_ADMIN are unrestricted. */
+  private async assertManagerOwnsReport(managerId: string, participantId: string, assessmentId: string): Promise<void> {
+    const participant = await this.participantRepo.findOne({
+      where: { id: participantId, assessmentId },
+    });
+    if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+
+    const reportUser = await this.userRepo.findOne({ where: { id: participant.userId } });
+    if (!reportUser || reportUser.managerId !== managerId) {
+      throw new ForbiddenException('You can only submit manager ratings for your direct reports.');
+    }
+  }
 
   async startSelfAssessment(
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<CompetencyAssessment> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
@@ -78,6 +125,7 @@ export class Uc2CompetencyService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     // Return existing if already started
     const existing = await this.caRepo.findOne({
@@ -140,8 +188,14 @@ export class Uc2CompetencyService {
     participantId: string,
     orgId: string,
     ratings: RatingDto[],
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<CompetencyAssessment> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
+
+    const participant = await this.participantRepo.findOne({ where: { id: participantId, assessmentId } });
+    if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const ca = await this.caRepo.findOne({
       where: { id: caId, assessmentId, participantId, assessorType: 'self' },
@@ -178,8 +232,7 @@ export class Uc2CompetencyService {
     ca.submittedAt = new Date();
     const saved = await this.caRepo.save(ca);
 
-    const participant = await this.participantRepo.findOne({ where: { id: participantId } });
-    if (participant && participant.status !== 'completed') {
+    if (participant.status !== 'completed') {
       participant.status = 'completed';
       participant.completedAt = new Date();
       await this.participantRepo.save(participant);
@@ -194,6 +247,7 @@ export class Uc2CompetencyService {
     managerId: string,
     participantId: string,
     orgId: string,
+    managerRole: UserRole,
   ): Promise<CompetencyAssessment> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
@@ -204,6 +258,10 @@ export class Uc2CompetencyService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+
+    if (managerRole === UserRole.MANAGER) {
+      await this.assertManagerOwnsReport(managerId, participantId, assessmentId);
+    }
 
     // Return existing manager CA if present
     const existing = await this.caRepo.findOne({
@@ -243,6 +301,7 @@ export class Uc2CompetencyService {
     managerId: string,
     orgId: string,
     ratings: RatingDto[],
+    managerRole: UserRole,
   ): Promise<CompetencyAssessment> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -250,6 +309,10 @@ export class Uc2CompetencyService {
       where: { id: caId, assessmentId, assessorId: managerId, assessorType: 'manager' },
     });
     if (!ca) throw new NotFoundException(`Manager assessment ${caId} not found`);
+
+    if (managerRole === UserRole.MANAGER) {
+      await this.assertManagerOwnsReport(managerId, ca.participantId, assessmentId);
+    }
 
     if (ca.submittedAt) {
       throw new BadRequestException('Manager assessment already submitted');
@@ -283,15 +346,28 @@ export class Uc2CompetencyService {
     return saved;
   }
 
+  /**
+   * requestingUserId/requestingUserRole are optional: omitted when called internally (report
+   * generation, succession candidate enrichment — no per-request caller), required (and
+   * enforced) when called from the controller on behalf of a real user.
+   */
   async getGapAnalysis(
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
   ): Promise<GapResult[]> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
     });
     if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+
+    if (requestingUserId && requestingUserRole) {
+      const participant = await this.participantRepo.findOne({ where: { id: participantId, assessmentId } });
+      if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+      await this.assertCanAccessParticipant(participant.userId, requestingUserId, requestingUserRole);
+    }
 
     const selfCA = await this.caRepo.findOne({
       where: { assessmentId, participantId, assessorType: 'self' },
@@ -356,8 +432,10 @@ export class Uc2CompetencyService {
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
   ): Promise<CompetencyProfileResult[]> {
-    const gaps = await this.getGapAnalysis(assessmentId, participantId, orgId);
+    const gaps = await this.getGapAnalysis(assessmentId, participantId, orgId, requestingUserId, requestingUserRole);
 
     // Group by domain
     const domainMap = new Map<

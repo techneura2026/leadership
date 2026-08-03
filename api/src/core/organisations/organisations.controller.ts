@@ -89,7 +89,7 @@ export class OrganisationsController {
   }
 
   @Patch('me')
-  @Roles(UserRole.ORG_ADMIN)
+  @Roles(UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update organisation settings' })
   updateMyOrg(@CurrentOrgId() orgId: string, @Body() dto: UpdateOrgDto) {
     return this.orgsService.update(orgId, dto);
@@ -102,14 +102,14 @@ export class OrganisationsController {
   }
 
   @Post('me/departments')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a department' })
   createDepartment(@CurrentOrgId() orgId: string, @Body() dto: CreateDepartmentDto) {
     return this.orgsService.createDepartment(orgId, dto.name, dto.description, dto.parentId);
   }
 
   @Patch('me/departments/:id')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update a department' })
   updateDepartment(
     @CurrentOrgId() orgId: string,
@@ -120,7 +120,7 @@ export class OrganisationsController {
   }
 
   @Delete('me/departments/:id')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a department' })
   deleteDepartment(@CurrentOrgId() orgId: string, @Param('id') id: string) {
@@ -128,7 +128,7 @@ export class OrganisationsController {
   }
 
   @Get('me/users')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List users in the current user\'s organisation' })
   getMyOrgUsers(
     @CurrentOrgId() orgId: string,

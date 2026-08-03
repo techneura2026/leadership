@@ -1,15 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Users, CheckCircle2, TrendingUp, Layers, Search, ChevronRight, ChevronUp, ChevronDown,
-  Download, FileWarning, Briefcase, Network,
+  Download, FileWarning, Briefcase, Network, Plus, Pencil, Trash2, UserPlus,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
 import { Avatar } from '@/components/ui/Avatar';
+import { Modal } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
+import { Spinner } from '@/components/ui/Spinner';
 import { NineBoxGrid } from '@/components/charts/NineBoxGrid';
+import { useApi } from '@/hooks/useApi';
+import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
 import { ReadinessRating } from '@leaderprism/shared';
+import type { DepartmentDto, UserDto } from '@leaderprism/shared';
 import { generateSuccessionPdf } from '@/lib/successionPdf';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -17,34 +24,101 @@ import { generateSuccessionPdf } from '@/lib/successionPdf';
 type Performance = 'high' | 'medium' | 'low';
 type Potential = 'high' | 'medium' | 'low';
 
-interface Candidate {
+// Shapes returned by the real backend (api/src/succession/succession.service.ts)
+interface ApiCandidate {
+  readinessScoreId: string;
+  participantId: string;
+  userId: string;
+  name: string;
+  title: string | null;
+  department: string | null;
+  roleProfileId: string;
+  roleTitle: string;
+  readinessRating: ReadinessRating;
+  compositeScore: number;
+  gridPerformance: Performance;
+  manualGridPerformance: Performance | null;
+  effectiveGridPerformance: Performance;
+  gridPotential: Potential;
+  keyStrengths: string[];
+  developmentAreas: string[];
+}
+
+interface ApiSuccessor {
   id: string;
+  candidateUserId: string | null;
+  candidateName: string;
+  readinessRating: ReadinessRating | null;
+  compositeScore: number | null;
+  notes: string | null;
+}
+
+interface ApiKeyRole {
+  id: string;
+  title: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  criticality: 'critical' | 'high' | 'medium';
+  incumbentId: string | null;
+  incumbentName: string | null;
+  incumbentSince: string | null;
+  flightRisk: 'high' | 'medium' | 'low';
+  successors: ApiSuccessor[];
+}
+
+interface ApiBench {
+  departmentId: string | null;
+  departmentName: string;
+  totalRoles: number;
+  coveredRoles: number;
+  readinessBreakdown: Record<string, number>;
+}
+
+interface ApiOrgUser {
+  id: string;
+  name: string;
+  title: string | null;
+  department: string | null;
+  managerId: string | null;
+}
+
+// Display-layer types used by the tab components below (unchanged shape from before,
+// so the existing rendering logic keeps working — only where the data comes from changed).
+interface Candidate {
+  id: string; // userId
+  readinessScoreId: string;
   name: string;
   title: string;
   department: string;
-  performance: Performance;
+  performance: Performance; // effective (manual override, falling back to auto)
+  autoPerformance: Performance;
+  manualGridPerformance: Performance | null;
   potential: Potential;
   readinessRating: ReadinessRating;
   compositeScore: number;
-  completedAssessments: string[];
   keyStrengths: string[];
   developmentAreas: string[];
 }
 
 interface Successor {
-  candidateId: string;
+  id: string;
+  candidateId: string | null;
   name: string;
-  readiness: ReadinessRating;
-  compositeScore: number;
+  readiness: ReadinessRating | null;
+  compositeScore: number | null;
 }
 
 interface KeyRole {
   id: string;
   title: string;
+  departmentId: string | null;
   department: string;
+  incumbentId: string | null;
   incumbent: string;
+  incumbentSince: string | null;
   incumbentTenure: string;
   criticality: 'critical' | 'high' | 'medium';
+  flightRisk: 'high' | 'medium' | 'low';
   successors: Successor[];
 }
 
@@ -57,310 +131,76 @@ interface DeptBench {
   developing: number;
 }
 
-// ── Mock Data ─────────────────────────────────────────────────────────────────
+// ── Mappers (real API response → display types) ──────────────────────────────
 
-const MOCK_CANDIDATES: Candidate[] = [
-  {
-    id: 'c1',
-    name: 'Amara Perera',
-    title: 'Senior Manager – Strategy',
-    department: 'Executive',
-    performance: 'high',
-    potential: 'high',
-    readinessRating: ReadinessRating.READY_NOW,
-    compositeScore: 92.4,
-    completedAssessments: ['360 Feedback', 'Competency', 'Readiness'],
-    keyStrengths: ['Strategic Thinking', 'Stakeholder Management', 'Decision Making'],
-    developmentAreas: ['Financial Acumen'],
-  },
-  {
-    id: 'c2',
-    name: 'David Mendis',
-    title: 'Engineering Lead',
-    department: 'Engineering',
-    performance: 'high',
-    potential: 'high',
-    readinessRating: ReadinessRating.READY_NOW,
-    compositeScore: 89.7,
-    completedAssessments: ['360 Feedback', 'Competency', 'Readiness', 'Personality'],
-    keyStrengths: ['Innovation', 'Team Building', 'Technical Leadership'],
-    developmentAreas: ['Executive Presence', 'P&L Management'],
-  },
-  {
-    id: 'c3',
-    name: 'Priya Kumari',
-    title: 'Finance Manager',
-    department: 'Finance',
-    performance: 'medium',
-    potential: 'high',
-    readinessRating: ReadinessRating.ONE_TWO_YEARS,
-    compositeScore: 84.1,
-    completedAssessments: ['360 Feedback', 'Competency', 'Readiness'],
-    keyStrengths: ['Financial Acumen', 'Analytical Thinking', 'Compliance'],
-    developmentAreas: ['Strategic Vision', 'People Leadership'],
-  },
-  {
-    id: 'c4',
-    name: 'Kasun Fernando',
-    title: 'Senior Software Engineer',
-    department: 'Engineering',
-    performance: 'medium',
-    potential: 'high',
-    readinessRating: ReadinessRating.ONE_TWO_YEARS,
-    compositeScore: 81.3,
-    completedAssessments: ['360 Feedback', 'Competency'],
-    keyStrengths: ['Innovation', 'Problem Solving', 'Collaboration'],
-    developmentAreas: ['Communication', 'Strategic Planning'],
-  },
-  {
-    id: 'c5',
-    name: 'Nirosha Rajapaksa',
-    title: 'Senior Finance Analyst',
-    department: 'Finance',
-    performance: 'high',
-    potential: 'medium',
-    readinessRating: ReadinessRating.ONE_TWO_YEARS,
-    compositeScore: 79.8,
-    completedAssessments: ['360 Feedback', 'Competency', 'Readiness'],
-    keyStrengths: ['Financial Reporting', 'Risk Management', 'Process Improvement'],
-    developmentAreas: ['Leadership Confidence', 'Team Development'],
-  },
-  {
-    id: 'c6',
-    name: 'Tom Wickramasinghe',
-    title: 'Senior Sales Manager',
-    department: 'Sales',
-    performance: 'high',
-    potential: 'medium',
-    readinessRating: ReadinessRating.ONE_TWO_YEARS,
-    compositeScore: 77.5,
-    completedAssessments: ['360 Feedback', 'Readiness'],
-    keyStrengths: ['Relationship Building', 'Revenue Growth', 'Negotiation'],
-    developmentAreas: ['Strategic Thinking', 'People Development'],
-  },
-  {
-    id: 'c7',
-    name: 'Anika Jayasekara',
-    title: 'HR Business Partner',
-    department: 'HR',
-    performance: 'medium',
-    potential: 'medium',
-    readinessRating: ReadinessRating.READY_NOW,
-    compositeScore: 76.2,
-    completedAssessments: ['360 Feedback', 'Competency', 'Personality'],
-    keyStrengths: ['People Leadership', 'Organisational Development', 'Coaching'],
-    developmentAreas: ['Data Analytics', 'Business Acumen'],
-  },
-  {
-    id: 'c8',
-    name: 'Ravi Seneviratne',
-    title: 'Operations Manager',
-    department: 'Operations',
-    performance: 'medium',
-    potential: 'medium',
-    readinessRating: ReadinessRating.ONE_TWO_YEARS,
-    compositeScore: 73.9,
-    completedAssessments: ['360 Feedback', 'Competency'],
-    keyStrengths: ['Process Excellence', 'Cost Management', 'Vendor Relations'],
-    developmentAreas: ['Strategic Vision', 'Change Leadership'],
-  },
-  {
-    id: 'c9',
-    name: 'Mark Silva',
-    title: 'Sales Account Manager',
-    department: 'Sales',
-    performance: 'medium',
-    potential: 'medium',
-    readinessRating: ReadinessRating.DEVELOPING,
-    compositeScore: 68.4,
-    completedAssessments: ['360 Feedback'],
-    keyStrengths: ['Client Relationships', 'Communication', 'Persistence'],
-    developmentAreas: ['Strategic Sales', 'Leadership Skills', 'Financial Literacy'],
-  },
-  {
-    id: 'c10',
-    name: 'Chamari De Silva',
-    title: 'Operations Analyst',
-    department: 'Operations',
-    performance: 'high',
-    potential: 'low',
-    readinessRating: ReadinessRating.DEVELOPING,
-    compositeScore: 65.1,
-    completedAssessments: ['Competency', 'Readiness'],
-    keyStrengths: ['Execution', 'Attention to Detail', 'Reliability'],
-    developmentAreas: ['Strategic Thinking', 'Leadership', 'Innovation'],
-  },
-  {
-    id: 'c11',
-    name: 'Dilshan Maduwantha',
-    title: 'Product Designer',
-    department: 'Engineering',
-    performance: 'low',
-    potential: 'high',
-    readinessRating: ReadinessRating.DEVELOPING,
-    compositeScore: 61.8,
-    completedAssessments: ['360 Feedback', 'Personality'],
-    keyStrengths: ['Creative Thinking', 'User Empathy', 'Vision'],
-    developmentAreas: ['Execution', 'Stakeholder Management', 'Consistency'],
-  },
-  {
-    id: 'c12',
-    name: 'Rohan Attanayake',
-    title: 'Marketing Manager',
-    department: 'Sales',
-    performance: 'medium',
-    potential: 'low',
-    readinessRating: ReadinessRating.DEVELOPING,
-    compositeScore: 58.3,
-    completedAssessments: ['360 Feedback'],
-    keyStrengths: ['Brand Awareness', 'Campaign Management'],
-    developmentAreas: ['Leadership', 'Data-Driven Decision Making', 'Strategy'],
-  },
-  {
-    id: 'c13',
-    name: 'Fiona Krishnaswamy',
-    title: 'HR Coordinator',
-    department: 'HR',
-    performance: 'low',
-    potential: 'medium',
-    readinessRating: ReadinessRating.NOT_YET_READY,
-    compositeScore: 52.7,
-    completedAssessments: ['360 Feedback'],
-    keyStrengths: ['Empathy', 'Process Following'],
-    developmentAreas: ['Business Acumen', 'Leadership', 'Strategic HR', 'Communication'],
-  },
-  {
-    id: 'c14',
-    name: 'Sasha Perera',
-    title: 'Finance Coordinator',
-    department: 'Finance',
-    performance: 'medium',
-    potential: 'low',
-    readinessRating: ReadinessRating.NOT_YET_READY,
-    compositeScore: 49.2,
-    completedAssessments: ['Competency'],
-    keyStrengths: ['Accuracy', 'Compliance'],
-    developmentAreas: ['Leadership', 'Strategic Thinking', 'Communication', 'Team Building'],
-  },
-  {
-    id: 'c15',
-    name: 'Leo Bandara',
-    title: 'Sales Associate',
-    department: 'Sales',
-    performance: 'low',
-    potential: 'low',
-    readinessRating: ReadinessRating.NOT_YET_READY,
-    compositeScore: 41.6,
-    completedAssessments: ['360 Feedback'],
-    keyStrengths: ['Customer Service'],
-    developmentAreas: ['Sales Skills', 'Leadership', 'Strategic Vision', 'Communication'],
-  },
-];
+function mapCandidate(c: ApiCandidate): Candidate {
+  return {
+    id: c.userId,
+    readinessScoreId: c.readinessScoreId,
+    name: c.name,
+    title: c.title ?? c.roleTitle ?? '—',
+    department: c.department ?? 'Unassigned',
+    performance: c.effectiveGridPerformance,
+    autoPerformance: c.gridPerformance,
+    manualGridPerformance: c.manualGridPerformance,
+    potential: c.gridPotential,
+    readinessRating: c.readinessRating,
+    compositeScore: c.compositeScore,
+    keyStrengths: c.keyStrengths,
+    developmentAreas: c.developmentAreas,
+  };
+}
 
-const MOCK_KEY_ROLES: KeyRole[] = [
-  {
-    id: 'r1',
-    title: 'Chief Executive Officer',
-    department: 'Executive',
-    incumbent: 'Michael Chen',
-    incumbentTenure: '6 years',
-    criticality: 'critical',
-    successors: [
-      { candidateId: 'c1', name: 'Amara Perera', readiness: ReadinessRating.READY_NOW, compositeScore: 92.4 },
-      { candidateId: 'c2', name: 'David Mendis', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 89.7 },
-    ],
-  },
-  {
-    id: 'r2',
-    title: 'Chief Financial Officer',
-    department: 'Finance',
-    incumbent: 'Sarah Park',
-    incumbentTenure: '4 years',
-    criticality: 'critical',
-    successors: [
-      { candidateId: 'c3', name: 'Priya Kumari', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 84.1 },
-      { candidateId: 'c5', name: 'Nirosha Rajapaksa', readiness: ReadinessRating.DEVELOPING, compositeScore: 79.8 },
-    ],
-  },
-  {
-    id: 'r3',
-    title: 'VP Engineering',
-    department: 'Engineering',
-    incumbent: 'James Wilson',
-    incumbentTenure: '3 years',
-    criticality: 'critical',
-    successors: [
-      { candidateId: 'c2', name: 'David Mendis', readiness: ReadinessRating.READY_NOW, compositeScore: 89.7 },
-      { candidateId: 'c4', name: 'Kasun Fernando', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 81.3 },
-    ],
-  },
-  {
-    id: 'r4',
-    title: 'VP Sales',
-    department: 'Sales',
-    incumbent: 'Elena Torres',
-    incumbentTenure: '5 years',
-    criticality: 'high',
-    successors: [
-      { candidateId: 'c6', name: 'Tom Wickramasinghe', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 77.5 },
-      { candidateId: 'c9', name: 'Mark Silva', readiness: ReadinessRating.DEVELOPING, compositeScore: 68.4 },
-    ],
-  },
-  {
-    id: 'r5',
-    title: 'Head of HR',
-    department: 'HR',
-    incumbent: 'Raj Patel',
-    incumbentTenure: '2 years',
-    criticality: 'high',
-    successors: [
-      { candidateId: 'c7', name: 'Anika Jayasekara', readiness: ReadinessRating.READY_NOW, compositeScore: 76.2 },
-    ],
-  },
-  {
-    id: 'r6',
-    title: 'Head of Operations',
-    department: 'Operations',
-    incumbent: 'Lisa Wang',
-    incumbentTenure: '4 years',
-    criticality: 'high',
-    successors: [
-      { candidateId: 'c8', name: 'Ravi Seneviratne', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 73.9 },
-      { candidateId: 'c10', name: 'Chamari De Silva', readiness: ReadinessRating.DEVELOPING, compositeScore: 65.1 },
-    ],
-  },
-  {
-    id: 'r7',
-    title: 'Finance Controller',
-    department: 'Finance',
-    incumbent: 'Nina Shah',
-    incumbentTenure: '7 years',
-    criticality: 'medium',
-    successors: [
-      { candidateId: 'c5', name: 'Nirosha Rajapaksa', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 79.8 },
-    ],
-  },
-  {
-    id: 'r8',
-    title: 'Engineering Manager',
-    department: 'Engineering',
-    incumbent: 'Alan Rodrigo',
-    incumbentTenure: '2 years',
-    criticality: 'medium',
-    successors: [
-      { candidateId: 'c4', name: 'Kasun Fernando', readiness: ReadinessRating.ONE_TWO_YEARS, compositeScore: 81.3 },
-    ],
-  },
-];
+function formatTenure(since: string | null): string {
+  if (!since) return 'Tenure unknown';
+  const start = new Date(since);
+  if (Number.isNaN(start.getTime())) return 'Tenure unknown';
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years === 0) return `${remMonths} mo${remMonths === 1 ? '' : 's'}`;
+  if (remMonths === 0) return `${years} yr${years === 1 ? '' : 's'}`;
+  return `${years} yr${years === 1 ? '' : 's'} ${remMonths} mo`;
+}
 
-const MOCK_BENCH: DeptBench[] = [
-  { department: 'Executive',   totalRoles: 2, coveredRoles: 2, readyNow: 1, oneTwoYears: 1, developing: 0 },
-  { department: 'Engineering', totalRoles: 3, coveredRoles: 3, readyNow: 1, oneTwoYears: 2, developing: 0 },
-  { department: 'Finance',     totalRoles: 3, coveredRoles: 3, readyNow: 0, oneTwoYears: 2, developing: 1 },
-  { department: 'Sales',       totalRoles: 3, coveredRoles: 2, readyNow: 0, oneTwoYears: 1, developing: 1 },
-  { department: 'HR',          totalRoles: 2, coveredRoles: 1, readyNow: 1, oneTwoYears: 0, developing: 0 },
-  { department: 'Operations',  totalRoles: 2, coveredRoles: 2, readyNow: 0, oneTwoYears: 1, developing: 1 },
-];
+function mapKeyRole(r: ApiKeyRole): KeyRole {
+  return {
+    id: r.id,
+    title: r.title,
+    departmentId: r.departmentId,
+    department: r.departmentName ?? 'Unassigned',
+    incumbentId: r.incumbentId,
+    incumbent: r.incumbentName ?? 'Vacant',
+    incumbentSince: r.incumbentSince,
+    incumbentTenure: r.incumbentName ? formatTenure(r.incumbentSince) : 'Vacant',
+    criticality: r.criticality,
+    flightRisk: r.flightRisk,
+    successors: r.successors.map((s) => ({
+      id: s.id,
+      candidateId: s.candidateUserId,
+      name: s.candidateName,
+      readiness: s.readinessRating,
+      compositeScore: s.compositeScore,
+    })),
+  };
+}
+
+function mapBench(b: ApiBench): DeptBench {
+  const breakdown = b.readinessBreakdown ?? {};
+  return {
+    department: b.departmentName,
+    totalRoles: b.totalRoles,
+    coveredRoles: b.coveredRoles,
+    readyNow: breakdown[ReadinessRating.READY_NOW] ?? 0,
+    oneTwoYears: breakdown[ReadinessRating.ONE_TWO_YEARS] ?? 0,
+    developing:
+      (breakdown[ReadinessRating.DEVELOPING] ?? 0) +
+      (breakdown[ReadinessRating.NOT_YET_READY] ?? 0) +
+      (breakdown['not_yet_assessed'] ?? 0),
+  };
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -377,12 +217,46 @@ const CRITICALITY_META: Record<string, { variant: 'error' | 'warning' | 'info'; 
   medium:   { variant: 'info',    label: 'Medium' },
 };
 
+const CRITICALITY_OPTIONS = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+];
+
+const FLIGHT_RISK_OPTIONS = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
+const PERFORMANCE_OVERRIDE_OPTIONS = [
+  { value: '', label: 'Auto (from 360 feedback)' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
 const TABS = [
   { key: 'overview',   label: 'Overview' },
   { key: 'ninebox',    label: '9-Box Grid' },
   { key: 'key-roles',  label: 'Key Roles' },
   { key: 'talent',     label: 'Talent Pool' },
 ];
+
+const inputCls =
+  'w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700';
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -442,9 +316,23 @@ function OverviewTab({ candidates, roles, bench }: {
   roles: KeyRole[];
   bench: DeptBench[];
 }) {
+  if (candidates.length === 0 && roles.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+        <Users className="w-10 h-10 text-gray-300 mx-auto mb-3" strokeWidth={1.5} />
+        <p className="text-sm font-medium text-gray-600">No succession data yet</p>
+        <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+          Once readiness assessments are completed and key roles are defined, this dashboard will show your leadership pipeline.
+        </p>
+      </div>
+    );
+  }
+
   const readyNow = candidates.filter(c => c.readinessRating === ReadinessRating.READY_NOW).length;
   const hipos = candidates.filter(c => c.potential === 'high');
-  const coverageRate = Math.round((roles.filter(r => r.successors.length > 0).length / roles.length) * 100);
+  const coverageRate = roles.length > 0
+    ? Math.round((roles.filter(r => r.successors.length > 0).length / roles.length) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -459,22 +347,26 @@ function OverviewTab({ candidates, roles, bench }: {
       {/* Readiness Distribution */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Readiness Distribution</h2>
-        <div className="space-y-3">
-          {Object.entries(READINESS_META).map(([rating, meta]) => {
-            const count = candidates.filter(c => c.readinessRating === rating).length;
-            const pct = Math.round((count / candidates.length) * 100);
-            return (
-              <div key={rating} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-28 shrink-0">{meta.label}</span>
-                <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                  <div className={`h-full rounded-full ${meta.color} transition-all`} style={{ width: `${pct}%` }} />
+        {candidates.length === 0 ? (
+          <p className="text-sm text-gray-400">No candidates with a computed readiness score yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {Object.entries(READINESS_META).map(([rating, meta]) => {
+              const count = candidates.filter(c => c.readinessRating === rating).length;
+              const pct = Math.round((count / candidates.length) * 100);
+              return (
+                <div key={rating} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 w-28 shrink-0">{meta.label}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div className={`h-full rounded-full ${meta.color} transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-700 w-6 text-right">{count}</span>
+                  <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
                 </div>
-                <span className="text-sm font-semibold text-gray-700 w-6 text-right">{count}</span>
-                <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bench Strength by Department */}
@@ -494,7 +386,11 @@ function OverviewTab({ candidates, roles, bench }: {
               </tr>
             </thead>
             <tbody>
-              {bench.map(d => {
+              {bench.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-gray-400">No key roles defined yet.</td>
+                </tr>
+              ) : bench.map(d => {
                 const pct = Math.round((d.coveredRoles / d.totalRoles) * 100);
                 const coverColor = pct === 100 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-400' : 'bg-red-400';
                 return (
@@ -533,38 +429,93 @@ function OverviewTab({ candidates, roles, bench }: {
           <h2 className="text-sm font-semibold text-gray-700">High Potential Spotlight</h2>
           <Badge variant="warning">{hipos.length} identified</Badge>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          {hipos.map(c => {
-            const meta = READINESS_META[c.readinessRating];
-            return (
-              <div key={c.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
-                <div className="flex items-start gap-3 mb-3">
-                  <Avatar seed={c.id} size="md" ring />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{c.title}</p>
+        {hipos.length === 0 ? (
+          <p className="text-sm text-gray-400">No high-potential candidates identified yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {hipos.map(c => {
+              const meta = READINESS_META[c.readinessRating];
+              return (
+                <div key={c.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <div className="flex items-start gap-3 mb-3">
+                    <Avatar seed={c.id} size="md" ring />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{c.title}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant={meta.variant}>{meta.label}</Badge>
+                    <span className="text-xs font-bold text-gray-700">{c.compositeScore.toFixed(1)}</span>
+                  </div>
+                  <ScoreBar score={c.compositeScore} />
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {c.keyStrengths.slice(0, 2).map(s => (
+                      <span key={s} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded-full">{s}</span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant={meta.variant}>{meta.label}</Badge>
-                  <span className="text-xs font-bold text-gray-700">{c.compositeScore.toFixed(1)}</span>
-                </div>
-                <ScoreBar score={c.compositeScore} />
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {c.keyStrengths.slice(0, 2).map(s => (
-                    <span key={s} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded-full">{s}</span>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function NineBoxTab({ candidates }: { candidates: Candidate[] }) {
+function PerformanceOverridePanel({ candidates, onMutate }: { candidates: Candidate[]; onMutate: () => void }) {
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  async function handleChange(readinessScoreId: string, value: string) {
+    setSavingId(readinessScoreId);
+    setError('');
+    try {
+      await api.patch(`/readiness-scores/${readinessScoreId}/performance-override`, {
+        gridPerformance: value || null,
+      });
+      onMutate();
+    } catch {
+      setError('Failed to update the override. Please try again.');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <h3 className="text-sm font-semibold text-gray-700 mb-1">Performance Calibration</h3>
+      <p className="text-xs text-gray-400 mb-4">
+        The performance axis defaults to each candidate&apos;s 360-feedback score. Override it here when you have better data, e.g. from a formal performance review.
+      </p>
+      {error && <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+      <div className="space-y-2">
+        {candidates.map((c) => (
+          <div key={c.readinessScoreId} className="flex items-center gap-3 border border-gray-100 rounded-lg px-3 py-2">
+            <Avatar seed={c.id} size="sm" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{c.name}</p>
+              <p className="text-xs text-gray-400 capitalize">Auto-derived: {c.autoPerformance}</p>
+            </div>
+            <div className="w-56">
+              <Select
+                value={c.manualGridPerformance ?? ''}
+                onChange={(v) => handleChange(c.readinessScoreId, v)}
+                options={PERFORMANCE_OVERRIDE_OPTIONS}
+                disabled={savingId === c.readinessScoreId}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NineBoxTab({ candidates, onMutate }: { candidates: Candidate[]; onMutate: () => void }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -609,170 +560,469 @@ function NineBoxTab({ candidates }: { candidates: Candidate[] }) {
           ))}
         </div>
       </div>
+
+      <PerformanceOverridePanel candidates={candidates} onMutate={onMutate} />
     </div>
   );
 }
 
-function KeyRolesTab({ roles }: { roles: KeyRole[] }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
+// ── Key Role modals ────────────────────────────────────────────────────────────
+
+interface KeyRoleFormModalProps {
+  open: boolean;
+  keyRole: KeyRole | null; // null = create
+  departments: DepartmentDto[];
+  users: UserDto[];
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function KeyRoleFormModal({ open, keyRole, departments, users, onClose, onSaved }: KeyRoleFormModalProps) {
+  const [title, setTitle] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [criticality, setCriticality] = useState<'critical' | 'high' | 'medium'>('medium');
+  const [incumbentId, setIncumbentId] = useState('');
+  const [incumbentSince, setIncumbentSince] = useState('');
+  const [flightRisk, setFlightRisk] = useState<'high' | 'medium' | 'low'>('medium');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle(keyRole?.title ?? '');
+    setDepartmentId(keyRole?.departmentId ?? '');
+    setCriticality(keyRole?.criticality ?? 'medium');
+    setIncumbentId(keyRole?.incumbentId ?? '');
+    setIncumbentSince(keyRole?.incumbentSince ?? '');
+    setFlightRisk(keyRole?.flightRisk ?? 'medium');
+    setError('');
+  }, [open, keyRole?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deptOptions = [
+    { value: '', label: 'No department' },
+    ...departments.filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name })),
+  ];
+  const incumbentOptions = [
+    { value: '', label: 'Vacant' },
+    ...users.filter((u) => u.isActive).map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` })),
+  ];
+
+  async function handleSubmit() {
+    if (!title.trim()) {
+      setError('Role title is required.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const payload = {
+        title: title.trim(),
+        departmentId: departmentId || null,
+        criticality,
+        incumbentId: incumbentId || null,
+        incumbentSince: incumbentSince || null,
+        flightRisk,
+      };
+      if (keyRole) {
+        await api.patch(`/succession/key-roles/${keyRole.id}`, payload);
+      } else {
+        await api.post('/succession/key-roles', payload);
+      }
+      onSaved();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to save key role.'));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-gray-700">Key Roles & Succession Pipeline ({roles.length} roles)</h2>
-        <div className="flex gap-2 text-xs">
-          {Object.entries(CRITICALITY_META).map(([k, v]) => (
-            <Badge key={k} variant={v.variant}>{v.label}</Badge>
-          ))}
+    <Modal open={open} onClose={onClose} title={keyRole ? 'Edit Key Role' : 'Add Key Role'}>
+      <div className="space-y-4">
+        <Field label="Role title" required>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className={inputCls}
+            placeholder="e.g. VP Engineering"
+            autoFocus
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Department">
+            <Select value={departmentId} onChange={setDepartmentId} options={deptOptions} />
+          </Field>
+          <Field label="Criticality">
+            <Select value={criticality} onChange={(v) => setCriticality(v as 'critical' | 'high' | 'medium')} options={CRITICALITY_OPTIONS} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Incumbent">
+            <Select value={incumbentId} onChange={setIncumbentId} options={incumbentOptions} />
+          </Field>
+          <Field label="Incumbent since">
+            <input
+              type="date"
+              value={incumbentSince}
+              onChange={(e) => setIncumbentSince(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+        <Field label="Flight risk">
+          <Select value={flightRisk} onChange={(v) => setFlightRisk(v as 'high' | 'medium' | 'low')} options={FLIGHT_RISK_OPTIONS} />
+        </Field>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Saving…' : keyRole ? 'Save Changes' : 'Create Role'}
+          </button>
         </div>
       </div>
-      <div className="divide-y divide-gray-100">
-        {roles.map(role => {
-          const isOpen = expanded === role.id;
-          const crit = CRITICALITY_META[role.criticality];
-          const hasCover = role.successors.length > 0;
-          return (
-            <div key={role.id}>
-              <button
-                className="w-full text-left px-4 py-4 hover:bg-gray-50 transition-colors"
-                onClick={() => setExpanded(isOpen ? null : role.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900">{role.title}</span>
-                      <Badge variant={crit.variant}>{crit.label}</Badge>
-                      {!hasCover && <Badge variant="error">No Successor</Badge>}
+    </Modal>
+  );
+}
+
+function DeleteKeyRoleModal({ keyRole, onClose, onDone }: { keyRole: KeyRole | null; onClose: () => void; onDone: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleDelete() {
+    if (!keyRole) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.delete(`/succession/key-roles/${keyRole.id}`);
+      onDone();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to delete key role.'));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal open={!!keyRole} onClose={onClose} title="Delete Key Role">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Delete <span className="font-semibold text-gray-900">{keyRole?.title}</span>? This also removes its successor pipeline. This cannot be undone.
+        </p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loading}
+            className="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function NominateSuccessorModal({ keyRole, users, onClose, onDone }: {
+  keyRole: KeyRole | null;
+  users: UserDto[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [candidateUserId, setCandidateUserId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setCandidateUserId('');
+    setNotes('');
+    setError('');
+  }, [keyRole?.id]);
+
+  const alreadyNominated = new Set((keyRole?.successors ?? []).map((s) => s.candidateId).filter(Boolean));
+  const candidateOptions = users
+    .filter((u) => u.isActive && !alreadyNominated.has(u.id))
+    .map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}` }));
+
+  async function handleSubmit() {
+    if (!keyRole) return;
+    if (!candidateUserId) {
+      setError('Select a candidate.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await api.post(`/succession/key-roles/${keyRole.id}/successors`, {
+        candidateUserId,
+        notes: notes.trim() || undefined,
+      });
+      onDone();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Failed to nominate successor.'));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Modal open={!!keyRole} onClose={onClose} title={keyRole ? `Nominate Successor — ${keyRole.title}` : 'Nominate Successor'}>
+      <div className="space-y-4">
+        <Field label="Candidate" required>
+          <Select
+            value={candidateUserId}
+            onChange={setCandidateUserId}
+            options={[{ value: '', label: 'Select a candidate…' }, ...candidateOptions]}
+          />
+        </Field>
+        <Field label="Notes">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={`${inputCls} min-h-[80px]`}
+            placeholder="Optional context for this nomination"
+          />
+        </Field>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Nominating…' : 'Nominate'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function KeyRolesTab({ roles, departments, users, onMutate }: {
+  roles: KeyRole[];
+  departments: DepartmentDto[];
+  users: UserDto[];
+  onMutate: () => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [formRole, setFormRole] = useState<KeyRole | 'new' | null>(null);
+  const [deleteRole, setDeleteRole] = useState<KeyRole | null>(null);
+  const [nominateRole, setNominateRole] = useState<KeyRole | null>(null);
+
+  async function handleRemoveSuccessor(roleId: string, successorId: string) {
+    if (!window.confirm('Remove this successor nomination?')) return;
+    await api.delete(`/succession/key-roles/${roleId}/successors/${successorId}`);
+    onMutate();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setFormRole('new')}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+        >
+          <Plus className="w-4 h-4" strokeWidth={2} /> Add Key Role
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-sm font-semibold text-gray-700">Key Roles & Succession Pipeline ({roles.length} roles)</h2>
+          <div className="flex gap-2 text-xs">
+            {Object.entries(CRITICALITY_META).map(([k, v]) => (
+              <Badge key={k} variant={v.variant}>{v.label}</Badge>
+            ))}
+          </div>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {roles.length === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-400">
+              No key roles defined yet. Add your organisation&apos;s critical roles to start tracking succession coverage.
+            </div>
+          ) : roles.map(role => {
+            const isOpen = expanded === role.id;
+            const crit = CRITICALITY_META[role.criticality];
+            const hasCover = role.successors.length > 0;
+            return (
+              <div key={role.id}>
+                <div className="w-full px-4 py-4 hover:bg-gray-50 transition-colors flex items-center gap-3">
+                  <button
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    onClick={() => setExpanded(isOpen ? null : role.id)}
+                  >
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} strokeWidth={2} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">{role.title}</span>
+                        <Badge variant={crit.variant}>{crit.label}</Badge>
+                        {!hasCover && <Badge variant="error">No Successor</Badge>}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {role.department} · Incumbent: <span className="font-medium text-gray-700">{role.incumbent}</span>
+                        <span className="text-gray-400"> ({role.incumbentTenure})</span>
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {role.department} · Incumbent: <span className="font-medium text-gray-700">{role.incumbent}</span>
-                      <span className="text-gray-400"> ({role.incumbentTenure})</span>
-                    </p>
-                  </div>
+                  </button>
                   <div className="flex items-center -space-x-2 shrink-0">
                     {role.successors.slice(0, 3).map(s => (
-                      <Avatar key={s.candidateId} seed={s.candidateId} size="sm" ring />
+                      <Avatar key={s.id} seed={s.candidateId ?? s.id} size="sm" ring />
                     ))}
                     {role.successors.length === 0 && (
                       <span className="text-xs text-gray-400 italic">None</span>
                     )}
                   </div>
-                </div>
-              </button>
-
-              {isOpen && (
-                <div className="px-11 pb-4 bg-gray-50 border-t border-gray-100">
-                  <p className="text-xs text-gray-500 font-medium pt-3 mb-2">
-                    Succession Pipeline ({role.successors.length} successors)
-                  </p>
-                  <div className="space-y-2">
-                    {role.successors.map((s, idx) => {
-                      const rm = READINESS_META[s.readiness];
-                      return (
-                        <div key={s.candidateId} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3">
-                          <span className="text-xs text-gray-400 font-bold w-4">#{idx + 1}</span>
-                          <Avatar seed={s.candidateId} size="sm" />
-                          <span className="text-sm font-medium text-gray-800 flex-1">{s.name}</span>
-                          <Badge variant={rm.variant}>{rm.label}</Badge>
-                          <div className="w-32">
-                            <ScoreBar score={s.compositeScore} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {role.successors.length === 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-600 flex items-center gap-2">
-                        <FileWarning className="w-4 h-4 shrink-0" strokeWidth={2} />
-                        No successors identified. This role is a succession gap — consider initiating a readiness assessment.
-                      </div>
-                    )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setFormRole(role)}
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Edit role"
+                    >
+                      <Pencil className="w-4 h-4" strokeWidth={2} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteRole(role)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete role"
+                    >
+                      <Trash2 className="w-4 h-4" strokeWidth={2} />
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {isOpen && (
+                  <div className="px-11 pb-4 bg-gray-50 border-t border-gray-100">
+                    <div className="flex items-center justify-between pt-3 mb-2">
+                      <p className="text-xs text-gray-500 font-medium">
+                        Succession Pipeline ({role.successors.length} successors)
+                      </p>
+                      <button
+                        onClick={() => setNominateRole(role)}
+                        className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" strokeWidth={2} /> Nominate Successor
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {role.successors.map((s, idx) => {
+                        const rm = s.readiness ? READINESS_META[s.readiness] : null;
+                        return (
+                          <div key={s.id} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3">
+                            <span className="text-xs text-gray-400 font-bold w-4">#{idx + 1}</span>
+                            <Avatar seed={s.candidateId ?? s.id} size="sm" />
+                            <span className="text-sm font-medium text-gray-800 flex-1">{s.name}</span>
+                            {rm ? <Badge variant={rm.variant}>{rm.label}</Badge> : <Badge variant="neutral">Not assessed</Badge>}
+                            <div className="w-32">
+                              {s.compositeScore !== null ? <ScoreBar score={s.compositeScore} /> : <span className="text-xs text-gray-400">—</span>}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveSuccessor(role.id, s.id)}
+                              className="p-1 text-gray-300 hover:text-red-600 transition-colors"
+                              title="Remove nomination"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {role.successors.length === 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-600 flex items-center gap-2">
+                          <FileWarning className="w-4 h-4 shrink-0" strokeWidth={2} />
+                          No successors identified. This role is a succession gap — nominate a candidate above.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      <KeyRoleFormModal
+        open={formRole !== null}
+        keyRole={formRole === 'new' ? null : formRole}
+        departments={departments}
+        users={users}
+        onClose={() => setFormRole(null)}
+        onSaved={() => { setFormRole(null); onMutate(); }}
+      />
+      <DeleteKeyRoleModal
+        keyRole={deleteRole}
+        onClose={() => setDeleteRole(null)}
+        onDone={() => { setDeleteRole(null); onMutate(); }}
+      />
+      <NominateSuccessorModal
+        keyRole={nominateRole}
+        users={users}
+        onClose={() => setNominateRole(null)}
+        onDone={() => { setNominateRole(null); onMutate(); }}
+      />
     </div>
   );
 }
 
-// ── Talent Pool — Organisation Hierarchy Tree ─────────────────────────────────
+// ── Talent Pool — Organisation Hierarchy Tree (real manager-based reporting lines) ────
 
 interface OrgNode {
   id: string;
   name: string;
   title: string;
   department: string;
-  candidate: Candidate | null; // null = current incumbent, not a succession candidate
+  candidate: Candidate | null; // set when this user is also a succession candidate somewhere
   children: OrgNode[];
 }
 
-interface OrgPosition {
-  id: string;
-  parentId: string | null;
-  name?: string;
-  title?: string;
-  department?: string;
-  candidateId?: string;
-}
-
-// Reporting lines built from the same mock roles/candidates used elsewhere on this page —
-// incumbents come from MOCK_KEY_ROLES, succession candidates are slotted in under the
-// role/manager they'd realistically report to.
-const ORG_POSITIONS: OrgPosition[] = [
-  { id: 'ceo', parentId: null, name: 'Michael Chen', title: 'Chief Executive Officer', department: 'Executive' },
-  { id: 'cfo', parentId: 'ceo', name: 'Sarah Park', title: 'Chief Financial Officer', department: 'Finance' },
-  { id: 'vp-eng', parentId: 'ceo', name: 'James Wilson', title: 'VP Engineering', department: 'Engineering' },
-  { id: 'vp-sales', parentId: 'ceo', name: 'Elena Torres', title: 'VP Sales', department: 'Sales' },
-  { id: 'head-hr', parentId: 'ceo', name: 'Raj Patel', title: 'Head of HR', department: 'HR' },
-  { id: 'head-ops', parentId: 'ceo', name: 'Lisa Wang', title: 'Head of Operations', department: 'Operations' },
-  { id: 'n-c1', parentId: 'ceo', candidateId: 'c1' },
-
-  { id: 'fin-ctrl', parentId: 'cfo', name: 'Nina Shah', title: 'Finance Controller', department: 'Finance' },
-  { id: 'n-c3', parentId: 'cfo', candidateId: 'c3' },
-  { id: 'n-c5', parentId: 'fin-ctrl', candidateId: 'c5' },
-  { id: 'n-c14', parentId: 'n-c3', candidateId: 'c14' },
-
-  { id: 'eng-mgr', parentId: 'vp-eng', name: 'Alan Rodrigo', title: 'Engineering Manager', department: 'Engineering' },
-  { id: 'n-c2', parentId: 'vp-eng', candidateId: 'c2' },
-  { id: 'n-c4', parentId: 'eng-mgr', candidateId: 'c4' },
-  { id: 'n-c11', parentId: 'n-c2', candidateId: 'c11' },
-
-  { id: 'n-c6', parentId: 'vp-sales', candidateId: 'c6' },
-  { id: 'n-c12', parentId: 'vp-sales', candidateId: 'c12' },
-  { id: 'n-c9', parentId: 'n-c6', candidateId: 'c9' },
-  { id: 'n-c15', parentId: 'n-c6', candidateId: 'c15' },
-
-  { id: 'n-c7', parentId: 'head-hr', candidateId: 'c7' },
-  { id: 'n-c13', parentId: 'n-c7', candidateId: 'c13' },
-
-  { id: 'n-c8', parentId: 'head-ops', candidateId: 'c8' },
-  { id: 'n-c10', parentId: 'n-c8', candidateId: 'c10' },
-];
-
-function buildOrgTree(candidates: Candidate[]): OrgNode {
-  const byId = new Map(candidates.map((c) => [c.id, c]));
+/** Builds a forest (not a single tree) since real org data can have multiple top-level users
+ *  (no manager set) — unlike the old mock, which always had exactly one CEO root. */
+function buildOrgForest(users: ApiOrgUser[], candidatesByUserId: Map<string, Candidate>): OrgNode[] {
   const nodes = new Map<string, OrgNode>();
-  ORG_POSITIONS.forEach((pos) => {
-    const candidate = pos.candidateId ? byId.get(pos.candidateId) ?? null : null;
-    nodes.set(pos.id, {
-      id: pos.id,
-      name: candidate ? candidate.name : pos.name ?? '',
-      title: candidate ? candidate.title : pos.title ?? '',
-      department: candidate ? candidate.department : pos.department ?? '',
+  users.forEach((u) => {
+    const candidate = candidatesByUserId.get(u.id) ?? null;
+    nodes.set(u.id, {
+      id: u.id,
+      name: u.name,
+      title: candidate?.title ?? u.title ?? '',
+      department: candidate?.department ?? u.department ?? '',
       candidate,
       children: [],
     });
   });
-  let root: OrgNode | null = null;
-  ORG_POSITIONS.forEach((pos) => {
-    const node = nodes.get(pos.id)!;
-    if (pos.parentId === null) root = node;
-    else nodes.get(pos.parentId)?.children.push(node);
+
+  const validIds = new Set(users.map((u) => u.id));
+  const roots: OrgNode[] = [];
+  users.forEach((u) => {
+    const node = nodes.get(u.id)!;
+    if (u.managerId && u.managerId !== u.id && validIds.has(u.managerId)) {
+      nodes.get(u.managerId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
   });
-  return root!;
+  return roots;
 }
 
 function nodeMatchesQuery(node: OrgNode, q: string): boolean {
@@ -831,7 +1081,7 @@ function OrgChartNode({
           className="relative z-10 rounded-full p-0.5"
           style={{ background: 'var(--bg-surface)', boxShadow: `0 0 0 3px ${ringColor}` }}
         >
-          <Avatar seed={node.candidate?.id ?? node.id} size="xl" />
+          <Avatar seed={node.id} size="xl" />
         </div>
 
         {/* Card */}
@@ -845,7 +1095,7 @@ function OrgChartNode({
             </div>
           ) : (
             <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-gray-400">
-              <Briefcase className="w-3 h-3" strokeWidth={2} /> Incumbent
+              <Briefcase className="w-3 h-3" strokeWidth={2} /> Team member
             </span>
           )}
         </div>
@@ -874,17 +1124,21 @@ function OrgChartNode({
   );
 }
 
-function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
+function TalentPoolTab({ users, candidates }: { users: ApiOrgUser[]; candidates: Candidate[] }) {
   const [search, setSearch] = useState('');
-  const orgTree = useMemo(() => buildOrgTree(candidates), [candidates]);
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set([orgTree.id]));
+  const candidatesByUserId = useMemo(() => new Map(candidates.map((c) => [c.id, c])), [candidates]);
+  const forest = useMemo(() => buildOrgForest(users, candidatesByUserId), [users, candidatesByUserId]);
+  const allIds = useMemo(() => forest.flatMap((r) => collectIds(r)), [forest]);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(forest.map((r) => r.id)));
 
   const query = search.trim().toLowerCase();
-  const displayRoot = query ? filterOrgTree(orgTree, query) : orgTree;
+  const displayForest = query
+    ? forest.map((r) => filterOrgTree(r, query)).filter((r): r is OrgNode => r !== null)
+    : forest;
 
-  const totalCount = collectIds(orgTree).length;
+  const totalCount = allIds.length;
   const candidateCount = candidates.length;
-  const incumbentCount = totalCount - candidateCount;
+  const incumbentCount = Math.max(0, totalCount - candidateCount);
 
   function toggleNode(id: string) {
     setOpenIds((prev) => {
@@ -894,7 +1148,7 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
     });
   }
   function expandAll() {
-    setOpenIds(new Set(collectIds(orgTree)));
+    setOpenIds(new Set(allIds));
   }
   function collapseAll() {
     setOpenIds(new Set());
@@ -906,10 +1160,10 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
       <div className="flex items-center gap-4 flex-wrap text-xs text-gray-500">
         <span className="flex items-center gap-1.5 font-medium text-gray-700">
           <Network className="w-3.5 h-3.5" strokeWidth={2} />
-          {totalCount} roles · {candidateCount} succession candidates · {incumbentCount} incumbents
+          {totalCount} people · {candidateCount} succession candidates · {incumbentCount} others
         </span>
         <span className="flex items-center gap-1.5">
-          <Briefcase className="w-3.5 h-3.5" strokeWidth={2} /> Incumbent — current role holder
+          <Briefcase className="w-3.5 h-3.5" strokeWidth={2} /> Team member — not currently a succession candidate
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-500" /> Candidate readiness colour-coded
@@ -946,15 +1200,19 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
 
       {/* Org chart tree */}
       <div className="bg-white rounded-2xl border border-gray-200">
-        {displayRoot ? (
+        {displayForest.length > 0 ? (
           <div className="org-chart-scroll">
             <ul className="org-chart">
-              <OrgChartNode node={displayRoot} openIds={openIds} onToggle={toggleNode} forceOpen={Boolean(query)} />
+              {displayForest.map((root) => (
+                <OrgChartNode key={root.id} node={root} openIds={openIds} onToggle={toggleNode} forceOpen={Boolean(query)} />
+              ))}
             </ul>
           </div>
         ) : (
           <div className="text-center py-16 text-sm text-gray-400">
-            No roles or candidates match &ldquo;{search}&rdquo;.
+            {users.length === 0
+              ? 'No users yet — add team members in Settings to build the org chart.'
+              : `No people match "${search}".`}
           </div>
         )}
       </div>
@@ -967,21 +1225,64 @@ function TalentPoolTab({ candidates }: { candidates: Candidate[] }) {
 export default function SuccessionPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [exporting, setExporting] = useState(false);
+  const organisation = useAuthStore((s) => s.organisation);
+
+  const { data: candidatesRaw, mutate: mutateCandidates, isLoading: loadingCandidates } = useApi<ApiCandidate[]>('/succession/candidates');
+  const { data: keyRolesRaw, mutate: mutateKeyRoles, isLoading: loadingKeyRoles } = useApi<ApiKeyRole[]>('/succession/key-roles');
+  const { data: benchRaw, isLoading: loadingBench } = useApi<ApiBench[]>('/succession/bench');
+  const { data: orgChartRaw, isLoading: loadingOrgChart } = useApi<ApiOrgUser[]>('/succession/org-chart');
+  const { data: departments } = useApi<DepartmentDto[]>('/organisations/me/departments');
+  const { data: allUsers } = useApi<UserDto[]>('/users');
+
+  const candidates = useMemo(() => (candidatesRaw ?? []).map(mapCandidate), [candidatesRaw]);
+  const roles = useMemo(() => (keyRolesRaw ?? []).map(mapKeyRole), [keyRolesRaw]);
+  const bench = useMemo(() => (benchRaw ?? []).map(mapBench), [benchRaw]);
+
+  function refreshAll() {
+    mutateCandidates();
+    mutateKeyRoles();
+  }
 
   async function handleExport() {
     setExporting(true);
     try {
       await generateSuccessionPdf({
-        organisationName: 'LeaderPrism Demo Org',
-        generatedAt: 'Jul 2026',
-        candidates: MOCK_CANDIDATES,
-        keyRoles: MOCK_KEY_ROLES,
-        bench: MOCK_BENCH,
+        organisationName: organisation?.name,
+        generatedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }),
+        candidates: candidates.map((c) => ({
+          id: c.id,
+          name: c.name,
+          title: c.title,
+          department: c.department,
+          performance: c.performance,
+          potential: c.potential,
+          readinessRating: c.readinessRating,
+          compositeScore: c.compositeScore,
+          keyStrengths: c.keyStrengths,
+          developmentAreas: c.developmentAreas,
+        })),
+        keyRoles: roles.map((r) => ({
+          id: r.id,
+          title: r.title,
+          department: r.department,
+          incumbent: r.incumbent,
+          incumbentTenure: r.incumbentTenure,
+          criticality: r.criticality,
+          successors: r.successors.map((s) => ({
+            candidateId: s.candidateId ?? s.id,
+            name: s.name,
+            readiness: s.readiness ?? ReadinessRating.NOT_YET_READY,
+            compositeScore: s.compositeScore ?? 0,
+          })),
+        })),
+        bench,
       });
     } finally {
       setExporting(false);
     }
   }
+
+  const isLoading = loadingCandidates || loadingKeyRoles || loadingBench || loadingOrgChart;
 
   return (
     <div>
@@ -993,11 +1294,11 @@ export default function SuccessionPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-gray-400 bg-gray-100 border border-gray-200 rounded-full px-3 py-1">
-            Updated Jul 2026
+            Updated {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </span>
           <button
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || isLoading}
             className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed rounded-xl transition-colors"
           >
             {exporting ? (
@@ -1022,17 +1323,25 @@ export default function SuccessionPage() {
       <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} className="mb-6" />
 
       {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <OverviewTab candidates={MOCK_CANDIDATES} roles={MOCK_KEY_ROLES} bench={MOCK_BENCH} />
-      )}
-      {activeTab === 'ninebox' && (
-        <NineBoxTab candidates={MOCK_CANDIDATES} />
-      )}
-      {activeTab === 'key-roles' && (
-        <KeyRolesTab roles={MOCK_KEY_ROLES} />
-      )}
-      {activeTab === 'talent' && (
-        <TalentPoolTab candidates={MOCK_CANDIDATES} />
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Spinner />
+        </div>
+      ) : (
+        <>
+          {activeTab === 'overview' && (
+            <OverviewTab candidates={candidates} roles={roles} bench={bench} />
+          )}
+          {activeTab === 'ninebox' && (
+            <NineBoxTab candidates={candidates} onMutate={mutateCandidates} />
+          )}
+          {activeTab === 'key-roles' && (
+            <KeyRolesTab roles={roles} departments={departments ?? []} users={allUsers ?? []} onMutate={refreshAll} />
+          )}
+          {activeTab === 'talent' && (
+            <TalentPoolTab users={orgChartRaw ?? []} candidates={candidates} />
+          )}
+        </>
       )}
     </div>
   );

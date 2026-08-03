@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,11 +10,12 @@ import { ReadinessRating, UserRole } from '@leaderprism/shared';
 import { RoleProfile } from './entities/role-profile.entity';
 import { SjtResponse } from './entities/sjt-response.entity';
 import { LearningAgilityResponse } from './entities/learning-agility-response.entity';
-import { ReadinessScore } from './entities/readiness-score.entity';
+import { ReadinessScore, effectiveGridPerformance } from './entities/readiness-score.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Item } from '../items/entities/item.entity';
 import { ReadinessScoringService } from './readiness-scoring.service';
+import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 
 export interface CreateRoleProfileDto {
   title: string;
@@ -90,6 +90,8 @@ export class Uc4ReadinessService {
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<{
     items: Array<{
       id: string;
@@ -107,6 +109,7 @@ export class Uc4ReadinessService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const items = await this.itemRepo.find({
       where: { module: 'sjt', isActive: true },
@@ -140,6 +143,8 @@ export class Uc4ReadinessService {
     orgId: string,
     itemId: string,
     selectedOption: number,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<SjtResponse> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -147,6 +152,7 @@ export class Uc4ReadinessService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const item = await this.itemRepo.findOne({ where: { id: itemId, module: 'sjt' } });
     if (!item) throw new NotFoundException(`SJT item ${itemId} not found`);
@@ -180,6 +186,8 @@ export class Uc4ReadinessService {
     assessmentId: string,
     participantId: string,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<{
     items: Array<{
       id: string;
@@ -198,6 +206,7 @@ export class Uc4ReadinessService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const items = await this.itemRepo.find({
       where: { module: 'learning_agility', isActive: true },
@@ -232,6 +241,8 @@ export class Uc4ReadinessService {
     orgId: string,
     itemId: string,
     value: number,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<LearningAgilityResponse> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -239,6 +250,7 @@ export class Uc4ReadinessService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const item = await this.itemRepo.findOne({
       where: { id: itemId, module: 'learning_agility' },
@@ -318,12 +330,12 @@ export class Uc4ReadinessService {
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
 
-    const isOwner = participant.userId === requestingUserId;
-    const isPrivileged =
-      requestingUserRole === UserRole.ORG_ADMIN || requestingUserRole === UserRole.HR_MANAGER;
-    if (!isOwner && !isPrivileged) {
-      throw new ForbiddenException("You can only view your own readiness results.");
-    }
+    assertOwnerOrPrivileged(
+      participant.userId,
+      requestingUserId,
+      requestingUserRole,
+      'You can only view your own readiness results.',
+    );
 
     return this.readinessScoreRepo.find({
       where: { assessmentId, participantId },
@@ -342,11 +354,16 @@ export class Uc4ReadinessService {
       roleProfileId: string;
       roleTitle: string;
       candidates: Array<{
+        readinessScoreId: string;
+        assessmentId: string;
         participantId: string;
+        userId: string;
         name: string;
         readinessRating: ReadinessRating;
         compositeScore: number;
         gridPerformance: string;
+        manualGridPerformance: string | null;
+        effectiveGridPerformance: string;
         gridPotential: string;
       }>;
     }>;
@@ -412,11 +429,16 @@ export class Uc4ReadinessService {
       candidates: role.candidates.map((c) => {
         const user = c.participant?.user;
         return {
+          readinessScoreId: c.id,
+          assessmentId: c.assessmentId,
           participantId: c.participantId,
+          userId: c.participant?.userId ?? '',
           name: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
           readinessRating: c.readinessRating,
           compositeScore: Number(c.compositeScore),
           gridPerformance: c.gridPerformance,
+          manualGridPerformance: c.manualGridPerformance,
+          effectiveGridPerformance: effectiveGridPerformance(c),
           gridPotential: c.gridPotential,
         };
       }),
@@ -427,5 +449,79 @@ export class Uc4ReadinessService {
       byRating,
       byRole,
     };
+  }
+
+  /**
+   * Latest readiness score per user (by AssessmentParticipant.userId), for org-scoped users.
+   * Used by the succession module to bucket successor-pipeline candidates by current
+   * readiness without succession.service.ts needing to reach into the ReadinessScore repo
+   * directly (module-boundary rule — cross-module access goes through exported services).
+   */
+  async getLatestReadinessForUsers(
+    orgId: string,
+    userIds: string[],
+  ): Promise<Map<string, { readinessRating: ReadinessRating; compositeScore: number }>> {
+    const result = new Map<string, { readinessRating: ReadinessRating; compositeScore: number }>();
+    if (userIds.length === 0) return result;
+
+    const scores = await this.readinessScoreRepo
+      .createQueryBuilder('rs')
+      .innerJoinAndSelect('rs.participant', 'p')
+      .innerJoin('p.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('p.user_id IN (:...userIds)', { userIds })
+      .orderBy('rs.calculated_at', 'DESC')
+      .getMany();
+
+    for (const score of scores) {
+      const userId = score.participant?.userId;
+      if (userId && !result.has(userId)) {
+        result.set(userId, {
+          readinessRating: score.readinessRating,
+          compositeScore: Number(score.compositeScore),
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Sets or clears (gridPerformance: null) the manual performance-rating override on a
+   * ReadinessScore row. The 9-box's performance axis defaults to the auto-derived value from
+   * the 360-feedback score — this lets HR/ORG_ADMIN correct it when they have better data.
+   */
+  async setPerformanceOverride(
+    readinessScoreId: string,
+    orgId: string,
+    setById: string,
+    gridPerformance: 'high' | 'medium' | 'low' | null,
+    note: string | null,
+  ): Promise<ReadinessScore> {
+    const score = await this.readinessScoreRepo.findOne({
+      where: { id: readinessScoreId },
+      relations: ['assessment'],
+    });
+    if (!score || score.assessment?.organisationId !== orgId) {
+      throw new NotFoundException(`Readiness score ${readinessScoreId} not found`);
+    }
+
+    if (gridPerformance === null) {
+      score.manualGridPerformance = null;
+      score.manualPerformanceNote = null;
+      score.manualPerformanceSetById = null;
+      score.manualPerformanceSetAt = null;
+    } else {
+      score.manualGridPerformance = gridPerformance;
+      score.manualPerformanceNote = note;
+      score.manualPerformanceSetById = setById;
+      score.manualPerformanceSetAt = new Date();
+    }
+
+    const saved = await this.readinessScoreRepo.save(score);
+    this.logger.log(
+      `${gridPerformance === null ? 'Cleared' : 'Set'} performance override on readiness score ${readinessScoreId}`,
+    );
+    return saved;
   }
 }

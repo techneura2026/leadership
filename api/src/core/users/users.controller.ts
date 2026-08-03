@@ -33,7 +33,7 @@ export class UsersController {
   ) {}
 
   @Post()
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a user within the organisation' })
   async create(@CurrentOrgId() orgId: string, @Body() dto: CreateUserDto) {
     // Every admin-set-or-generated initial password is treated as temporary — the invited
@@ -50,6 +50,7 @@ export class UsersController {
       role: dto.role as UserRole,
       jobTitle: dto.jobTitle,
       departmentId: dto.departmentId,
+      managerId: dto.managerId,
       avatarUrl: dto.avatarUrl,
       mustChangePassword: true,
     });
@@ -69,21 +70,21 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all active users in the organisation' })
   findAll(@CurrentOrgId() orgId: string) {
     return this.usersService.findAll(orgId);
   }
 
   @Get(':id')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get a user by ID' })
   findOne(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.findById(id, orgId);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update user profile or role' })
   update(
     @CurrentOrgId() orgId: string,
@@ -95,7 +96,7 @@ export class UsersController {
 
   @Patch(':id/password')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin-set a new password for a locked-out user (forces change on next login)' })
   async setPassword(
     @CurrentOrgId() orgId: string,
@@ -107,7 +108,7 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles(UserRole.ORG_ADMIN)
+  @Roles(UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Deactivate a user (soft delete)' })
   async deactivate(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.update(id, orgId, { isActive: false });
@@ -115,7 +116,7 @@ export class UsersController {
 
   @Delete(':id/permanent')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles(UserRole.ORG_ADMIN)
+  @Roles(UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Permanently delete a user' })
   async hardDelete(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.hardDelete(id, orgId);
