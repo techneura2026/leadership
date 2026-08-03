@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Avatar } from '@/components/ui/Avatar';
+import { TopCenterToast } from '@/components/ui/TopCenterToast';
 import { cn } from '@/lib/utils';
 import { TYPE_META } from '@/lib/assessmentTypeMeta';
 import {
@@ -104,6 +105,12 @@ export default function ReportsPage() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+    setToast({ message, type });
+  }
 
   const [showAssessmentMenu, setShowAssessmentMenu] = useState(false);
   const assessmentMenuRef = useRef<HTMLDivElement>(null);
@@ -156,10 +163,33 @@ export default function ReportsPage() {
       // list above polls until it reaches 'ready'/'failed'.
       await api.post('/reports/generate', { assessmentId, participantId, reportType, language: 'en' });
       await mutateReports();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate report', err);
+      showToast(err?.response?.data?.message || 'Failed to generate report.', 'error');
     } finally {
       setGeneratingId(null);
+    }
+  }
+
+  // Retry from the "All Reports" table: unlike generateFor (which re-derives reportType from
+  // the assessment type — ambiguous for types that share an AssessmentType, e.g. ORG_SUMMARY),
+  // this posts using the row's own known-good fields, and works for org-level reports too
+  // (participantId null). requestReport() reuses the existing row rather than adding a new one.
+  async function retryReport(report: ReportDto) {
+    setRetryingId(report.id);
+    try {
+      await api.post('/reports/generate', {
+        assessmentId: report.assessmentId,
+        participantId: report.participantId ?? undefined,
+        reportType: report.reportType,
+        language: report.language,
+      });
+      await mutateReports();
+    } catch (err: any) {
+      console.error('Failed to retry report', err);
+      showToast(err?.response?.data?.message || 'Failed to retry report.', 'error');
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -182,8 +212,9 @@ export default function ReportsPage() {
     setDownloadingId(report.id);
     try {
       await downloadReport(report.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to download report', err);
+      showToast(err?.response?.data?.message || 'Failed to download report.', 'error');
     } finally {
       setDownloadingId(null);
     }
@@ -205,6 +236,11 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -442,8 +478,9 @@ export default function ReportsPage() {
                     report={r}
                     assessment={assessments.find((a) => a.id === r.assessmentId)}
                     downloading={downloadingId === r.id}
+                    retrying={retryingId === r.id}
                     onDownload={() => handleDownload(r)}
-                    onRetry={() => r.participantId && generateFor(r.assessmentId, r.participantId)}
+                    onRetry={() => retryReport(r)}
                   />
                 ))}
               </tbody>
@@ -487,11 +524,12 @@ export default function ReportsPage() {
 // ── Report Row (resolves participant name via cached per-assessment fetch) ────
 
 function ReportRow({
-  report, assessment, downloading, onDownload, onRetry,
+  report, assessment, downloading, retrying, onDownload, onRetry,
 }: {
   report: ReportDto;
   assessment: AssessmentDto | undefined;
   downloading: boolean;
+  retrying: boolean;
   onDownload: () => void;
   onRetry: () => void;
 }) {
@@ -545,10 +583,15 @@ function ReportRow({
         ) : report.status === 'failed' ? (
           <button
             onClick={onRetry}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+            disabled={retrying}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
           >
-            <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
-            Retry
+            {retrying ? (
+              <span className="inline-block w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
+            )}
+            {retrying ? 'Retrying…' : 'Retry'}
           </button>
         ) : (
           <span className="text-xs text-gray-300">—</span>

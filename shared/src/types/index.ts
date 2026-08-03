@@ -1,4 +1,7 @@
 import { AssessmentStatus, AssessmentType, Language, Plan, RaterRelationship, ReadinessRating, ReportType, UserRole } from '../enums';
+import { FormQuestion } from './formQuestion';
+
+export * from './formQuestion';
 
 // ── API Response envelope ────────────────────────────────────
 
@@ -96,6 +99,8 @@ export interface AssessmentDto {
 
 export interface AssessmentConfig {
   competencyIds?: string[];
+  questionMode?: 'competency' | 'custom';
+  questions?: FormQuestion[];
   ratingScale?: number;
   openEndedEnabled?: boolean;
   raterMinThreshold?: number;

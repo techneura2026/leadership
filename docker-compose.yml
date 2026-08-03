@@ -42,6 +42,8 @@ services:
       - AZURE_COMMUNICATION_CONNECTION_STRING=${AZURE_COMMUNICATION_CONNECTION_STRING}
       - EMAIL_FROM=${EMAIL_FROM}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+    volumes:
+      - reports_data:/app/reports
     depends_on:
       db:
         condition: service_healthy
@@ -100,5 +102,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  reports_data:
   caddy_data:
   caddy_config:

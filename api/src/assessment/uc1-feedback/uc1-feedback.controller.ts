@@ -11,13 +11,13 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { Uc1FeedbackService, AggregatedScore } from './uc1-feedback.service';
+import { Uc1FeedbackService, AggregatedScore, CustomQuestionSummary } from './uc1-feedback.service';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { UserRole } from '@leaderprism/shared';
 import { NominateRatersDto } from './dto/nominate-raters.dto';
-import { SaveParticipantResponsesDto } from './dto/save-participant-responses.dto';
 import { SaveRaterBehaviourResponsesDto } from './dto/save-rater-behaviour-responses.dto';
+import { SaveRaterCustomResponseDto } from './dto/save-rater-custom-response.dto';
 import { SubmitRaterOverallDto } from './dto/submit-rater-overall.dto';
 
 @ApiTags('360 Feedback')
@@ -90,21 +90,19 @@ export class Uc1FeedbackController {
     );
   }
 
-  @Post('assessments/:id/360/participant-responses/:participantId')
+  @Get('assessments/:id/360/custom-summary/:participantId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Submit custom question responses for a 360 feedback assessment' })
-  saveParticipantResponses(
+  @ApiOperation({ summary: 'Get aggregated custom-question summary (tallies + anonymised quotes)' })
+  getCustomQuestionSummary(
     @Request() req: any,
     @Param('id', ParseUUIDPipe) assessmentId: string,
     @Param('participantId', ParseUUIDPipe) participantId: string,
-    @Body() body: SaveParticipantResponsesDto,
-  ) {
-    return this.uc1Service.saveParticipantResponses(
+  ): Promise<CustomQuestionSummary[]> {
+    return this.uc1Service.getCustomQuestionSummary(
       assessmentId,
       participantId,
       req.user.orgId,
-      body.responses,
       req.user.sub,
       req.user.role,
     );
@@ -142,6 +140,21 @@ export class Uc1FeedbackController {
   @ApiOperation({ summary: 'Get competency clusters with behaviours for this rater token' })
   getRaterCompetencies(@Param('token') token: string) {
     return this.uc1Service.getRaterCompetencies(token);
+  }
+
+  @Get('rater/:token/questions')
+  @ApiOperation({ summary: 'Get custom questions for this rater token (custom-question mode only)' })
+  getRaterQuestions(@Param('token') token: string) {
+    return this.uc1Service.getRaterQuestions(token);
+  }
+
+  @Post('rater/:token/custom-responses')
+  @ApiOperation({ summary: 'Save one custom-question answer (auto-save, idempotent)' })
+  saveRaterCustomResponses(
+    @Param('token') token: string,
+    @Body() body: SaveRaterCustomResponseDto,
+  ) {
+    return this.uc1Service.saveRaterCustomResponses(token, body.questionId, body.answer);
   }
 
   @Post('rater/:token/responses')

@@ -18,6 +18,18 @@ import { User } from '../core/users/entities/user.entity';
 @Index(['organisationId'])
 @Index(['assessmentId'])
 @Index(['status'])
+// Prevent duplicate reports for the same target — retrying/regenerating must reuse the
+// existing row (see ReportingService.requestReport) rather than accumulate new ones.
+// Two partial indexes are needed because Postgres treats each NULL participant_id as
+// distinct, so a plain unique index would not dedupe org-level (participant_id IS NULL) reports.
+@Index('UQ_reports_participant_scope', ['organisationId', 'assessmentId', 'participantId', 'reportType'], {
+  unique: true,
+  where: '"participant_id" IS NOT NULL',
+})
+@Index('UQ_reports_org_scope', ['organisationId', 'assessmentId', 'reportType'], {
+  unique: true,
+  where: '"participant_id" IS NULL',
+})
 export class Report {
   @PrimaryGeneratedColumn('uuid')
   id: string;
