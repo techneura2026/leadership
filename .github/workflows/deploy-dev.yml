@@ -67,7 +67,7 @@ jobs:
             rm deploy.tar.gz
             
             # Write environment variables
-            cat <<EOT > .env
+            cat <<EOT > .env.new
             DATABASE_URL=postgresql://leaderprism:leaderprism_dev@db:5432/leaderprism?sslmode=disable
             REDIS_URL=redis://redis:6379
             JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
@@ -79,6 +79,7 @@ jobs:
             NODE_ENV=production
             FQDN=leaderprism-dev-app.centralus.cloudapp.azure.com
             APP_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com
+            WEB_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
             AZURE_STORAGE_CONTAINER_REPORTS=reports
@@ -87,6 +88,28 @@ jobs:
             EMAIL_FROM=${{ secrets.EMAIL_FROM }}
             EMAIL_FROM_NAME=LeaderPrism
             EOT
+
+            if [ -f .env ]; then
+              if [ -z "${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" ]; then
+                EXISTING_ACS=$(grep '^AZURE_COMMUNICATION_CONNECTION_STRING=' .env | cut -d'=' -f2- || true)
+                if [ -n "$EXISTING_ACS" ]; then
+                  sed -i "s|^AZURE_COMMUNICATION_CONNECTION_STRING=.*|AZURE_COMMUNICATION_CONNECTION_STRING=$EXISTING_ACS|" .env.new
+                fi
+              fi
+              if [ -z "${{ secrets.EMAIL_FROM }}" ]; then
+                EXISTING_FROM=$(grep '^EMAIL_FROM=' .env | cut -d'=' -f2- || true)
+                if [ -n "$EXISTING_FROM" ]; then
+                  sed -i "s|^EMAIL_FROM=.*|EMAIL_FROM=$EXISTING_FROM|" .env.new
+                fi
+              fi
+              if [ -z "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" ]; then
+                EXISTING_ST=$(grep '^AZURE_STORAGE_CONNECTION_STRING=' .env | cut -d'=' -f2- || true)
+                if [ -n "$EXISTING_ST" ]; then
+                  sed -i "s|^AZURE_STORAGE_CONNECTION_STRING=.*|AZURE_STORAGE_CONNECTION_STRING=$EXISTING_ST|" .env.new
+                fi
+              fi
+            fi
+            mv .env.new .env
             
             # Stop existing PM2 processes if any
             pm2 delete all || true
