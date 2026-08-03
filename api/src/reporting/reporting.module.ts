@@ -20,7 +20,15 @@ import { NotificationsModule } from '../core/notifications/notifications.module'
 @Module({
   imports: [
     TypeOrmModule.forFeature([Report, Assessment, AssessmentParticipant, User, Organisation, ReadinessScore]),
-    BullModule.registerQueue({ name: 'reports' }),
+    BullModule.registerQueue({
+      name: 'reports',
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: { age: 24 * 3600, count: 500 },
+        removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
+      },
+    }),
     Uc1FeedbackModule,
     Uc2CompetencyModule,
     Uc3PersonalityModule,

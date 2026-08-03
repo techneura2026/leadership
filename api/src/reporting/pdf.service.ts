@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ReportType } from '@leaderprism/shared';
+import { QuestionType, ReportType } from '@leaderprism/shared';
 
 // Register Handlebars helpers
 Handlebars.registerHelper('formatScore', (score: number | null | undefined) => {
@@ -28,6 +28,11 @@ Handlebars.registerHelper('gapClass', (gap: number | null | undefined) => {
 Handlebars.registerHelper('barWidth', (score: number, maxScale: number) => {
   if (!score || !maxScale) return 0;
   return Math.round((Number(score) / Number(maxScale)) * 100);
+});
+
+Handlebars.registerHelper('percentOfTotal', (count: number, total: number) => {
+  if (!total) return 0;
+  return Math.round((Number(count) / Number(total)) * 100);
 });
 
 Handlebars.registerHelper('markerPosition', function (this: any) {
@@ -161,6 +166,33 @@ export class PdfService {
   }): Promise<string> {
     const html = this.buildReportHtml('360-feedback', { ...data, maxScale: data.ratingScale });
     const filename = `360-${data.participantName.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
+    const outputPath = path.join(REPORTS_DIR, filename);
+    return this.generatePdf(html, outputPath);
+  }
+
+  /**
+   * Generates a 360° feedback PDF report for custom-question-mode assessments
+   * (tallies + anonymised quotes — no competency scores/gaps exist in this mode).
+   */
+  async generate360CustomReport(data: {
+    participantName: string;
+    jobTitle: string;
+    assessmentTitle: string;
+    organisationName: string;
+    generatedDate: string;
+    totalRaters: number;
+    perspectives: string;
+    questions: Array<{
+      questionId: string;
+      title: string;
+      type: QuestionType;
+      tally?: Array<{ optionId: string; optionText: string; count: number }>;
+      responses?: string[];
+      totalResponses: number;
+    }>;
+  }): Promise<string> {
+    const html = this.buildReportHtml('360-feedback-custom', data);
+    const filename = `360-custom-${data.participantName.replace(/\s+/g, '_')}-${Date.now()}.pdf`;
     const outputPath = path.join(REPORTS_DIR, filename);
     return this.generatePdf(html, outputPath);
   }

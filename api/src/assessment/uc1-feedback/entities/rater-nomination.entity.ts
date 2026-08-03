@@ -10,7 +10,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
-import { RaterRelationship } from '@leaderprism/shared';
+import { Answer, RaterRelationship } from '@leaderprism/shared';
 import { Assessment } from '../../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../../engine/entities/assessment-participant.entity';
 import { User } from '../../../core/users/entities/user.entity';
@@ -68,6 +68,9 @@ export class RaterNomination {
 
   @Column({ name: 'development_comment', type: 'text', nullable: true })
   developmentComment: string | null;
+
+  @Column({ name: 'custom_answers', type: 'jsonb', nullable: true, default: null })
+  customAnswers: Record<string, Answer> | null;
 
   @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
   completedAt: Date | null;

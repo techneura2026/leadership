@@ -648,4 +648,260 @@ describe('[QA-360] 360° Feedback Assessment', () => {
     expect(reminderRes.body.data).toHaveProperty('sent');
     expect(reminderRes.body.data.sent).toBe(2);
   });
+
+  // ─── QA-360-012 ─────────────────────────────────────────────────────────
+
+  /**
+   * QA-360-012 | P1
+   * Scenario: A 360 assessment created with config.questionMode='custom' serves its
+   * authored questions to raters instead of the competency framework, and blocks the
+   * competency-mode rater endpoint.
+   */
+  it('QA-360-012 | P1 — custom-question assessment serves authored questions to raters, not competencies', async () => {
+    const questions = [
+      {
+        id: 'q1', type: 'SINGLE_CHOICE', title: 'How clear is their communication?',
+        required: true, options: [{ id: 'opt-a', text: 'Very clear' }, { id: 'opt-b', text: 'Unclear' }],
+        tableRows: [], tableColumns: [],
+      },
+      {
+        id: 'q2', type: 'SHORT_ANSWER', title: 'What should they focus on?',
+        required: false, options: [], tableRows: [], tableColumns: [],
+      },
+    ];
+
+    const customId = await createDraftAssessment(app, org.admin, {
+      title: `Custom questions test ${uid()}`,
+      assessmentType: '360_feedback',
+      config: { questionMode: 'custom', questions },
+    });
+    const customParticipantUserId = await createUserInOrg(ds, org.id, {
+      email: `custom-p+${uid()}@example.com`,
+      firstName: 'Custom', lastName: 'Participant', role: 'participant', password: 'Test1234!',
+    });
+    await addParticipant(app, org.admin, customId, customParticipantUserId);
+    await launchAssessment(app, org.admin, customId);
+
+    const partsRes = await authGet(
+      app, org.admin, `/api/v1/assessments/${customId}/participants`,
+    ).expect(200);
+    const apId = partsRes.body.data[0].id;
+
+    const sfx = uid();
+    await authPost(app, org.admin, `/api/v1/assessments/${customId}/360/nominations`, {
+      participantId: apId,
+      raters: [{ raterEmail: `custom-peer+${sfx}@example.com`, raterName: 'Custom Peer', relationship: 'peer' }],
+    }).expect(201);
+    await authPost(app, org.admin, `/api/v1/assessments/${customId}/360/nominations/approve`).expect(201);
+
+    const tokenRows = await ds.query(
+      `SELECT token FROM rater_nominations WHERE assessment_id = $1`,
+      [customId],
+    );
+    const customToken: string = tokenRows[0].token;
+
+    // Landing reports custom mode
+    const landingRes = await http(app).get(`/api/v1/rater/${customToken}`).expect(200);
+    expect(landingRes.body.data.questionMode).toBe('custom');
+
+    // Questions endpoint returns the authored set
+    const questionsRes = await http(app).get(`/api/v1/rater/${customToken}/questions`).expect(200);
+    expect(questionsRes.body.data).toHaveLength(2);
+    expect(questionsRes.body.data.map((q: any) => q.id)).toEqual(['q1', 'q2']);
+
+    // Competency endpoint is blocked for a custom-mode assessment
+    const compRes = await http(app).get(`/api/v1/rater/${customToken}/competencies`);
+    expect(compRes.status).toBe(400);
+
+    // Submit answers via the custom-responses endpoint
+    await http(app).post(`/api/v1/rater/${customToken}/custom-responses`)
+      .send({ questionId: 'q1', answer: 'opt-a' }).expect(201);
+    await http(app).post(`/api/v1/rater/${customToken}/custom-responses`)
+      .send({ questionId: 'q2', answer: 'Delegate more.' }).expect(201);
+
+    const rows = await ds.query(
+      `SELECT status, custom_answers FROM rater_nominations WHERE token = $1`,
+      [customToken],
+    );
+    expect(rows[0].custom_answers).toEqual({ q1: 'opt-a', q2: 'Delegate more.' });
+    expect(rows[0].status).not.toBe('completed');
+
+    // Finish via the same overall endpoint used by competency mode
+    await http(app).post(`/api/v1/rater/${customToken}/overall`)
+      .send({ overallRating: 8 }).expect(201);
+
+    const finalRows = await ds.query(
+      `SELECT status FROM rater_nominations WHERE token = $1`,
+      [customToken],
+    );
+    expect(finalRows[0].status).toBe('completed');
+  });
+
+  // ─── QA-360-013 ─────────────────────────────────────────────────────────
+
+  /**
+   * QA-360-013 | P1
+   * Scenario: Mode-mismatch guards — a competency-mode nomination's token cannot hit the
+   * custom-question endpoints and vice versa. This keeps the two question systems mutually
+   * exclusive per assessment rather than silently returning wrong data.
+   */
+  it('QA-360-013 | P1 — mode-mismatch guards reject cross-mode endpoint calls with 400', async () => {
+    // Fresh, self-contained competency-mode assessment (does not depend on the shared
+    // suite's tokens, which other tests may have already consumed/expired).
+    const modeGuardId = await createDraftAssessment(app, org.admin, {
+      title: `Mode guard test ${uid()}`,
+      assessmentType: '360_feedback',
+    });
+    const modeGuardUserId = await createUserInOrg(ds, org.id, {
+      email: `mode-guard-p+${uid()}@example.com`,
+      firstName: 'ModeGuard', lastName: 'Participant', role: 'participant', password: 'Test1234!',
+    });
+    await addParticipant(app, org.admin, modeGuardId, modeGuardUserId);
+    await launchAssessment(app, org.admin, modeGuardId);
+
+    const partsRes = await authGet(
+      app, org.admin, `/api/v1/assessments/${modeGuardId}/participants`,
+    ).expect(200);
+    const apId = partsRes.body.data[0].id;
+
+    const sfx = uid();
+    await authPost(app, org.admin, `/api/v1/assessments/${modeGuardId}/360/nominations`, {
+      participantId: apId,
+      raters: [{ raterEmail: `mode-guard-peer+${sfx}@example.com`, raterName: 'Mode Guard Peer', relationship: 'peer' }],
+    }).expect(201);
+    await authPost(app, org.admin, `/api/v1/assessments/${modeGuardId}/360/nominations/approve`).expect(201);
+
+    const tokenRows = await ds.query(`SELECT token FROM rater_nominations WHERE assessment_id = $1`, [modeGuardId]);
+    const competencyModeToken: string = tokenRows[0].token;
+
+    const questionsRes = await http(app).get(`/api/v1/rater/${competencyModeToken}/questions`);
+    expect(questionsRes.status).toBe(400);
+
+    const customResponseRes = await http(app).post(`/api/v1/rater/${competencyModeToken}/custom-responses`)
+      .send({ questionId: 'q1', answer: 'opt-a' });
+    expect(customResponseRes.status).toBe(400);
+  });
+
+  // ─── QA-360-014 ─────────────────────────────────────────────────────────
+
+  /**
+   * QA-360-014 | P1
+   * Scenario: Backward-compat regression — a 360 assessment created without a questionMode
+   * field (matching every assessment created before this feature existed, including ones
+   * that happen to have a `questions` array from the old wizard shape) must still resolve
+   * raters to the competency flow, exactly as it always has.
+   */
+  it('QA-360-014 | P1 — assessments with no questionMode resolve to competency mode regardless of legacy config.questions', async () => {
+    for (const legacyConfig of [undefined, {}, { questions: [] }, { questions: [{ id: 'x' }] }]) {
+      const legacyId = await createDraftAssessment(app, org.admin, {
+        title: `Legacy config test ${uid()}`,
+        assessmentType: '360_feedback',
+        ...(legacyConfig !== undefined ? { config: legacyConfig } : {}),
+      });
+      const legacyUserId = await createUserInOrg(ds, org.id, {
+        email: `legacy-p+${uid()}@example.com`,
+        firstName: 'Legacy', lastName: 'Participant', role: 'participant', password: 'Test1234!',
+      });
+      await addParticipant(app, org.admin, legacyId, legacyUserId);
+      await launchAssessment(app, org.admin, legacyId);
+
+      const partsRes = await authGet(
+        app, org.admin, `/api/v1/assessments/${legacyId}/participants`,
+      ).expect(200);
+      const apId = partsRes.body.data[0].id;
+
+      const sfx = uid();
+      await authPost(app, org.admin, `/api/v1/assessments/${legacyId}/360/nominations`, {
+        participantId: apId,
+        raters: [{ raterEmail: `legacy-peer+${sfx}@example.com`, raterName: 'Legacy Peer', relationship: 'peer' }],
+      }).expect(201);
+      await authPost(app, org.admin, `/api/v1/assessments/${legacyId}/360/nominations/approve`).expect(201);
+
+      const tokenRows = await ds.query(`SELECT token FROM rater_nominations WHERE assessment_id = $1`, [legacyId]);
+      const legacyToken: string = tokenRows[0].token;
+
+      const landingRes = await http(app).get(`/api/v1/rater/${legacyToken}`).expect(200);
+      expect(landingRes.body.data.questionMode).toBe('competency');
+
+      await http(app).get(`/api/v1/rater/${legacyToken}/competencies`).expect(200);
+    }
+  });
+
+  // ─── QA-360-015 ─────────────────────────────────────────────────────────
+
+  /**
+   * QA-360-015 | P1
+   * Scenario: The custom-question summary endpoint enforces the same anonymity threshold
+   * as competency scores — 2 completed peers is insufficient, 3 unlocks the summary.
+   */
+  it('QA-360-015 | P1 — custom-question summary enforces the anonymity threshold like competency scores', async () => {
+    const questions = [
+      {
+        id: 'q1', type: 'SINGLE_CHOICE', title: 'Overall impression?',
+        required: true, options: [{ id: 'opt-a', text: 'Positive' }, { id: 'opt-b', text: 'Negative' }],
+        tableRows: [], tableColumns: [],
+      },
+    ];
+
+    const summaryId = await createDraftAssessment(app, org.admin, {
+      title: `Custom summary anonymity test ${uid()}`,
+      assessmentType: '360_feedback',
+      config: { questionMode: 'custom', questions },
+    });
+    const summaryUserId = await createUserInOrg(ds, org.id, {
+      email: `summary-p+${uid()}@example.com`,
+      firstName: 'Summary', lastName: 'Participant', role: 'participant', password: 'Test1234!',
+    });
+    await addParticipant(app, org.admin, summaryId, summaryUserId);
+    await launchAssessment(app, org.admin, summaryId);
+
+    const partsRes = await authGet(
+      app, org.admin, `/api/v1/assessments/${summaryId}/participants`,
+    ).expect(200);
+    const apId = partsRes.body.data[0].id;
+
+    const sfx = uid();
+    await authPost(app, org.admin, `/api/v1/assessments/${summaryId}/360/nominations`, {
+      participantId: apId,
+      raters: [
+        { raterEmail: `sum-peer1+${sfx}@example.com`, raterName: 'Sum Peer 1', relationship: 'peer' },
+        { raterEmail: `sum-peer2+${sfx}@example.com`, raterName: 'Sum Peer 2', relationship: 'peer' },
+        { raterEmail: `sum-peer3+${sfx}@example.com`, raterName: 'Sum Peer 3', relationship: 'peer' },
+      ],
+    }).expect(201);
+    await authPost(app, org.admin, `/api/v1/assessments/${summaryId}/360/nominations/approve`).expect(201);
+
+    const peerTokens: string[] = (await ds.query(
+      `SELECT token FROM rater_nominations WHERE assessment_id = $1`,
+      [summaryId],
+    )).map((r: any) => r.token);
+
+    async function completeCustomRater(token: string, answer: string) {
+      await http(app).post(`/api/v1/rater/${token}/custom-responses`)
+        .send({ questionId: 'q1', answer }).expect(201);
+      await http(app).post(`/api/v1/rater/${token}/overall`).send({ overallRating: 7 }).expect(201);
+    }
+
+    await completeCustomRater(peerTokens[0], 'opt-a');
+    await completeCustomRater(peerTokens[1], 'opt-a');
+
+    const blockedRes = await authGet(
+      app, org.admin, `/api/v1/assessments/${summaryId}/360/custom-summary/${apId}`,
+    );
+    expect(blockedRes.status).toBe(403);
+
+    await completeCustomRater(peerTokens[2], 'opt-b');
+
+    const summaryRes = await authGet(
+      app, org.admin, `/api/v1/assessments/${summaryId}/360/custom-summary/${apId}`,
+    ).expect(200);
+
+    expect(summaryRes.body.data).toHaveLength(1);
+    expect(summaryRes.body.data[0].tally).toEqual(
+      expect.arrayContaining([
+        { optionId: 'opt-a', optionText: 'Positive', count: 2 },
+        { optionId: 'opt-b', optionText: 'Negative', count: 1 },
+      ]),
+    );
+  });
 });

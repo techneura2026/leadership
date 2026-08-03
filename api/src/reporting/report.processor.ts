@@ -25,7 +25,9 @@ export class ReportProcessor extends WorkerHost {
       this.logger.log(`Report job ${job.id} completed successfully`);
     } catch (err) {
       this.logger.error(`Report job ${job.id} failed:`, err);
-      throw err; // BullMQ will retry based on job options
+      // Re-throwing lets BullMQ retry per the `defaultJobOptions` (attempts/backoff)
+      // configured on the 'reports' queue in reporting.module.ts.
+      throw err;
     }
   }
 }

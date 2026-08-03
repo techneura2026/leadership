@@ -8,7 +8,7 @@ import { PageSpinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { RadarChart, RadarAxis } from '@/components/ui/RadarChart';
 import { useAuthStore } from '@/store/auth.store';
-import { AssessmentDto, AssessmentType, CompetencyDto, RaterRelationship } from '@leaderprism/shared';
+import { AssessmentDto, AssessmentType, CompetencyDto, QuestionType, RaterRelationship, resolveQuestionMode } from '@leaderprism/shared';
 
 interface MyReportDto {
   id: string;
@@ -415,6 +415,92 @@ function Feedback360ResultsView({
   );
 }
 
+interface CustomQuestionSummary {
+  questionId: string;
+  title: string;
+  type: QuestionType;
+  tally?: Array<{ optionId: string; optionText: string; count: number }>;
+  responses?: string[];
+  totalResponses: number;
+}
+
+function CustomQuestion360ResultsView({
+  assessmentId, participantId,
+}: { assessmentId: string; participantId: string }) {
+  const { data: questions, error, isLoading } = useApi<CustomQuestionSummary[]>(
+    `/assessments/${assessmentId}/360/custom-summary/${participantId}`,
+  );
+
+  if (isLoading) return <PageSpinner />;
+
+  const status = (error as any)?.response?.status;
+  if (status === 403) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+        Your results aren&apos;t ready yet — feedback is only shown once enough raters in each
+        group have responded, to keep individual responses anonymous.
+      </div>
+    );
+  }
+  if (error || !questions) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+        Failed to load your feedback results. Please try again later.
+      </div>
+    );
+  }
+  if (questions.length === 0) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+        No feedback has been submitted for you yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {questions.map((q) => (
+        <div key={q.questionId} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900">{q.title}</h3>
+          </div>
+          <div className="px-5 py-4 space-y-2.5">
+            {q.tally && q.tally.map((t) => {
+              const pct = q.totalResponses > 0 ? Math.round((t.count / q.totalResponses) * 100) : 0;
+              return (
+                <div key={t.optionId} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-600 w-32 shrink-0 font-medium truncate">{t.optionText}</span>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 w-16 text-right">{t.count} ({pct}%)</span>
+                </div>
+              );
+            })}
+            {q.responses && (
+              q.responses.length > 0 ? (
+                <div className="space-y-2">
+                  {q.responses.map((r, i) => (
+                    <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-700 italic">
+                      &ldquo;{r}&rdquo;
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic">No responses yet.</p>
+              )
+            )}
+          </div>
+        </div>
+      ))}
+
+      <p className="text-xs text-gray-400 text-center mt-8">
+        Use this feedback as a starting point for development conversations.
+      </p>
+    </div>
+  );
+}
+
 // ── Readiness Results View ────────────────────────────────────────────────────
 
 interface ReadinessScoreDto {
@@ -585,7 +671,11 @@ export default function AssessmentResultsPage() {
       )}
 
       {assessment.assessmentType === AssessmentType.FEEDBACK_360 && (
-        <Feedback360ResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+        resolveQuestionMode(assessment.config) === 'custom' ? (
+          <CustomQuestion360ResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+        ) : (
+          <Feedback360ResultsView assessmentId={assessmentId} participantId={myRecord.id} />
+        )
       )}
 
       {assessment.assessmentType === AssessmentType.PERSONALITY && (

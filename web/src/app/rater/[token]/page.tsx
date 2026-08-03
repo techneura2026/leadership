@@ -4,18 +4,21 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
 import { TopCenterToast } from '@/components/ui/TopCenterToast';
+import { QuestionCard, isAnswered } from '@/components/QuestionCard';
+import { Answer, FormQuestion } from '@leaderprism/shared';
 
 // ── Standalone page — no auth, no app shell ───────────────────────────────────
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 const raterApi = axios.create({ baseURL: BASE });
 
-type Screen = 'loading' | 'error' | 'landing' | 'feedback' | 'overall' | 'thankyou';
+type Screen = 'loading' | 'error' | 'landing' | 'feedback' | 'questions' | 'overall' | 'thankyou';
 
 interface RaterLanding {
   participantName: string;
   assessmentTitle: string;
   completionMinutes: number;
   language: string;
+  questionMode: 'competency' | 'custom';
 }
 
 interface BehaviourItem {
@@ -93,26 +96,33 @@ export default function RaterPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [clusterIndex, setClusterIndex] = useState(0);
   const [clusterStates, setClusterStates] = useState<ClusterState[]>([]);
+  const [questions, setQuestions] = useState<FormQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [questionIdx, setQuestionIdx] = useState(0);
   const [overallRating, setOverallRating] = useState<number | null>(null);
   const [developmentComment, setDevelopmentComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Load landing info and clusters on mount
+  // Load landing info first — which endpoint to call next depends on its questionMode.
   useEffect(() => {
     async function init() {
       try {
-        const [landingRes, clustersRes] = await Promise.all([
-          raterApi.get<{ data: RaterLanding }>(`/rater/${token}`),
-          raterApi.get<{ data: CompetencyCluster[] }>(`/rater/${token}/competencies`),
-        ]);
+        const landingRes = await raterApi.get<{ data: RaterLanding }>(`/rater/${token}`);
         setLanding(landingRes.data.data);
-        const loadedClusters = clustersRes.data.data;
-        setClusters(loadedClusters);
-        setClusterStates(
-          loadedClusters.map((c) => ({ competencyId: c.id, ratings: {}, comment: '' })),
-        );
+
+        if (landingRes.data.data.questionMode === 'custom') {
+          const questionsRes = await raterApi.get<{ data: FormQuestion[] }>(`/rater/${token}/questions`);
+          setQuestions(questionsRes.data.data);
+        } else {
+          const clustersRes = await raterApi.get<{ data: CompetencyCluster[] }>(`/rater/${token}/competencies`);
+          const loadedClusters = clustersRes.data.data;
+          setClusters(loadedClusters);
+          setClusterStates(
+            loadedClusters.map((c) => ({ competencyId: c.id, ratings: {}, comment: '' })),
+          );
+        }
         setScreen('landing');
       } catch (err: unknown) {
         const code = (err as any)?.response?.data?.error?.code ?? '';
@@ -165,6 +175,37 @@ export default function RaterPage() {
     };
     autoSave();
   }, [debouncedRatings, currentCluster, currentState, token]);
+
+  const currentQuestion = questions[questionIdx];
+  const totalQuestions = questions.length;
+
+  // Auto-save custom-question answers via debounce (mirrors the competency ratings auto-save above)
+  const debouncedAnswer = useDebounce(currentQuestion ? answers[currentQuestion.id] : undefined, 500);
+  const prevAnswerRef = useRef<{ questionId: string; value: string } | null>(null);
+
+  useEffect(() => {
+    if (!currentQuestion || debouncedAnswer === undefined) return;
+    const serialized = JSON.stringify(debouncedAnswer);
+    if (prevAnswerRef.current?.questionId === currentQuestion.id && prevAnswerRef.current.value === serialized) {
+      return;
+    }
+    prevAnswerRef.current = { questionId: currentQuestion.id, value: serialized };
+
+    const autoSave = async () => {
+      setSaving(true);
+      try {
+        await raterApi.post(`/rater/${token}/custom-responses`, {
+          questionId: currentQuestion.id,
+          answer: debouncedAnswer,
+        });
+      } catch {
+        // silent auto-save failure
+      } finally {
+        setSaving(false);
+      }
+    };
+    autoSave();
+  }, [debouncedAnswer, currentQuestion, token]);
 
   function setRating(behaviourId: string, score: number) {
     setClusterStates((prev) =>
@@ -317,7 +358,7 @@ export default function RaterPage() {
           </div>
 
           <button
-            onClick={() => setScreen('feedback')}
+            onClick={() => setScreen(landing.questionMode === 'custom' ? 'questions' : 'feedback')}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3.5 text-base transition-colors"
           >
             Begin Feedback
@@ -430,6 +471,70 @@ export default function RaterPage() {
               )}
               {clusterIndex < totalClusters - 1 ? 'Save & Continue' : 'Continue to Final Step'}
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Custom Questions Screen ────────────────────────────────────────────────
+  if (screen === 'questions' && currentQuestion) {
+    const pct = totalQuestions > 0 ? Math.round((questionIdx / totalQuestions) * 100) : 0;
+    const answered = isAnswered(currentQuestion, answers[currentQuestion.id]);
+    const isLastQuestion = questionIdx === totalQuestions - 1;
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>Question {questionIdx + 1} of {totalQuestions}</span>
+              <span className="flex items-center gap-1.5">
+                {saving && (
+                  <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin inline-block" />
+                )}
+                {pct}% complete
+              </span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-10">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            {currentQuestion.required && (
+              <span className="text-xs font-semibold text-red-500 block mb-1">Required</span>
+            )}
+            <h2 className="text-base font-semibold text-gray-900 mb-5 leading-snug">{currentQuestion.title}</h2>
+
+            <QuestionCard
+              question={currentQuestion}
+              answer={answers[currentQuestion.id]}
+              onChange={(val) => setAnswers((prev) => ({ ...prev, [currentQuestion.id]: val }))}
+            />
+
+            <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100">
+              {questionIdx > 0 && (
+                <button
+                  onClick={() => setQuestionIdx((i) => i - 1)}
+                  className="flex-1 py-3 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Previous
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (isLastQuestion) setScreen('overall');
+                  else setQuestionIdx((i) => i + 1);
+                }}
+                disabled={currentQuestion.required && !answered}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
+              >
+                {isLastQuestion ? 'Continue to Final Step' : 'Next'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -6,8 +6,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Repository } from 'typeorm';
-import { ReportType } from '@leaderprism/shared';
+import { IsNull, Repository } from 'typeorm';
+import { AssessmentConfig, ReportType, resolveQuestionMode } from '@leaderprism/shared';
 import { Report } from './report.entity';
 import { PdfService } from './pdf.service';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
@@ -49,9 +49,14 @@ export class ReportingService {
   ) {}
 
   /**
-   * Creates the pending report record and enqueues the actual PDF generation as a
-   * BullMQ job — returns immediately so the request doesn't block on Puppeteer.
+   * Creates (or reuses) the pending report record and enqueues the actual PDF generation
+   * as a BullMQ job — returns immediately so the request doesn't block on Puppeteer.
    * The worker (ReportProcessor) calls processReport() to do the real work.
+   *
+   * This is also the sole entry point for "Retry": there is no separate retry endpoint.
+   * A prior report for the same (org, assessment, participant, reportType) is reused in
+   * place rather than inserting a new row, otherwise every failed attempt/retry would
+   * leave a permanent extra 'failed' row behind (see the UQ_reports_* indexes on Report).
    */
   async requestReport(
     orgId: string,
@@ -66,6 +71,33 @@ export class ReportingService {
     });
     if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
 
+    const existing = await this.reportRepo.findOne({
+      where: {
+        organisationId: orgId,
+        assessmentId,
+        participantId: participantId ?? IsNull(),
+        reportType,
+      },
+    });
+
+    // Already in flight — don't enqueue a second concurrent job for the same target.
+    if (existing && (existing.status === 'pending' || existing.status === 'processing')) {
+      return existing;
+    }
+
+    // Failed or ready — reuse the same row instead of accumulating a new one.
+    if (existing) {
+      existing.status = 'pending';
+      existing.localPath = null;
+      existing.blobUrl = null;
+      existing.generatedAt = null;
+      existing.generatedBy = generatedBy;
+      existing.language = language;
+      const savedReport = await this.reportRepo.save(existing);
+      await this.reportsQueue.add('generate', { reportId: savedReport.id });
+      return savedReport;
+    }
+
     const report = this.reportRepo.create({
       organisationId: orgId,
       assessmentId,
@@ -75,7 +107,26 @@ export class ReportingService {
       language,
       generatedBy,
     });
-    const savedReport = await this.reportRepo.save(report);
+
+    let savedReport: Report;
+    try {
+      savedReport = await this.reportRepo.save(report);
+    } catch (err: any) {
+      // Lost a create race to a concurrent request for the same target — the unique
+      // index rejected our insert, so return the row that won instead of erroring.
+      if (err?.code === '23505') {
+        const winner = await this.reportRepo.findOne({
+          where: {
+            organisationId: orgId,
+            assessmentId,
+            participantId: participantId ?? IsNull(),
+            reportType,
+          },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
 
     await this.reportsQueue.add('generate', { reportId: savedReport.id });
 
@@ -100,6 +151,11 @@ export class ReportingService {
     savedReport.status = 'processing';
     await this.reportRepo.save(savedReport);
 
+    // Hoisted so the post-generation notification block (outside the try/catch below)
+    // can still reference them without re-deriving participant info after the fact.
+    let participantUser: User | null = null;
+    let participantName = 'Participant';
+
     try {
       const generatedDate = new Date().toLocaleDateString('en-GB', {
         day: '2-digit',
@@ -110,7 +166,6 @@ export class ReportingService {
       let localPath: string;
 
       // Get participant/user info if applicable
-      let participantUser: User | null = null;
       if (participantId) {
         const participant = await this.participantRepo.findOne({
           where: { id: participantId },
@@ -119,7 +174,7 @@ export class ReportingService {
         participantUser = (participant as any)?.user ?? null;
       }
 
-      const participantName = participantUser
+      participantName = participantUser
         ? `${participantUser.firstName} ${participantUser.lastName}`
         : 'Participant';
 
@@ -136,14 +191,34 @@ export class ReportingService {
       switch (reportType) {
         case ReportType.INDIVIDUAL_360: {
           if (!participantId) throw new Error('participantId required for 360 report');
-          const scores = await this.uc1Service.get360Scores(assessmentId, participantId, orgId);
-
-          // Shuffle open comments for anonymity
-          const allComments: string[] = [];
+          const mode = resolveQuestionMode(assessment.config as AssessmentConfig | undefined);
           const nominations = await this.uc1Service.getCompletedNominationsWithResponses(
             assessmentId,
             participantId,
           );
+          const perspectives = Object.keys(
+            nominations.reduce((acc, n) => ({ ...acc, [n.relationship]: true }), {}),
+          ).join(', ');
+
+          if (mode === 'custom') {
+            const questions = await this.uc1Service.getCustomQuestionSummary(
+              assessmentId,
+              participantId,
+              orgId,
+            );
+            localPath = await this.pdfService.generate360CustomReport({
+              ...commonData,
+              totalRaters: nominations.length,
+              perspectives,
+              questions,
+            });
+            break;
+          }
+
+          const scores = await this.uc1Service.get360Scores(assessmentId, participantId, orgId);
+
+          // Shuffle open comments for anonymity
+          const allComments: string[] = [];
           for (const nom of nominations) {
             for (const resp of nom.responses ?? []) {
               if (resp.openText) {
@@ -171,9 +246,7 @@ export class ReportingService {
           localPath = await this.pdfService.generate360Report({
             ...commonData,
             totalRaters: nominations.length,
-            perspectives: Object.keys(
-              nominations.reduce((acc, n) => ({ ...acc, [n.relationship]: true }), {}),
-            ).join(', '),
+            perspectives,
             ratingScale: (assessment.config as any)?.ratingScale ?? 5,
             scores: scores.map((s) => ({ ...s, competencyName: s.competencyName ?? s.competencyId })),
             openComments: allComments,
@@ -290,24 +363,30 @@ export class ReportingService {
       savedReport.generatedAt = new Date();
       await this.reportRepo.save(savedReport);
 
-      // Send notification if participant user exists
-      if (participantUser) {
-        await this.notificationsService.sendReportReady(
-          participantUser.email,
-          participantName,
-          `/api/reports/${savedReport.id}/download`,
-          { orgId },
-        );
-      }
-
       this.logger.log(`Report ${savedReport.id} generated: ${localPath}`);
-      return savedReport;
     } catch (err) {
       savedReport.status = 'failed';
       await this.reportRepo.save(savedReport);
       this.logger.error(`Report generation failed for ${savedReport.id}:`, err);
       throw err;
     }
+
+    // Isolated from the try/catch above on purpose: a notification failure here must
+    // never revert an already-persisted successful report back to 'failed'.
+    if (participantUser) {
+      try {
+        await this.notificationsService.sendReportReady(
+          participantUser.email,
+          participantName,
+          `/api/reports/${savedReport.id}/download`,
+          { orgId },
+        );
+      } catch (err) {
+        this.logger.error(`Failed to send report-ready notification for ${savedReport.id}:`, err);
+      }
+    }
+
+    return savedReport;
   }
 
   async getReport(id: string, orgId: string): Promise<Report> {

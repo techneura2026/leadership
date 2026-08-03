@@ -901,6 +901,11 @@ function ReportsTab({
   const localReports = liveReports ?? reports;
   const [generating, setGenerating] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' | 'info' = 'success') {
+    setToast({ message, type });
+  }
 
   async function generateReport(participant: Participant) {
     setGenerating(participant.id);
@@ -914,8 +919,9 @@ function ReportsTab({
         language: 'en',
       });
       await mutateReports();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to generate report', err);
+      showToast(err?.response?.data?.message || 'Failed to generate report.', 'error');
     } finally {
       setGenerating(null);
     }
@@ -935,8 +941,9 @@ function ReportsTab({
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to download report', err);
+      showToast(err?.response?.data?.message || 'Failed to download report.', 'error');
     } finally {
       setDownloading(null);
     }
@@ -948,6 +955,11 @@ function ReportsTab({
 
   return (
     <div className="space-y-4">
+      <TopCenterToast
+        message={toast?.message ?? null}
+        type={toast?.type ?? 'info'}
+        onClose={() => setToast(null)}
+      />
       <h3 className="text-sm font-semibold text-gray-900">Individual Reports</h3>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1018,6 +1030,13 @@ function ReportsTab({
                           {downloading === p.id ? <Spinner size="sm" /> : <Download className="w-3.5 h-3.5" strokeWidth={2} />}
                           Download PDF
                         </button>
+                      ) : generating !== p.id && (report?.status === 'pending' || report?.status === 'processing') ? (
+                        // Already in flight on the worker — the polling reports fetch above
+                        // will flip this to Download/Generate once the job settles.
+                        <span className="text-xs text-gray-400 flex items-center gap-1 justify-end">
+                          <Spinner size="sm" />
+                          Processing…
+                        </span>
                       ) : (
                         <button
                           onClick={() => generateReport(p)}
@@ -1025,7 +1044,7 @@ function ReportsTab({
                           className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ml-auto"
                         >
                           {generating === p.id ? <Spinner size="sm" /> : <Sparkles className="w-3.5 h-3.5" strokeWidth={2} />}
-                          Generate
+                          {report?.status === 'failed' ? 'Retry' : 'Generate'}
                         </button>
                       )}
                     </td>

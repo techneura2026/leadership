@@ -7,7 +7,15 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
-import { RaterRelationship, UserRole } from '@leaderprism/shared';
+import {
+  Answer,
+  AssessmentConfig,
+  FormQuestion,
+  QuestionType,
+  RaterRelationship,
+  UserRole,
+  resolveQuestionMode,
+} from '@leaderprism/shared';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 import { RaterNomination } from './entities/rater-nomination.entity';
 import { RaterResponse } from './entities/rater-response.entity';
@@ -52,6 +60,15 @@ export interface AggregatedScore {
   >;
   overallMean: number;
   gapVsSelf: number | null;
+}
+
+export interface CustomQuestionSummary {
+  questionId: string;
+  title: string;
+  type: QuestionType;
+  tally?: Array<{ optionId: string; optionText: string; count: number }>;
+  responses?: string[];
+  totalResponses: number;
 }
 
 @Injectable()
@@ -240,6 +257,7 @@ export class Uc1FeedbackService {
     language: string;
     relationship: RaterRelationship;
     tokenExpires: Date | null;
+    questionMode: 'competency' | 'custom';
   }> {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(token)) {
@@ -271,16 +289,22 @@ export class Uc1FeedbackService {
       ? `${user.firstName} ${user.lastName}`
       : 'the participant';
 
-    const competencyCount = ((nomination.assessment?.config as any)?.competencyIds as string[] | undefined)?.length ?? 5;
+    const config = nomination.assessment?.config as AssessmentConfig | undefined;
+    const mode = resolveQuestionMode(config);
+    const completionMinutes =
+      mode === 'custom'
+        ? Math.max(5, (config?.questions?.length ?? 0) * 2)
+        : Math.max(5, (config?.competencyIds?.length ?? 5) * 3);
 
     return {
       nominationId: nomination.id,
       assessmentTitle: nomination.assessment?.title ?? '',
       participantName,
-      completionMinutes: Math.max(5, competencyCount * 3),
+      completionMinutes,
       language: 'en',
       relationship: nomination.relationship as RaterRelationship,
       tokenExpires: nomination.tokenExpires,
+      questionMode: mode,
     };
   }
 
@@ -295,8 +319,11 @@ export class Uc1FeedbackService {
     if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
       throw new ForbiddenException('Rater token has expired');
     }
+    if (resolveQuestionMode(nomination.assessment?.config as AssessmentConfig | undefined) !== 'competency') {
+      throw new BadRequestException('This assessment uses custom questions, not competencies.');
+    }
 
-    const competencyIds = (nomination.assessment?.config as any)?.competencyIds as string[] | undefined;
+    const competencyIds = (nomination.assessment?.config as AssessmentConfig | undefined)?.competencyIds;
     const orgId = nomination.assessment?.organisationId;
 
     let competencies: Competency[];
@@ -329,17 +356,61 @@ export class Uc1FeedbackService {
     }));
   }
 
+  async getRaterQuestions(token: string): Promise<FormQuestion[]> {
+    const nomination = await this.nominationRepo.findOne({
+      where: { token },
+      relations: ['assessment'],
+    });
+
+    if (!nomination) throw new NotFoundException('Invalid rater token');
+    if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
+    if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
+      throw new ForbiddenException('Rater token has expired');
+    }
+
+    const config = nomination.assessment?.config as AssessmentConfig | undefined;
+    if (resolveQuestionMode(config) !== 'custom') {
+      throw new BadRequestException('This assessment does not use custom questions.');
+    }
+
+    return config?.questions ?? [];
+  }
+
+  async saveRaterCustomResponses(token: string, questionId: string, answer: Answer): Promise<void> {
+    const nomination = await this.nominationRepo.findOne({
+      where: { token },
+      relations: ['assessment'],
+    });
+    if (!nomination) throw new NotFoundException('Invalid rater token');
+    if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
+    if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
+      throw new ForbiddenException('Rater token has expired');
+    }
+    if (resolveQuestionMode(nomination.assessment?.config as AssessmentConfig | undefined) !== 'custom') {
+      throw new BadRequestException('This assessment does not use custom questions.');
+    }
+
+    nomination.customAnswers = { ...(nomination.customAnswers ?? {}), [questionId]: answer };
+    await this.nominationRepo.save(nomination);
+  }
+
   async saveRaterBehaviourResponses(
     token: string,
     competencyId: string,
     ratings: BehaviourRating[],
     comment: string,
   ): Promise<void> {
-    const nomination = await this.nominationRepo.findOne({ where: { token } });
+    const nomination = await this.nominationRepo.findOne({
+      where: { token },
+      relations: ['assessment'],
+    });
     if (!nomination) throw new NotFoundException('Invalid rater token');
     if (nomination.status === 'completed') throw new BadRequestException('Feedback already submitted');
     if (nomination.tokenExpires && nomination.tokenExpires < new Date()) {
       throw new ForbiddenException('Rater token has expired');
+    }
+    if (resolveQuestionMode(nomination.assessment?.config as AssessmentConfig | undefined) !== 'competency') {
+      throw new BadRequestException('This assessment uses custom questions, not competencies.');
     }
 
     const avgScore =
@@ -587,14 +658,17 @@ export class Uc1FeedbackService {
     });
   }
 
-  async saveParticipantResponses(
+  /**
+   * requestingUserId/requestingUserRole are optional for the same reason as get360Scores:
+   * omitted when called internally by the report-generation worker.
+   */
+  async getCustomQuestionSummary(
     assessmentId: string,
     participantId: string,
     orgId: string,
-    responses: Record<string, any>,
-    requestingUserId: string,
-    requestingUserRole: UserRole,
-  ): Promise<void> {
+    requestingUserId?: string,
+    requestingUserRole?: UserRole,
+  ): Promise<CustomQuestionSummary[]> {
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
     });
@@ -602,20 +676,120 @@ export class Uc1FeedbackService {
       throw new NotFoundException(`Assessment ${assessmentId} not found`);
     }
 
-    const participant = await this.participantRepo.findOne({
-      where: { id: participantId, assessmentId },
-    });
-    if (!participant) {
-      throw new NotFoundException(`Participant ${participantId} not found`);
+    if (requestingUserId && requestingUserRole) {
+      const participant = await this.participantRepo.findOne({
+        where: { id: participantId, assessmentId },
+      });
+      if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+      assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
     }
-    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
-    participant.responses = responses;
-    participant.status = 'completed';
-    participant.completedAt = new Date();
-    await this.participantRepo.save(participant);
+    const nominations = await this.nominationRepo.find({ where: { assessmentId, participantId } });
+    const completedNominations = nominations.filter((n) => n.status === 'completed');
 
-    this.logger.log(`Saved feedback responses for participant ${participantId} in assessment ${assessmentId}`);
+    // Same anonymity threshold check as get360Scores
+    const groupCounts = this.groupBy(completedNominations, 'relationship');
+    for (const [rel, noms] of Object.entries(groupCounts)) {
+      if (
+        rel !== RaterRelationship.SUPERVISOR &&
+        rel !== RaterRelationship.SELF &&
+        (noms as any[]).length < MIN_RATERS
+      ) {
+        throw new ForbiddenException(
+          `Insufficient ${rel} responses for anonymity (${(noms as any[]).length}/${MIN_RATERS})`,
+        );
+      }
+    }
+
+    const questions = ((assessment.config as AssessmentConfig)?.questions ?? []) as FormQuestion[];
+    return this.aggregateCustomAnswers(questions, completedNominations);
+  }
+
+  aggregateCustomAnswers(
+    questions: FormQuestion[],
+    nominations: RaterNomination[],
+  ): CustomQuestionSummary[] {
+    return questions.map((q) => {
+      const answers = nominations
+        .map((n) => n.customAnswers?.[q.id])
+        .filter((a): a is Answer => a !== undefined && a !== null);
+
+      if (q.type === 'TRUE_FALSE') {
+        // Stored answers are the literal strings 'true'/'false', not the authored
+        // option ids ('opt-true'/'opt-false') — matches how the rater UI submits them.
+        let trueCount = 0;
+        let falseCount = 0;
+        for (const a of answers) {
+          if (a === 'true') trueCount++;
+          else if (a === 'false') falseCount++;
+        }
+        return {
+          questionId: q.id,
+          title: q.title,
+          type: q.type,
+          totalResponses: answers.length,
+          tally: [
+            { optionId: 'true', optionText: 'True', count: trueCount },
+            { optionId: 'false', optionText: 'False', count: falseCount },
+          ],
+        };
+      }
+
+      if (q.type === 'SHORT_ANSWER') {
+        const texts = answers.filter(
+          (a): a is string => typeof a === 'string' && a.trim().length > 0,
+        );
+        return {
+          questionId: q.id,
+          title: q.title,
+          type: q.type,
+          totalResponses: answers.length,
+          responses: this.shuffle(texts),
+        };
+      }
+
+      if (q.type === 'TABLE') {
+        const flat = answers.flatMap((a) =>
+          typeof a === 'object' && !Array.isArray(a)
+            ? Object.entries(a as Record<string, string>).map(
+                ([rowIdx, colIdx]) =>
+                  `${q.tableRows[Number(rowIdx)] ?? rowIdx}: ${q.tableColumns[Number(colIdx)] ?? colIdx}`,
+              )
+            : [],
+        );
+        return {
+          questionId: q.id,
+          title: q.title,
+          type: q.type,
+          totalResponses: answers.length,
+          responses: this.shuffle(flat),
+        };
+      }
+
+      // SINGLE_CHOICE / MULTIPLE_CHOICE — stored answer values are option ids
+      const counts = new Map<string, number>();
+      for (const a of answers) {
+        for (const id of Array.isArray(a) ? a : [a as string]) {
+          counts.set(id, (counts.get(id) ?? 0) + 1);
+        }
+      }
+      return {
+        questionId: q.id,
+        title: q.title,
+        type: q.type,
+        totalResponses: answers.length,
+        tally: q.options.map((o) => ({ optionId: o.id, optionText: o.text, count: counts.get(o.id) ?? 0 })),
+      };
+    });
+  }
+
+  private shuffle<T>(items: T[]): T[] {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   }
 
   async sendReminders(assessmentId: string, orgId: string): Promise<{ sent: number }> {
