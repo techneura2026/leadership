@@ -2,12 +2,12 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { Modal } from '@/components/ui/Modal';
 import type { AuthResponseDto } from '@leaderprism/shared';
 
 const schema = z.object({
@@ -23,6 +23,7 @@ function LoginForm() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const {
     register,
@@ -81,9 +82,13 @@ function LoginForm() {
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Password
             </label>
-            <Link href="/forgot-password" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(true)}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            >
               Forgot password?
-            </Link>
+            </button>
           </div>
           <div className="relative">
             <input
@@ -147,6 +152,21 @@ function LoginForm() {
           )}
         </button>
       </form>
+
+      <Modal open={showForgotModal} onClose={() => setShowForgotModal(false)} title="Forgot Password">
+        <div className="space-y-5">
+          <p className="text-sm text-gray-600">
+            This service is currently not available. Please contact your system admin to regenerate your password.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowForgotModal(false)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl px-4 py-3 text-sm transition-all"
+          >
+            Okay
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

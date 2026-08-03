@@ -29,11 +29,23 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<User | null> {
-    const user = await this.usersService.findByEmail(email);
+    // Looks up the user regardless of active status so a deactivated account can get its own
+    // error message below — but only after the password checks out, so a wrong-password guess
+    // against a deactivated (or nonexistent) email still gets the generic "invalid" response
+    // and doesn't leak account existence/status.
+    const user = await this.usersService.findByEmailIncludingInactive(email);
     if (!user) return null;
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    return valid ? user : null;
+    if (!valid) return null;
+
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'Your account has been deactivated. Please contact your organisation administrator.',
+      );
+    }
+
+    return user;
   }
 
   async register(dto: RegisterOrgDto, req: { ip?: string; headers: Record<string, string | string[] | undefined> }): Promise<AuthResponseDto> {
