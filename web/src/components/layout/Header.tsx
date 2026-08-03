@@ -38,13 +38,13 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
 
   return (
-    <header className="h-16 flex items-center justify-between gap-3 px-4 sm:px-6 shrink-0 z-30" style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+    <header className="h-16 flex items-center justify-between gap-3 px-4 sm:px-6 shrink-0 z-30" style={{ background: 'var(--navbar-bg)', borderBottom: '1px solid var(--navbar-border)' }}>
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* Mobile menu button */}
         <button
           onClick={onMenuClick}
           className="md:hidden p-2 -ml-2 rounded-lg shrink-0"
-          style={{ color: 'var(--text-secondary)' }}
+          style={{ color: 'var(--navbar-text-secondary)' }}
           aria-label="Open menu"
         >
           <Menu className="w-5 h-5" />
@@ -56,7 +56,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         <button
           onClick={toggle}
           className="flex items-center justify-center w-9 h-9 rounded-lg transition-all"
-          style={{ color: 'var(--text-secondary)' }}
+          style={{ color: 'var(--navbar-text-secondary)' }}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           aria-label="Toggle theme"
         >
@@ -68,14 +68,10 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
           <button
             onClick={() => setNotifOpen((v) => !v)}
             className="relative flex items-center justify-center w-9 h-9 rounded-lg transition-all"
-            style={{ color: 'var(--text-secondary)' }}
+            style={{ color: 'var(--navbar-text-secondary)' }}
             aria-label="Notifications"
           >
             <Bell className="w-[18px] h-[18px]" />
-            <span
-              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-              style={{ background: '#f04438', boxShadow: '0 0 0 2px var(--bg-surface)' }}
-            />
           </button>
           {notifOpen && (
             <div
@@ -92,28 +88,31 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
           )}
         </div>
 
-        <div className="w-px h-6 mx-1" style={{ background: 'var(--border)' }} />
+        <div className="w-px h-6 mx-1" style={{ background: 'var(--navbar-divider)' }} />
 
         {/* Profile dropdown */}
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl transition-all"
-            style={{ color: 'var(--text-primary)' }}
+            style={{ color: 'var(--navbar-text)' }}
           >
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%)' }}
+              style={{
+                background: 'linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%)',
+                boxShadow: 'var(--navbar-avatar-ring)',
+              }}
             >
               {initials}
             </div>
             <div className="hidden md:block text-left leading-none">
               <p className="text-sm font-semibold leading-none">{user?.firstName} {user?.lastName}</p>
-              <p className="text-xs mt-1 capitalize leading-none" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs mt-1 capitalize leading-none" style={{ color: 'var(--navbar-text-muted)' }}>
                 {user?.role?.replace(/_/g, ' ')}
               </p>
             </div>
-            <ChevronDown className="hidden md:block w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+            <ChevronDown className="hidden md:block w-4 h-4 shrink-0" style={{ color: 'var(--navbar-text-muted)' }} />
           </button>
 
           {profileOpen && (

@@ -885,10 +885,11 @@ function StepParticipants360({
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-1">Participants & Feedback Givers</h2>
       <p className="text-sm text-gray-500 mb-5">
-        Add participants to be assessed, then assign who will give them feedback.
+        A 360° assessment covers a single participant. Add that participant, then assign multiple feedback givers to rate them.
       </p>
 
-      {/* Add participant search */}
+      {/* Add participant search — only when no participant selected yet (single-participant limit) */}
+      {participants360.length === 0 ? (
       <div className="mb-5 relative" ref={dropdownRef}>
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
           Add Participant
@@ -996,6 +997,11 @@ function StepParticipants360({
           </div>
         )}
       </div>
+      ) : (
+        <p className="mb-5 text-xs text-gray-400">
+          Only one participant is allowed per 360° assessment. Remove the current participant below to choose a different one.
+        </p>
+      )}
 
       {/* Selected participants */}
       {participants360.length === 0 ? (
@@ -2354,6 +2360,7 @@ export default function NewAssessmentPage() {
   // 360° participant management
   function addParticipant360(user: UserDto) {
     setState((prev) => {
+      if (prev.participants360.length >= 1) return prev;
       if (prev.participants360.some((p) => p.userId === user.id)) return prev;
       return {
         ...prev,

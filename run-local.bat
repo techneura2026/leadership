@@ -30,11 +30,11 @@ powershell -NoProfile -Command ^
   "foreach ($port in $ports) {" ^
   "  $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue;" ^
   "  if ($conn) {" ^
-  "    $pids = $conn.OwningProcess | Select-Object -Unique;" ^
-  "    foreach ($pid in $pids) {" ^
-  "      if ($pid -and $pid -ne 0 -and $pid -ne 4) {" ^
-  "        Write-Host ('Killing process {0} on port {1}...' -f $pid, $port) -ForegroundColor Yellow;" ^
-  "        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue;" ^
+  "    $procIds = $conn.OwningProcess | Select-Object -Unique;" ^
+  "    foreach ($procId in $procIds) {" ^
+  "      if ($procId -and $procId -ne 0 -and $procId -ne 4) {" ^
+  "        Write-Host ('Killing process {0} on port {1}...' -f $procId, $port) -ForegroundColor Yellow;" ^
+  "        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue;" ^
   "      }" ^
   "    }" ^
   "  }" ^

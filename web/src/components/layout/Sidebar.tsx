@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
-import { UserRole, type OrganisationDto } from '@leaderprism/shared';
+import { UserRole } from '@leaderprism/shared';
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; roles: UserRole[] | null }[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: null },
@@ -31,12 +31,10 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; roles: UserRol
 function SidebarContent({
   visibleItems,
   pathname,
-  org,
   onNavigate,
 }: {
   visibleItems: typeof NAV_ITEMS;
   pathname: string;
-  org: OrganisationDto | null;
   onNavigate?: () => void;
 }) {
   return (
@@ -44,22 +42,18 @@ function SidebarContent({
       {/* Brand header */}
       <div
         className="h-16 px-5 flex items-center gap-3 shrink-0"
-        style={{ borderBottom: '1px solid var(--sidebar-border)' }}
+        style={{ background: 'var(--sidebar-header-bg)', borderBottom: '1px solid var(--sidebar-header-border)' }}
       >
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%)' }}
-        >
-          <svg className="w-4.5 h-4.5 text-white" width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        </div>
+        <Image
+          src="/logo-techneura.png"
+          alt="LeaderPrism"
+          width={34}
+          height={34}
+          className="object-contain shrink-0"
+        />
         <div className="min-w-0">
-          <p className="text-sm font-semibold truncate leading-none" style={{ color: 'var(--text-primary)' }}>
-            {org?.name ?? 'LeaderPrism'}
-          </p>
-          <p className="text-[11px] capitalize mt-1.5 leading-none font-medium" style={{ color: 'var(--sidebar-text)' }}>
-            {org?.plan ?? 'professional'} plan
+          <p className="text-sm font-semibold truncate leading-none" style={{ color: 'var(--sidebar-header-text)' }}>
+            LeaderPrism
           </p>
         </div>
       </div>
@@ -98,20 +92,6 @@ function SidebarContent({
           })}
         </div>
       </nav>
-
-      {/* Powered by */}
-      <div className="px-4 py-4 flex items-center justify-center gap-2 shrink-0" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
-        <span className="text-[10px] font-medium" style={{ color: 'var(--sidebar-text)' }}>Powered by</span>
-        <div className="px-2 py-1 rounded-md flex items-center" style={{ background: '#1d2939' }}>
-          <Image
-            src="/logo-techneura.png"
-            alt="TechNeura Labs"
-            width={56}
-            height={14}
-            className="object-contain"
-          />
-        </div>
-      </div>
     </>
   );
 }
@@ -125,7 +105,6 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
-  const org = useAuthStore((s) => s.organisation);
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.roles || (user && item.roles.includes(user.role)),
@@ -156,7 +135,7 @@ export function Sidebar({
         >
           <X className="w-5 h-5" />
         </button>
-        <SidebarContent visibleItems={visibleItems} pathname={pathname} org={org} onNavigate={onCloseMobile} />
+        <SidebarContent visibleItems={visibleItems} pathname={pathname} onNavigate={onCloseMobile} />
       </aside>
 
       {/* Desktop sidebar */}
@@ -164,7 +143,7 @@ export function Sidebar({
         className="hidden md:flex flex-col w-64 shrink-0"
         style={{ backgroundColor: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}
       >
-        <SidebarContent visibleItems={visibleItems} pathname={pathname} org={org} />
+        <SidebarContent visibleItems={visibleItems} pathname={pathname} />
       </aside>
     </>
   );

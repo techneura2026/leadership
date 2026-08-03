@@ -57,6 +57,21 @@
   --sidebar-active-to:     #ecf3ff;
   --sidebar-active-shadow: none;
 
+  /* ── Brand header / navbar (gradient in light so the logo reads clearly;
+         swapped for the plain surface colors in dark mode) ────────────── */
+  --sidebar-header-bg:      linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%);
+  --sidebar-header-border:  rgba(255,255,255,0.16);
+  --sidebar-header-text:    #ffffff;
+
+  --navbar-bg:              linear-gradient(135deg, var(--blue-500) 0%, var(--blue-700) 100%);
+  --navbar-border:          rgba(255,255,255,0.16);
+  --navbar-divider:         rgba(255,255,255,0.28);
+  --navbar-ring:            var(--blue-600);
+  --navbar-avatar-ring:     0 0 0 2px rgba(255,255,255,0.4);
+  --navbar-text:            #ffffff;
+  --navbar-text-secondary:  rgba(255,255,255,0.88);
+  --navbar-text-muted:      rgba(255,255,255,0.68);
+
   /* ── App Surfaces (Light) ───────────────────────────────────────────── */
   --bg-app:         #f9fafb;
   --bg-surface:     #ffffff;
@@ -113,6 +128,20 @@
   --sidebar-item-hover:    rgba(255,255,255,0.06);
   --sidebar-active-from:   rgba(70,95,255,0.16);
   --sidebar-active-to:     rgba(70,95,255,0.16);
+
+  /* Brand header / navbar — keep as-is in dark mode (no gradient) */
+  --sidebar-header-bg:      transparent;
+  --sidebar-header-border:  var(--sidebar-border);
+  --sidebar-header-text:    var(--text-primary);
+
+  --navbar-bg:              var(--bg-surface);
+  --navbar-border:          var(--border);
+  --navbar-divider:         var(--border);
+  --navbar-ring:            var(--bg-surface);
+  --navbar-avatar-ring:     none;
+  --navbar-text:            var(--text-primary);
+  --navbar-text-secondary:  var(--text-secondary);
+  --navbar-text-muted:      var(--text-muted);
 
   /* Surfaces */
   --bg-app:         #0c111d;

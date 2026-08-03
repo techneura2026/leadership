@@ -147,15 +147,6 @@ function LoginForm() {
           )}
         </button>
       </form>
-
-      <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-        <p className="text-sm text-gray-500">
-          New to LeaderPrism?{' '}
-          <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
-            Create an account
-          </Link>
-        </p>
-      </div>
     </>
   );
 }
