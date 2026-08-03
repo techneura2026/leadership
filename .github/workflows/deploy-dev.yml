@@ -132,3 +132,4 @@ jobs:
 
             # Run database seeds
             docker compose exec -T api node api/dist/api/src/database/seeds/run-seeds.js
+            docker compose exec -T api node api/dist/api/src/database/seeds/run-thrivehive-seed.js
