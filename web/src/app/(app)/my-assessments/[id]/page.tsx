@@ -115,6 +115,12 @@ export default function AssessmentDetailPage() {
   const isInProgress = participantStatus === 'in_progress';
   const canViewResults = isCompleted && assessment.assessmentType === AssessmentType.PERSONALITY;
 
+  // Self-assessment is optional per 360 assessment (config.includeSelfAssessment) — when it's
+  // off, the reviewee has nothing to do here (only their feedback givers rate them), so don't
+  // send them into the take-assessment flow, which has no task waiting for them either.
+  const noSelfReviewNeeded =
+    is360Assessment && (assessment.config as any)?.includeSelfAssessment === false;
+
   const isFutureStart = (() => {
     if (!assessment.startDate) return false;
     const start = new Date(assessment.startDate);
@@ -126,6 +132,7 @@ export default function AssessmentDetailPage() {
 
   function getCtaLabel() {
     if (canViewResults) return 'View My Results';
+    if (noSelfReviewNeeded) return 'No Self-Assessment Needed';
     if (isCompleted) return 'Assessment Completed';
     if (isInProgress) return 'Continue Assessment';
     if (isFutureStart && assessment?.startDate)
@@ -195,7 +202,7 @@ export default function AssessmentDetailPage() {
       {/* CTA */}
       <button
         onClick={handleCta}
-        disabled={(isCompleted && !canViewResults) || isFutureStart}
+        disabled={(isCompleted && !canViewResults) || isFutureStart || noSelfReviewNeeded}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl py-3.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {getCtaLabel()}

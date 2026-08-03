@@ -339,12 +339,16 @@ export class EngineService {
     const assessment = await this.assessmentRepo.findOne({ where: { id: assessmentId } });
     if (!assessment || assessment.status !== AssessmentStatus.ACTIVE) return;
 
-    const participants = await this.participantRepo.find({ where: { assessmentId } });
-    if (!allParticipantsDone(participants)) return;
-
+    // 360's "reviewee" AssessmentParticipant.status only reflects their own optional self-
+    // assessment (see includeSelfAssessment), which may not exist at all — so completion for
+    // this type is judged entirely by rater nominations (self, if present, is one of them),
+    // not by AssessmentParticipant rows.
     if (assessment.assessmentType === AssessmentType.FEEDBACK_360) {
       const nominations = await this.nominationRepo.find({ where: { assessmentId } });
       if (!allNominationsDone(nominations)) return;
+    } else {
+      const participants = await this.participantRepo.find({ where: { assessmentId } });
+      if (!allParticipantsDone(participants)) return;
     }
 
     assessment.status = AssessmentStatus.CLOSED;
@@ -426,8 +430,11 @@ export class EngineService {
       // Auto-create the reviewee's own "self" perspective as a RaterNomination — the same
       // mechanism every other 360 rater uses — so the take-assessment redirect always has
       // somewhere to send them, instead of relying on an admin remembering to manually add
-      // "self" as a rater (previously the only way this ever got created).
-      if (assessment.assessmentType === AssessmentType.FEEDBACK_360) {
+      // "self" as a rater (previously the only way this ever got created). Optional per
+      // assessment via config.includeSelfAssessment — defaults to true when unset, matching
+      // the behaviour before this flag existed.
+      const includeSelfAssessment = (assessment.config as AssessmentConfig | undefined)?.includeSelfAssessment !== false;
+      if (assessment.assessmentType === AssessmentType.FEEDBACK_360 && includeSelfAssessment) {
         const tokenExpires = new Date();
         tokenExpires.setDate(tokenExpires.getDate() + 14);
         const selfNomination = manager.create(RaterNomination, {
@@ -474,6 +481,30 @@ export class EngineService {
       status: p.status,
       completedAt: p.completedAt,
     }));
+  }
+
+  /**
+   * Finds this user's participant record in their most recently completed assessment
+   * of a given type within the org. Used to resolve cross-assessment references (e.g.
+   * a readiness assessment needs the participant's own competency/360/personality
+   * assessment IDs, which are distinct AssessmentParticipant rows — see @Unique(['assessmentId', 'userId']).
+   */
+  async findLatestParticipantByType(
+    orgId: string,
+    userId: string,
+    assessmentType: AssessmentType,
+  ): Promise<{ assessmentId: string; participantId: string } | null> {
+    const participant = await this.participantRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('a.assessment_type = :type', { type: assessmentType })
+      .andWhere('p.user_id = :userId', { userId })
+      .andWhere('p.status = :status', { status: 'completed' })
+      .orderBy('p.completed_at', 'DESC')
+      .getOne();
+
+    return participant ? { assessmentId: participant.assessmentId, participantId: participant.id } : null;
   }
 
   async findMine(

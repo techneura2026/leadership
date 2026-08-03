@@ -67,6 +67,10 @@ export class Report {
   @Column({ length: 20, default: 'pending' })
   status: 'pending' | 'processing' | 'ready' | 'failed';
 
+  /** Populated when status is 'failed' so the UI can show why instead of a bare "Failed". */
+  @Column({ type: 'text', nullable: true })
+  error: string | null;
+
   @Column({ length: 2, default: 'en' })
   language: string;
 

@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AssessmentStatus, ReadinessRating } from '@leaderprism/shared';
+import { AssessmentStatus, AssessmentType } from '@leaderprism/shared';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../assessment/engine/entities/assessment-participant.entity';
 import { Report } from '../reporting/report.entity';
 import { RaterNomination } from '../assessment/uc1-feedback/entities/rater-nomination.entity';
 import { CompetencyRating } from '../assessment/uc2-competency/entities/competency-rating.entity';
 import { CompetencyAssessment } from '../assessment/uc2-competency/entities/competency-assessment.entity';
-import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-score.entity';
 import { Competency } from '../assessment/items/entities/competency.entity';
-import { RoleProfile } from '../assessment/uc4-readiness/entities/role-profile.entity';
 import { PersonalityScore } from '../assessment/uc3-personality/entities/personality-score.entity';
 import { Department } from '../core/organisations/entities/department.entity';
 
@@ -43,20 +41,6 @@ export interface RadarAggregate {
   personalityRadar: Array<{ key: string; label: string; value: number; sampleSize: number }>;
 }
 
-export interface SuccessionOverview {
-  totalCandidates: number;
-  byRating: Record<ReadinessRating, number>;
-  byRole: Array<{
-    roleProfileId: string;
-    roleTitle: string;
-    totalCandidates: number;
-    readyNow: number;
-    pipeline: number; // 1_2_years + developing
-    candidates: Array<{ participantId: string; readinessRating: string }>;
-  }>;
-}
-
-
 export interface ParticipantCompletion {
   rate: number;
   completed: number;
@@ -82,12 +66,8 @@ export class AnalyticsService {
     private readonly competencyRatingRepo: Repository<CompetencyRating>,
     @InjectRepository(CompetencyAssessment)
     private readonly caRepo: Repository<CompetencyAssessment>,
-    @InjectRepository(ReadinessScore)
-    private readonly readinessScoreRepo: Repository<ReadinessScore>,
     @InjectRepository(Competency)
     private readonly competencyRepo: Repository<Competency>,
-    @InjectRepository(RoleProfile)
-    private readonly roleProfileRepo: Repository<RoleProfile>,
     @InjectRepository(PersonalityScore)
     private readonly personalityScoreRepo: Repository<PersonalityScore>,
   ) { }
@@ -303,82 +283,6 @@ export class AnalyticsService {
   }
 
   /**
-   * Returns succession pipeline overview with counts per readiness rating and role.
-   */
-  async getSuccessionOverview(orgId: string): Promise<SuccessionOverview> {
-    const scores = await this.readinessScoreRepo
-      .createQueryBuilder('rs')
-      .innerJoin('rs.assessment', 'a')
-      .where('a.organisation_id = :orgId', { orgId })
-      .select([
-        'rs.participantId',
-        'rs.roleProfileId',
-        'rs.readinessRating',
-      ])
-      .getMany();
-
-    const byRating: Record<ReadinessRating, number> = {
-      [ReadinessRating.READY_NOW]: 0,
-      [ReadinessRating.ONE_TWO_YEARS]: 0,
-      [ReadinessRating.DEVELOPING]: 0,
-      [ReadinessRating.NOT_YET_READY]: 0,
-    };
-
-    for (const s of scores) {
-      byRating[s.readinessRating] = (byRating[s.readinessRating] ?? 0) + 1;
-    }
-
-    const roleProfiles = await this.roleProfileRepo.find({
-      where: { organisationId: orgId },
-    });
-
-    const roleProfileMap = new Map<string, RoleProfile>(
-      roleProfiles.map((rp) => [rp.id, rp]),
-    );
-
-    // Group by role profile
-    const byRoleMap = new Map<
-      string,
-      { roleProfileId: string; roleTitle: string; scores: typeof scores }
-    >();
-
-    for (const s of scores) {
-      const roleId = s.roleProfileId ?? 'none';
-      const roleTitle =
-        s.roleProfileId && roleProfileMap.has(s.roleProfileId)
-          ? roleProfileMap.get(s.roleProfileId)!.title
-          : 'Unassigned';
-
-      if (!byRoleMap.has(roleId)) {
-        byRoleMap.set(roleId, { roleProfileId: roleId, roleTitle, scores: [] });
-      }
-      byRoleMap.get(roleId)!.scores.push(s);
-    }
-
-    const byRole = Array.from(byRoleMap.values()).map((role) => ({
-      roleProfileId: role.roleProfileId,
-      roleTitle: role.roleTitle,
-      totalCandidates: role.scores.length,
-      readyNow: role.scores.filter((s) => s.readinessRating === ReadinessRating.READY_NOW).length,
-      pipeline: role.scores.filter(
-        (s) =>
-          s.readinessRating === ReadinessRating.ONE_TWO_YEARS ||
-          s.readinessRating === ReadinessRating.DEVELOPING,
-      ).length,
-      candidates: role.scores.map((s) => ({
-        participantId: s.participantId,
-        readinessRating: s.readinessRating,
-      })),
-    }));
-
-    return {
-      totalCandidates: scores.length,
-      byRating,
-      byRole,
-    };
-  }
-
-  /**
    * Returns aggregate radar chart data for a specific user, scoped to the
    * requesting org so a user from another organisation can never be queried.
    */
@@ -540,27 +444,42 @@ export class AnalyticsService {
   }
 
   async getParticipantCompletion(orgId: string): Promise<ParticipantCompletion> {
+  // 360's AssessmentParticipant row only reflects the reviewee's own (optional) self-
+  // assessment, not the feedback givers actually doing the rating — so 360 assessments are
+  // excluded here and folded in via rater nominations below instead, otherwise the org-wide
+  // completion rate would only ever reflect the single reviewee per 360 assessment.
   const raw = await this.participantRepo
     .createQueryBuilder('p')
     .innerJoin('p.assessment', 'a')
     .where('a.organisation_id = :orgId', { orgId })
     .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+    .andWhere('a.assessment_type != :feedback360', { feedback360: AssessmentType.FEEDBACK_360 })
     .select('p.status', 'status')
     .addSelect('COUNT(*)', 'count')
     .groupBy('p.status')
     .getRawMany();
 
-  const completed = Number(
-    raw.find(r => r.status === 'completed')?.count ?? 0,
-  );
+  const nominationRaw = await this.nominationRepo
+    .createQueryBuilder('n')
+    .innerJoin('n.assessment', 'a')
+    .where('a.organisation_id = :orgId', { orgId })
+    .andWhere('a.status = :status', { status: AssessmentStatus.ACTIVE })
+    .select('n.status', 'status')
+    .addSelect('COUNT(*)', 'count')
+    .groupBy('n.status')
+    .getRawMany();
 
-  const inProgress = Number(
-    raw.find(r => r.status === 'in_progress')?.count ?? 0,
-  );
+  const nominationCount = (status: string) =>
+    Number(nominationRaw.find((r) => r.status === status)?.count ?? 0);
 
-  const notStarted = Number(
-    raw.find(r => r.status === 'invited')?.count ?? 0,
-  );
+  const completed =
+    Number(raw.find(r => r.status === 'completed')?.count ?? 0) + nominationCount('completed');
+
+  const inProgress = Number(raw.find(r => r.status === 'in_progress')?.count ?? 0);
+
+  const notStarted =
+    Number(raw.find(r => r.status === 'invited')?.count ?? 0) +
+    nominationCount('pending') + nominationCount('approved') + nominationCount('sent');
 
   const total = completed + inProgress + notStarted;
 

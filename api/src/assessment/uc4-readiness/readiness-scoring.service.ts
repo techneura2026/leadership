@@ -21,6 +21,17 @@ interface ComponentScores {
   personalityFitScore: number;
 }
 
+export interface ParticipantRef {
+  assessmentId: string;
+  participantId: string;
+}
+
+export interface CrossAssessmentRefs {
+  competency: ParticipantRef | null;
+  feedback: ParticipantRef | null;
+  personality: ParticipantRef | null;
+}
+
 @Injectable()
 export class ReadinessScoringService {
   private readonly logger = new Logger(ReadinessScoringService.name);
@@ -64,16 +75,17 @@ export class ReadinessScoringService {
     assessmentId: string,
     participantId: string,
     roleProfileId: string | null,
+    refs: CrossAssessmentRefs,
   ): Promise<ReadinessScore> {
     const roleProfile = roleProfileId
       ? await this.roleProfileRepo.findOne({ where: { id: roleProfileId } })
       : null;
 
-    const competencyScore = await this.getCompetencyScore(assessmentId, participantId, roleProfile);
-    const feedbackScore = await this.getFeedbackScore(assessmentId, participantId);
+    const competencyScore = await this.getCompetencyScore(refs.competency, roleProfile);
+    const feedbackScore = await this.getFeedbackScore(refs.feedback);
     const sjtScore = await this.getSjtScore(assessmentId, participantId);
     const learningAgilityScore = await this.getLearningAgilityScore(assessmentId, participantId);
-    const personalityFitScore = await this.getPersonalityFitScore(participantId, assessmentId, roleProfile);
+    const personalityFitScore = await this.getPersonalityFitScore(refs.personality, roleProfile);
 
     const compositeScore = this.getCompositeScore({
       competencyScore,
@@ -125,10 +137,12 @@ export class ReadinessScoringService {
    * Returns 0-100 weighted score.
    */
   async getCompetencyScore(
-    assessmentId: string,
-    participantId: string,
+    ref: ParticipantRef | null,
     roleProfile: RoleProfile | null,
   ): Promise<number> {
+    if (!ref) return 0;
+    const { assessmentId, participantId } = ref;
+
     if (!roleProfile || !roleProfile.requiredCompetencies?.length) {
       // Fall back to simple average of manager ratings normalised to 0-100
       const managerCA = await this.caRepo.findOne({
@@ -173,7 +187,10 @@ export class ReadinessScoringService {
    * Returns 360 overall effectiveness score as 0-100.
    * Uses mean of all completed rater scores across all competencies.
    */
-  async getFeedbackScore(assessmentId: string, participantId: string): Promise<number> {
+  async getFeedbackScore(ref: ParticipantRef | null): Promise<number> {
+    if (!ref) return 0;
+    const { assessmentId, participantId } = ref;
+
     const nominations = await this.nominationRepo.find({
       where: { assessmentId, participantId, status: 'completed' },
       relations: ['responses'],
@@ -251,13 +268,13 @@ export class ReadinessScoringService {
    * Returns 0-100 fit score.
    */
   async getPersonalityFitScore(
-    participantId: string,
-    assessmentId: string,
+    ref: ParticipantRef | null,
     roleProfile: RoleProfile | null,
   ): Promise<number> {
-    if (!roleProfile || !Object.keys(roleProfile.personalityFit ?? {}).length) {
+    if (!ref || !roleProfile || !Object.keys(roleProfile.personalityFit ?? {}).length) {
       return 50; // Neutral if no role requirements defined
     }
+    const { assessmentId, participantId } = ref;
 
     const scores = await this.personalityScoreRepo.find({
       where: { assessmentId, participantId },

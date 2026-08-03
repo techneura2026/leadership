@@ -27,8 +27,6 @@ import { NotificationsService } from '../../core/notifications/notifications.ser
 import { EngineService } from '../engine/engine.service';
 import { v4 as uuidv4 } from 'uuid';
 
-const MIN_RATERS = 3;
-
 interface NominateRaterDto {
   raterEmail: string;
   raterName?: string;
@@ -621,21 +619,7 @@ export class Uc1FeedbackService {
       relations: ['responses'],
     });
 
-    // Anonymity threshold check
     const completedNominations = nominations.filter((n) => n.status === 'completed');
-    const groupCounts = this.groupBy(completedNominations, 'relationship');
-
-    for (const [rel, noms] of Object.entries(groupCounts)) {
-      if (
-        rel !== RaterRelationship.SUPERVISOR &&
-        rel !== RaterRelationship.SELF &&
-        (noms as any[]).length < MIN_RATERS
-      ) {
-        throw new ForbiddenException(
-          `Insufficient ${rel} responses for anonymity (${(noms as any[]).length}/${MIN_RATERS})`,
-        );
-      }
-    }
 
     return this.aggregateScores(completedNominations);
   }
@@ -743,20 +727,6 @@ export class Uc1FeedbackService {
 
     const nominations = await this.nominationRepo.find({ where: { assessmentId, participantId } });
     const completedNominations = nominations.filter((n) => n.status === 'completed');
-
-    // Same anonymity threshold check as get360Scores
-    const groupCounts = this.groupBy(completedNominations, 'relationship');
-    for (const [rel, noms] of Object.entries(groupCounts)) {
-      if (
-        rel !== RaterRelationship.SUPERVISOR &&
-        rel !== RaterRelationship.SELF &&
-        (noms as any[]).length < MIN_RATERS
-      ) {
-        throw new ForbiddenException(
-          `Insufficient ${rel} responses for anonymity (${(noms as any[]).length}/${MIN_RATERS})`,
-        );
-      }
-    }
 
     const questions = ((assessment.config as AssessmentConfig)?.questions ?? []) as FormQuestion[];
     return this.aggregateCustomAnswers(questions, completedNominations);
@@ -936,19 +906,5 @@ export class Uc1FeedbackService {
 
     await this.nominationRepo.delete({ id: nominationId, assessmentId });
     this.logger.log(`Removed rater nomination ${nominationId} from assessment ${assessmentId}`);
-  }
-
-  private groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
-    return items.reduce(
-      (groups, item) => {
-        const groupKey = String(item[key]);
-        if (!groups[groupKey]) {
-          groups[groupKey] = [];
-        }
-        groups[groupKey].push(item);
-        return groups;
-      },
-      {} as Record<string, T[]>,
-    );
   }
 }

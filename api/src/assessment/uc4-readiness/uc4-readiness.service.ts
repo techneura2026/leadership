@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ReadinessRating, UserRole } from '@leaderprism/shared';
+import { AssessmentType, ReadinessRating, UserRole } from '@leaderprism/shared';
 import { RoleProfile } from './entities/role-profile.entity';
 import { SjtResponse } from './entities/sjt-response.entity';
 import { LearningAgilityResponse } from './entities/learning-agility-response.entity';
@@ -14,7 +14,7 @@ import { ReadinessScore, effectiveGridPerformance } from './entities/readiness-s
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Item } from '../items/entities/item.entity';
-import { ReadinessScoringService } from './readiness-scoring.service';
+import { ReadinessScoringService, CrossAssessmentRefs } from './readiness-scoring.service';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 import { EngineService } from '../engine/engine.service';
 
@@ -294,10 +294,35 @@ export class Uc4ReadinessService {
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
     assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
+    await this.assertSjtAndLaComplete(assessmentId, participantId);
+
+    // Readiness draws on the participant's competency/360/personality assessments,
+    // which are separate Assessment/AssessmentParticipant rows for the same user —
+    // resolve their latest completed instance of each rather than reusing this
+    // assessment's own IDs (those never match those other tables).
+    const refs: CrossAssessmentRefs = {
+      competency: await this.engineService.findLatestParticipantByType(
+        orgId,
+        participant.userId,
+        AssessmentType.COMPETENCY,
+      ),
+      feedback: await this.engineService.findLatestParticipantByType(
+        orgId,
+        participant.userId,
+        AssessmentType.FEEDBACK_360,
+      ),
+      personality: await this.engineService.findLatestParticipantByType(
+        orgId,
+        participant.userId,
+        AssessmentType.PERSONALITY,
+      ),
+    };
+
     const score = await this.readinessScoringService.calculateReadiness(
       assessmentId,
       participantId,
       roleProfileId,
+      refs,
     );
 
     // Mark participant as completed so the frontend shows the correct status
@@ -312,6 +337,36 @@ export class Uc4ReadinessService {
     );
 
     return score;
+  }
+
+  /** Resolves a user's participant record in their latest completed assessment of a given type. */
+  async resolveParticipantRef(
+    orgId: string,
+    userId: string,
+    assessmentType: AssessmentType,
+  ): Promise<{ assessmentId: string; participantId: string } | null> {
+    return this.engineService.findLatestParticipantByType(orgId, userId, assessmentType);
+  }
+
+  /** Ensures every active SJT and learning-agility item has a recorded response before scoring. */
+  private async assertSjtAndLaComplete(assessmentId: string, participantId: string): Promise<void> {
+    const [sjtTotal, sjtAnswered, laTotal, laAnswered] = await Promise.all([
+      this.itemRepo.count({ where: { module: 'sjt', isActive: true } }),
+      this.sjtResponseRepo.count({ where: { assessmentId, participantId } }),
+      this.itemRepo.count({ where: { module: 'learning_agility', isActive: true } }),
+      this.laResponseRepo.count({ where: { assessmentId, participantId } }),
+    ]);
+
+    if (sjtAnswered < sjtTotal) {
+      throw new BadRequestException(
+        `SJT questionnaire incomplete: ${sjtAnswered}/${sjtTotal} scenarios answered`,
+      );
+    }
+    if (laAnswered < laTotal) {
+      throw new BadRequestException(
+        `Learning agility questionnaire incomplete: ${laAnswered}/${laTotal} items answered`,
+      );
+    }
   }
 
   /**

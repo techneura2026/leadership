@@ -119,6 +119,7 @@ function DueBadge({ endDate, done }: { endDate: string | null | undefined; done:
 function OverviewTab({
   assessment,
   participants,
+  nominations,
   questions,
   onGoToReports,
   onCloseAssessment,
@@ -126,6 +127,7 @@ function OverviewTab({
 }: {
   assessment: AssessmentDto;
   participants: Participant[];
+  nominations: RaterNominationDto[];
   questions: AssessmentQuestion[];
   onGoToReports: () => void;
   onCloseAssessment: () => Promise<void>;
@@ -190,8 +192,14 @@ async function archiveAssessment() {
   }
 }
 
-  const completedCount = participants.filter((p) => p.status === 'completed').length;
-  const totalCount = participants.length;
+  // A 360 assessment's response rate must reflect its feedback givers, not just the single
+  // reviewee — the reviewee's own (optional) self-assessment is itself one of `nominations`,
+  // so this total already covers both without needing to combine two different collections.
+  const is360Overview = assessment.assessmentType === AssessmentType.FEEDBACK_360;
+  const completedCount = is360Overview
+    ? nominations.filter((n) => n.status === 'completed').length
+    : participants.filter((p) => p.status === 'completed').length;
+  const totalCount = is360Overview ? nominations.length : participants.length;
   const responseRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
@@ -296,26 +304,47 @@ async function archiveAssessment() {
         </div>
 
         <div className="space-y-3">
-          {participants.slice(0, 5).map((p) => (
-            <div key={p.id} className="flex items-center gap-3">
-              <Avatar seed={p.userId} src={p.user?.avatarUrl} size="xs" />
-              <div className="w-28 text-xs font-medium text-gray-700 truncate shrink-0">
-                {p.user?.firstName} {p.user?.lastName}
-              </div>
-              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    'h-full rounded-full transition-all',
-                    p.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-400',
-                  )}
-                  style={{ width: `${participantCompletion(p)}%` }}
-                />
-              </div>
-              <span className="text-xs text-gray-500 w-10 text-right tabular-nums">
-                {participantCompletion(p)}%
-              </span>
-            </div>
-          ))}
+          {is360Overview
+            ? nominations.slice(0, 5).map((n) => (
+                <div key={n.id} className="flex items-center gap-3">
+                  <Avatar seed={n.raterUserId ?? n.raterEmail} src={n.raterAvatarUrl} size="xs" />
+                  <div className="w-28 text-xs font-medium text-gray-700 truncate shrink-0">
+                    {n.raterName ?? n.raterEmail}
+                  </div>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        n.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-400',
+                      )}
+                      style={{ width: n.status === 'completed' ? '100%' : '0%' }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 w-10 text-right tabular-nums">
+                    {n.status === 'completed' ? '100' : '0'}%
+                  </span>
+                </div>
+              ))
+            : participants.slice(0, 5).map((p) => (
+                <div key={p.id} className="flex items-center gap-3">
+                  <Avatar seed={p.userId} src={p.user?.avatarUrl} size="xs" />
+                  <div className="w-28 text-xs font-medium text-gray-700 truncate shrink-0">
+                    {p.user?.firstName} {p.user?.lastName}
+                  </div>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all',
+                        p.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-400',
+                      )}
+                      style={{ width: `${participantCompletion(p)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 w-10 text-right tabular-nums">
+                    {participantCompletion(p)}%
+                  </span>
+                </div>
+              ))}
         </div>
       </div>
 
@@ -1061,19 +1090,27 @@ function ReportsTab({
                       {generating === p.id ? (
                         <Badge variant="warning">Generating…</Badge>
                       ) : report ? (
-                        <Badge
-                          variant={
-                            report.status === 'ready'
-                              ? 'success'
-                              : report.status === 'failed'
-                                ? 'error'
-                                : report.status === 'processing'
-                                  ? 'warning'
-                                  : 'neutral'
-                          }
-                        >
-                          {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                        </Badge>
+                        <>
+                          <Badge
+                            variant={
+                              report.status === 'ready'
+                                ? 'success'
+                                : report.status === 'failed'
+                                  ? 'error'
+                                  : report.status === 'processing'
+                                    ? 'warning'
+                                    : 'neutral'
+                            }
+                            title={report.error ?? undefined}
+                          >
+                            {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                          </Badge>
+                          {report.status === 'failed' && report.error && (
+                            <p className="text-xs text-red-500 mt-1 max-w-[200px] truncate" title={report.error}>
+                              {report.error}
+                            </p>
+                          )}
+                        </>
                       ) : (
                         <span className="text-gray-400 text-xs">Not generated</span>
                       )}
@@ -1424,6 +1461,7 @@ export default function AssessmentDetailPage() {
         <OverviewTab
           assessment={assessment}
           participants={participants}
+          nominations={nominations ?? []}
           questions={((assessment.config as any)?.questions ?? []) as AssessmentQuestion[]}
           onGoToReports={() => setActiveTab('reports')}
           onCloseAssessment={handleCloseAssessment}

@@ -46,6 +46,7 @@ interface WizardState {
   startDate: string;
   endDate: string;
   isRatingMandatory: boolean;
+  includeSelfReview: boolean;
   competencyIds: string[];
   participantIds: string[];
   participants360: Participant360[];
@@ -589,12 +590,16 @@ function StepParticipants360({
   onRemoveParticipant,
   onAddRater,
   onRemoveRater,
+  includeSelfReview,
+  onToggleSelfReview,
 }: {
   participants360: Participant360[];
   onAddParticipant: (user: UserDto) => void;
   onRemoveParticipant: (userId: string) => void;
   onAddRater: (participantUserId: string, rater: RaterEntry) => void;
   onRemoveRater: (participantUserId: string, raterUserId: string) => void;
+  includeSelfReview: boolean;
+  onToggleSelfReview: (val: boolean) => void;
 }) {
   const { data: allUsers } = useApi<UserDto[]>('/organisations/me/users');
   const { data: departments } = useApi<any[]>('/organisations/me/departments');
@@ -684,6 +689,22 @@ function StepParticipants360({
       <p className="text-sm text-gray-500 mb-5">
         A 360° assessment covers a single participant. Add that participant, then assign multiple feedback givers to rate them.
       </p>
+
+      <label className="flex items-start gap-2.5 mb-5 bg-gray-50 border border-gray-200 rounded-xl p-3.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={includeSelfReview}
+          onChange={(e) => onToggleSelfReview(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="block text-sm font-medium text-gray-800">Include a self-assessment</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            The participant also rates themselves on the same competencies, so their self-view can be compared
+            against rater feedback. Turn this off if only external feedback is needed.
+          </span>
+        </span>
+      </label>
 
       {/* Add participant search — only when no participant selected yet (single-participant limit) */}
       {participants360.length === 0 ? (
@@ -1924,6 +1945,7 @@ function StepReview({
           <>
             <Row label="Participants" value={`${state.participants360.length}`} />
             <Row label="Feedback givers" value={`${totalRaters} total`} />
+            <Row label="Self-Assessment" value={state.includeSelfReview ? 'Included' : 'Not included'} />
             {state.questionMode === 'custom' ? (
               <Row label="Questions" value={`${state.questions.length}`} />
             ) : (
@@ -2150,6 +2172,7 @@ export default function NewAssessmentPage() {
     startDate: '',
     endDate: '',
     isRatingMandatory: true,
+    includeSelfReview: true,
     competencyIds: [],
     participantIds: [],
     participants360: [],
@@ -2369,10 +2392,15 @@ export default function NewAssessmentPage() {
           endDate: state.endDate || null,
           config:
             state.questionMode === 'custom'
-              ? { questionMode: 'custom' as const, questions: state.questions }
+              ? {
+                  questionMode: 'custom' as const,
+                  questions: state.questions,
+                  includeSelfAssessment: state.includeSelfReview,
+                }
               : {
                   questionMode: 'competency' as const,
                   competencyIds: state.competencyIds.length ? state.competencyIds : undefined,
+                  includeSelfAssessment: state.includeSelfReview,
                 },
         });
         const assessmentId = res.data.data.id;
@@ -2520,6 +2548,8 @@ export default function NewAssessmentPage() {
               onRemoveParticipant={removeParticipant360}
               onAddRater={addRater}
               onRemoveRater={removeRater}
+              includeSelfReview={state.includeSelfReview}
+              onToggleSelfReview={(val) => update({ includeSelfReview: val })}
             />
           ) : isCompetency ? (
             <StepCompetencies

@@ -564,8 +564,15 @@ function ReportRow({
           {report.status === 'processing' && (
             <span className="inline-block w-3 h-3 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
           )}
-          <Badge variant={STATUS_VARIANT[report.status]}>{STATUS_LABELS[report.status]}</Badge>
+          <Badge variant={STATUS_VARIANT[report.status]} title={report.error ?? undefined}>
+            {STATUS_LABELS[report.status]}
+          </Badge>
         </div>
+        {report.status === 'failed' && report.error && (
+          <p className="text-xs text-red-500 mt-1 max-w-[220px] truncate" title={report.error}>
+            {report.error}
+          </p>
+        )}
       </td>
       <td className="px-5 py-3.5 text-gray-400 text-xs">
         {report.generatedAt ? format(new Date(report.generatedAt), 'dd MMM yyyy, HH:mm') : '—'}

@@ -108,6 +108,8 @@ export interface AssessmentConfig {
   instructions?: string;
   targetRoleId?: string;
   isRatingMandatory?: boolean;
+  /** 360 only — whether the participant also rates themselves. Defaults to true when unset. */
+  includeSelfAssessment?: boolean;
 }
 
 // ── 360 Feedback ─────────────────────────────────────────────
@@ -176,6 +178,8 @@ export interface ReportDto {
   language: Language;
   generatedAt: string | null;
   downloadUrl?: string;
+  /** Populated when status is 'failed' — why generation failed. */
+  error?: string | null;
 }
 
 // ── Plan limits ──────────────────────────────────────────────

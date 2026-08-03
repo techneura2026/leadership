@@ -314,12 +314,12 @@ describe('[QA-READY] Readiness Scoring & Succession', () => {
 
   /**
    * QA-READY-004 | P1
-   * Scenario: GET /analytics/succession after computing readiness shows candidate.
-   * After a readiness score is persisted, the succession analytics endpoint must
-   * include that candidate in the results with their correct readinessRating.
-   * This validates the analytics layer reads freshly computed scores correctly.
+   * Scenario: GET /succession/candidates after computing readiness shows candidate.
+   * After a readiness score is persisted, the succession dashboard (the endpoint the
+   * frontend succession tab actually calls) must include that candidate in the
+   * results with their correct readinessRating.
    */
-  it('QA-READY-004 | P1 — succession analytics reflect computed readiness rating', async () => {
+  it('QA-READY-004 | P1 — succession candidates reflect computed readiness rating', async () => {
     // Recompute to ensure idempotency and have a known rating to check
     const computeRes = await authPost(
       app,
@@ -330,25 +330,13 @@ describe('[QA-READY] Readiness Scoring & Succession', () => {
     expect(computeRes.status).toBe(201);
     const expectedRating: string = computeRes.body.data?.readinessRating;
 
-    // Query succession analytics
-    const successionRes = await authGet(app, org.admin, '/api/v1/analytics/succession');
+    // Query the real succession candidates endpoint
+    const successionRes = await authGet(app, org.admin, '/api/v1/succession/candidates');
     expect(successionRes.status).toBe(200);
-    const succession = successionRes.body.data;
+    const allCandidates: Array<{ participantId: string; readinessRating: string }> = successionRes.body.data ?? [];
 
-    expect(succession).toBeDefined();
-    expect(typeof succession.totalCandidates).toBe('number');
-    expect(succession.totalCandidates).toBeGreaterThanOrEqual(1);
+    expect(allCandidates.length).toBeGreaterThanOrEqual(1);
 
-    // The candidate's rating must be counted in byRating
-    expect(succession.byRating).toBeDefined();
-    const ratingCount: number = succession.byRating[expectedRating] ?? 0;
-    expect(ratingCount).toBeGreaterThanOrEqual(1);
-
-    // At least one byRole entry must contain this participant
-    const allCandidates = (succession.byRole ?? []).flatMap(
-      (role: { candidates?: Array<{ participantId: string; readinessRating: string }> }) =>
-        role.candidates ?? [],
-    );
     const found = allCandidates.find(
       (c: { participantId: string }) => c.participantId === participantId,
     );

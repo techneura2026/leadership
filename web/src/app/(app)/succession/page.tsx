@@ -1227,10 +1227,10 @@ export default function SuccessionPage() {
   const [exporting, setExporting] = useState(false);
   const organisation = useAuthStore((s) => s.organisation);
 
-  const { data: candidatesRaw, mutate: mutateCandidates, isLoading: loadingCandidates } = useApi<ApiCandidate[]>('/succession/candidates');
-  const { data: keyRolesRaw, mutate: mutateKeyRoles, isLoading: loadingKeyRoles } = useApi<ApiKeyRole[]>('/succession/key-roles');
-  const { data: benchRaw, isLoading: loadingBench } = useApi<ApiBench[]>('/succession/bench');
-  const { data: orgChartRaw, isLoading: loadingOrgChart } = useApi<ApiOrgUser[]>('/succession/org-chart');
+  const { data: candidatesRaw, mutate: mutateCandidates, isLoading: loadingCandidates, error: candidatesError } = useApi<ApiCandidate[]>('/succession/candidates');
+  const { data: keyRolesRaw, mutate: mutateKeyRoles, isLoading: loadingKeyRoles, error: keyRolesError } = useApi<ApiKeyRole[]>('/succession/key-roles');
+  const { data: benchRaw, isLoading: loadingBench, error: benchError } = useApi<ApiBench[]>('/succession/bench');
+  const { data: orgChartRaw, isLoading: loadingOrgChart, error: orgChartError } = useApi<ApiOrgUser[]>('/succession/org-chart');
   const { data: departments } = useApi<DepartmentDto[]>('/organisations/me/departments');
   const { data: allUsers } = useApi<UserDto[]>('/users');
 
@@ -1283,6 +1283,7 @@ export default function SuccessionPage() {
   }
 
   const isLoading = loadingCandidates || loadingKeyRoles || loadingBench || loadingOrgChart;
+  const loadError = candidatesError || keyRolesError || benchError || orgChartError;
 
   return (
     <div>
@@ -1318,6 +1319,12 @@ export default function SuccessionPage() {
           </button>
         </div>
       </div>
+
+      {loadError && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+          Failed to load succession data. Please refresh the page or try again later.
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} className="mb-6" />

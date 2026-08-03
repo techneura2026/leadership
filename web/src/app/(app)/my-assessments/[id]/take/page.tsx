@@ -480,8 +480,9 @@ function ReadinessTaker({ assessmentId, participantId }: { assessmentId: string;
     try {
       await api.post(`/assessments/${assessmentId}/readiness/${participantId}/compute`, {});
       router.push('/my-assessments');
-    } catch {
-      setToast({ message: 'Submission failed. Please try again.', type: 'error' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.response?.data?.error?.message;
+      setToast({ message: msg ?? 'Submission failed. Please try again.', type: 'error' });
       setSubmitting(false);
     }
   }
@@ -723,7 +724,9 @@ export default function TakeAssessmentPage() {
 
       {is360Assessment && !selfNomination?.selfRaterToken && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-          Your self-assessment link isn&apos;t ready yet — please contact your HR admin.
+          {(assessment.config as any)?.includeSelfAssessment === false
+            ? "This 360° assessment doesn't include a self-assessment — only your feedback givers rate you."
+            : "Your self-assessment link isn't ready yet — please contact your HR admin."}
         </div>
       )}
     </div>

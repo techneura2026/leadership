@@ -91,6 +91,7 @@ export class ReportingService {
       existing.localPath = null;
       existing.blobUrl = null;
       existing.generatedAt = null;
+      existing.error = null;
       existing.generatedBy = generatedBy;
       existing.language = language;
       const savedReport = await this.reportRepo.save(existing);
@@ -361,11 +362,13 @@ export class ReportingService {
       savedReport.status = 'ready';
       savedReport.localPath = localPath;
       savedReport.generatedAt = new Date();
+      savedReport.error = null;
       await this.reportRepo.save(savedReport);
 
       this.logger.log(`Report ${savedReport.id} generated: ${localPath}`);
     } catch (err) {
       savedReport.status = 'failed';
+      savedReport.error = err instanceof Error ? err.message : String(err);
       await this.reportRepo.save(savedReport);
       this.logger.error(`Report generation failed for ${savedReport.id}:`, err);
       throw err;

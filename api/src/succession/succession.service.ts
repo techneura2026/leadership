@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ReadinessRating } from '@leaderprism/shared';
+import { AssessmentType, ReadinessRating } from '@leaderprism/shared';
 import { KeyRole } from './entities/key-role.entity';
 import { Successor } from './entities/successor.entity';
 import { CreateKeyRoleDto } from './dto/create-key-role.dto';
@@ -94,7 +94,14 @@ export class SuccessionService {
         let keyStrengths: string[] = [];
         let developmentAreas: string[] = [];
         try {
-          const profile = await this.uc2Service.getCompetencyProfile(c.assessmentId, c.participantId, orgId);
+          const competencyRef = await this.uc4Service.resolveParticipantRef(
+            orgId,
+            c.userId,
+            AssessmentType.COMPETENCY,
+          );
+          const profile = competencyRef
+            ? await this.uc2Service.getCompetencyProfile(competencyRef.assessmentId, competencyRef.participantId, orgId)
+            : [];
           const allCompetencies = profile
             .flatMap((d) => d.competencies)
             .map((comp) => ({
