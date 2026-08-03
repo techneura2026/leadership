@@ -73,12 +73,34 @@ Handlebars.registerHelper('readinessNarrative', (rating: string, name: string) =
 
 const REPORTS_DIR = path.resolve(process.cwd(), 'reports');
 
+/**
+ * Walks upward from `startDir` looking for a `reporting/templates` directory.
+ * Guards against the compiled output landing at an extra nesting depth relative
+ * to where nest-cli's asset copier places the .hbs files (see resolveTemplatesDir).
+ */
+function findTemplatesDirUpward(startDir: string): string | null {
+  let dir = startDir;
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, 'reporting', 'templates');
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
 function resolveTemplatesDir(): string {
-  // In compiled output __dirname = dist/reporting; templates are copied there by nest-cli assets.
-  // Fallback to src/ so dev and pre-rebuild prod builds still work.
-  const distPath = path.resolve(__dirname, 'templates');
-  if (fs.existsSync(distPath)) return distPath;
-  return path.resolve(process.cwd(), 'src', 'reporting', 'templates');
+  const candidates = [
+    path.resolve(__dirname, 'templates'), // sibling of this compiled file — the expected layout
+    findTemplatesDirUpward(__dirname), // handles the compiled output landing a few levels deeper
+    path.resolve(process.cwd(), 'api', 'dist', 'reporting', 'templates'), // Docker WORKDIR=/app, dist copied to /app/api/dist
+    path.resolve(process.cwd(), 'dist', 'reporting', 'templates'), // running from api/ as cwd
+    path.resolve(process.cwd(), 'api', 'src', 'reporting', 'templates'), // Docker fallback if src is also copied
+    path.resolve(process.cwd(), 'src', 'reporting', 'templates'), // local dev, cwd = api/
+  ].filter((c): c is string => !!c);
+
+  return candidates.find((c) => fs.existsSync(c)) ?? candidates[0];
 }
 
 @Injectable()

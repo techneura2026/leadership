@@ -15,5 +15,9 @@ COPY shared/dist ./shared/dist
 COPY api/dist ./api/dist
 COPY api/src/database/init.sql ./api/src/database/init.sql
 COPY api/src/database/seeds ./api/src/database/seeds
+# Safety net for PDF report templates: nest-cli's asset copy places these at
+# api/dist/reporting/templates, but pdf.service.ts's resolveTemplatesDir() also
+# checks this path in case the dist output layout ever shifts.
+COPY api/src/reporting/templates ./api/src/reporting/templates
 EXPOSE 3001
 CMD ["node", "api/dist/api/src/main.js"]
