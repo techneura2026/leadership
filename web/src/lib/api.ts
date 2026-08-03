@@ -85,10 +85,18 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Don't retry the refresh endpoint itself
-    if (original.url?.includes('/auth/refresh')) {
-      useAuthStore.getState().clearAuth();
-      if (typeof window !== 'undefined') window.location.href = '/login';
+    // Don't retry the refresh endpoint itself, and don't hijack a failed login/register
+    // attempt into a silent-refresh + hard redirect — that would wipe out the error message
+    // the login form is about to show before the user ever sees it.
+    if (
+      original.url?.includes('/auth/refresh') ||
+      original.url?.includes('/auth/login') ||
+      original.url?.includes('/auth/register')
+    ) {
+      if (original.url?.includes('/auth/refresh')) {
+        useAuthStore.getState().clearAuth();
+        if (typeof window !== 'undefined') window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 

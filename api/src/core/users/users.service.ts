@@ -42,6 +42,15 @@ export class UsersService {
       .getOne();
   }
 
+  /** Includes deactivated users — only for login, so we can tell a wrong password apart from a deactivated account. */
+  async findByEmailIncludingInactive(email: string): Promise<User | null> {
+    return this.userRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('LOWER(u.email) = LOWER(:email)', { email })
+      .getOne();
+  }
+
   async findById(id: string, organisationId: string): Promise<User> {
     const user = await this.userRepo.findOne({
       where: { id, organisationId },

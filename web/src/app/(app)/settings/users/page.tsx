@@ -176,8 +176,14 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Add User">
-      <div className="space-y-4">
+    <Modal open={open} onClose={handleClose} title="Add User" className="scrollbar-hide">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+        className="space-y-4"
+      >
         <div className='h-40 w-full border-0  flex justify-center'>
           <div className='h-40 w-40 border-4 border-gray-100 bg-gray-200 rounded-full relative'>
 
@@ -209,6 +215,8 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         <div className="grid grid-cols-2 gap-3">
           <Field label="First name" required>
             <input
+              name="firstName"
+              autoComplete="given-name"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               className={inputCls}
@@ -218,6 +226,8 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
           </Field>
           <Field label="Last name" required>
             <input
+              name="lastName"
+              autoComplete="family-name"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               className={inputCls}
@@ -229,6 +239,8 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         <Field label="Work email" required>
           <input
             type="email"
+            name="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className={inputCls}
@@ -256,6 +268,8 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Job title">
             <input
+              name="jobTitle"
+              autoComplete="organization-title"
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               className={inputCls}
@@ -279,20 +293,21 @@ function AddUserModal({ open, onClose, onCreated }: AddUserModalProps) {
 
         <div className="flex gap-3 pt-1">
           <button
+            type="button"
             onClick={handleClose}
             className="flex-1 border border-gray-300 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
             className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Creating…' : 'Create User'}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
@@ -828,6 +843,8 @@ export default function UsersSettingsPage() {
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" strokeWidth={2} />
           <input
+            name="usersTableSearch"
+            autoComplete="off"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email…"

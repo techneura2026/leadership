@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { useAuthStore } from '@/store/auth.store';
 import { formatDate } from '@/lib/utils';
 import {
-  Building2, Sparkles, Star, Crown, Zap, ImagePlus, Palette, CheckCircle2,
+  Building2, Sparkles, Star, Crown, Zap, ImagePlus, CheckCircle2,
 } from 'lucide-react';
 import type { OrganisationDto } from '@leaderprism/shared';
 
@@ -45,7 +45,6 @@ export default function OrgSettingsPage() {
   const { data: org, mutate, isLoading } = useApi<OrgWithBranding>('/organisations/me');
   const [name, setName] = useState('');
   const [brandingName, setBrandingName] = useState('');
-  const [primaryColour, setPrimaryColour] = useState('#1E40AF');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -53,7 +52,6 @@ export default function OrgSettingsPage() {
     if (org) {
       setName(org.name);
       setBrandingName(org.brandingName ?? '');
-      setPrimaryColour(org.primaryColour);
     }
   }, [org]);
 
@@ -61,7 +59,7 @@ export default function OrgSettingsPage() {
     setSaving(true);
     setSaved(false);
     try {
-      const updated = await api.patch('/organisations/me', { name, brandingName, primaryColour });
+      const updated = await api.patch('/organisations/me', { name, brandingName });
       mutate(updated.data.data);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -138,20 +136,6 @@ export default function OrgSettingsPage() {
             <input value={brandingName} onChange={e => setBrandingName(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
               placeholder="e.g. Acme HR Consulting" />
-          </div>
-          <div>
-            <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
-              <Palette className="w-3.5 h-3.5 text-gray-400" strokeWidth={2} />
-              Primary Brand Colour
-            </label>
-            <div className="flex items-center gap-3">
-              <input type="color" value={primaryColour} onChange={e => setPrimaryColour(e.target.value)}
-                className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5 bg-gray-50 hover:bg-white hover:border-gray-300 transition-colors" />
-              <input value={primaryColour} onChange={e => setPrimaryColour(e.target.value)}
-                className="w-32 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700 uppercase"
-                placeholder="#1E40AF" />
-              <div className="w-8 h-8 rounded-md shadow-sm border border-black/10" style={{ backgroundColor: primaryColour }} />
-            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>

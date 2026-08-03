@@ -208,6 +208,14 @@
 
   .dark ::-webkit-scrollbar-thumb { background: #2a3d57; }
   .dark ::-webkit-scrollbar-thumb:hover { background: #3a526e; }
+
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

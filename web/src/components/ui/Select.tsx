@@ -22,7 +22,13 @@ export function Select({ value, onChange, options, placeholder = 'Select…', cl
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownStyle, setDropdownStyle] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    maxHeight: 256,
+    direction: 'down' as 'down' | 'up',
+  });
 
   // Handle clicking outside of both the button AND the portal dropdown
   useEffect(() => {
@@ -38,14 +44,31 @@ export function Select({ value, onChange, options, placeholder = 'Select…', cl
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Calculate the exact position of the dropdown when opened
+  // Calculate the exact position of the dropdown when opened, flipping and
+  // clamping its height so it always stays fully within the viewport.
   useEffect(() => {
     if (open && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
+      const margin = 8;
+      const desiredHeight = 256; // matches max-h-64
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const spaceAbove = rect.top - margin;
+
+      const direction: 'down' | 'up' =
+        spaceBelow >= Math.min(desiredHeight, spaceBelow + spaceAbove) || spaceBelow >= spaceAbove
+          ? 'down'
+          : 'up';
+      const maxHeight = Math.max(
+        120,
+        Math.min(desiredHeight, direction === 'down' ? spaceBelow : spaceAbove),
+      );
+
       setDropdownStyle({
-        top: rect.bottom + window.scrollY, // Accounts for page scroll
-        left: rect.left + window.scrollX,
-        width: rect.width, // Matches the width of the trigger button
+        top: direction === 'down' ? rect.bottom : rect.top,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+        direction,
       });
     }
   }, [open]);
@@ -75,12 +98,17 @@ useEffect(() => {
   const dropdownMenu = open ? (
     <div
       ref={dropdownRef}
-      className="absolute z-[9999] mt-1 bg-white border border-gray-100 rounded-xl shadow-xl max-h-64 overflow-y-scroll py-1.5"
+      className="fixed z-[9999] bg-white border border-gray-100 rounded-xl shadow-xl overflow-y-auto overscroll-contain py-1.5"
       style={{
-        top: `${dropdownStyle.top}px`,
+        top: dropdownStyle.direction === 'down' ? `${dropdownStyle.top + 4}px` : undefined,
+        bottom: dropdownStyle.direction === 'up' ? `${window.innerHeight - dropdownStyle.top + 4}px` : undefined,
         left: `${dropdownStyle.left}px`,
         width: `${dropdownStyle.width}px`,
-        animation: 'slideDown 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        maxHeight: `${dropdownStyle.maxHeight}px`,
+        animation:
+          dropdownStyle.direction === 'down'
+            ? 'slideDown 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            : 'slideUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards',
       }}
     >
       {options.map((opt) => (
@@ -144,6 +172,10 @@ useEffect(() => {
         __html: `
         @keyframes slideDown {
           from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(4px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}} />
