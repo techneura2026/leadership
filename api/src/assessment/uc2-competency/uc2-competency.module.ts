@@ -7,6 +7,7 @@ import { AssessmentParticipant } from '../engine/entities/assessment-participant
 import { Competency } from '../items/entities/competency.entity';
 import { CompetencyDomain } from '../items/entities/competency-domain.entity';
 import { User } from '../../core/users/entities/user.entity';
+import { EngineModule } from '../engine/engine.module';
 import { Uc2CompetencyService } from './uc2-competency.service';
 import { Uc2CompetencyController } from './uc2-competency.controller';
 
@@ -21,6 +22,7 @@ import { Uc2CompetencyController } from './uc2-competency.controller';
       CompetencyDomain,
       User,
     ]),
+    EngineModule,
   ],
   providers: [Uc2CompetencyService],
   controllers: [Uc2CompetencyController],

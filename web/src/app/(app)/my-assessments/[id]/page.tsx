@@ -37,8 +37,8 @@ const TYPE_META: Record<
     label: '360° Feedback',
     icon: <TypeIcon360 />,
     description:
-      'Rate your own leadership behaviours across competency areas. For each competency, select the proficiency level that best reflects your current performance and optionally provide supporting evidence. Your results will be grouped by domain.',
-    participantAction: 'Start Assessment',
+      "You'll complete your own self-assessment as part of this 360° review, rating yourself on the same competencies your nominated raters (manager, peers, direct reports) will be asked about. Your results will combine every perspective, grouped by domain, so you can see how your self-view compares with how others experience you.",
+    participantAction: 'Start Self-Assessment',
   },
   [AssessmentType.COMPETENCY]: {
     label: 'Competency Assessment',
@@ -69,6 +69,12 @@ interface AssessmentParticipant {
   status: string;
 }
 
+interface MyAssessmentSummary {
+  id: string;
+  selfRaterToken?: string;
+  selfNominationStatus?: string;
+}
+
 export default function AssessmentDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -80,6 +86,12 @@ export default function AssessmentDetailPage() {
 
   const { data: participants, isLoading: loadingParticipants } =
     useApi<AssessmentParticipant[]>(assessment ? `/assessments/${id}/participants` : null);
+
+  // 360's self-assessment is completed through the rater-response flow (same mechanism as
+  // every other rater — see EngineService.findMine), not the generic take-assessment page.
+  const is360Assessment = assessment?.assessmentType === AssessmentType.FEEDBACK_360;
+  const { data: mine } = useApi<MyAssessmentSummary[]>(is360Assessment ? '/assessments/mine' : null);
+  const selfNomination = mine?.find((m) => m.id === id && m.selfRaterToken);
 
   const myRecord = participants?.find((p) => p.userId === currentUser?.id);
   const participantStatus = myRecord?.status ?? 'not_started';
@@ -124,6 +136,8 @@ export default function AssessmentDetailPage() {
   function handleCta() {
     if (canViewResults) {
       router.push(`/my-assessments/${id}/results`);
+    } else if (selfNomination?.selfRaterToken && selfNomination.selfNominationStatus !== 'completed') {
+      router.push(`/rater/${selfNomination.selfRaterToken}`);
     } else {
       router.push(`/my-assessments/${id}/take`);
     }

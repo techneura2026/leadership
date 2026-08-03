@@ -122,16 +122,19 @@ function OverviewTab({
   questions,
   onGoToReports,
   onCloseAssessment,
+  onArchiveAssessment,
 }: {
   assessment: AssessmentDto;
   participants: Participant[];
   questions: AssessmentQuestion[];
   onGoToReports: () => void;
   onCloseAssessment: () => Promise<void>;
+  onArchiveAssessment: () => Promise<void>;
 }) {
   const [sendingReminders, setSendingReminders] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const meta = TYPE_META[assessment.assessmentType];
   const Icon = meta.icon;
@@ -171,6 +174,19 @@ async function closeAssessment() {
     showToast('Failed to close assessment.', 'error');
   } finally {
     setClosing(false);
+  }
+}
+
+async function archiveAssessment() {
+  try {
+    setArchiving(true);
+    await onArchiveAssessment();
+    showToast('Assessment has been archived.');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to archive assessment.', 'error');
+  } finally {
+    setArchiving(false);
   }
 }
 
@@ -235,6 +251,16 @@ async function closeAssessment() {
               >
                 <XCircle className="w-4 h-4" strokeWidth={2} />
                 Close Assessment
+              </button>
+            )}
+            {assessment.status === AssessmentStatus.CLOSED && (
+              <button
+                onClick={archiveAssessment}
+                disabled={archiving}
+                className="text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 rounded-lg px-4 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {archiving ? <Spinner size="sm" /> : <XCircle className="w-4 h-4" strokeWidth={2} />}
+                {archiving ? 'Archiving…' : 'Archive Assessment'}
               </button>
             )}
             <button
@@ -404,17 +430,22 @@ async function closeAssessment() {
 // ── Participants Tab ──────────────────────────────────────────────────────────
 function ParticipantsTab({
   assessmentId,
+  assessmentType,
   participants,
   onRefresh,
   assessmentStatus,
   assessmentEndDate,
 }: {
   assessmentId: string;
+  assessmentType: AssessmentType;
   participants: Participant[];
   onRefresh: () => void;
   assessmentStatus: AssessmentStatus;
   assessmentEndDate: string | null;
 }) {
+  // A 360 assessment has exactly one participant (the subject), fixed at creation — adding
+  // more, or removing/reminding the existing one from this generic tab, isn't a valid action.
+  const is360 = assessmentType === AssessmentType.FEEDBACK_360;
   const [showAdd, setShowAdd] = useState(false);
   const [adding, setAdding] = useState(false);
   const [remindingId, setRemindingId] = useState<string | null>(null);
@@ -522,16 +553,18 @@ function ParticipantsTab({
         <h3 className="text-sm font-semibold text-gray-900">
           {participants.length} Participant{participants.length !== 1 ? 's' : ''}
         </h3>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
-        >
-          <PlusIcon className="w-4 h-4" strokeWidth={2.5} />
-          Add Participant
-        </button>
+        {!is360 && (
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-50 text-blue-600 hover:bg-gray-100 rounded-lg px-3 py-2 transition-colors shrink-0"
+          >
+            <PlusIcon className="w-4 h-4" strokeWidth={2.5} />
+            Add Participant
+          </button>
+        )}
       </div>
 
-      {showAdd && (
+      {!is360 && showAdd && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col gap-3 relative" ref={dropdownRef}>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -719,25 +752,27 @@ function ParticipantsTab({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      {p.status !== 'completed' && assessmentStatus === AssessmentStatus.ACTIVE && (
+                    {!is360 && (
+                      <div className="flex items-center justify-end gap-3">
+                        {p.status !== 'completed' && assessmentStatus === AssessmentStatus.ACTIVE && (
+                          <button
+                            onClick={() => remindParticipant(p.id)}
+                            disabled={remindingId === p.id}
+                            className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {remindingId === p.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
+                            Remind
+                          </button>
+                        )}
                         <button
-                          onClick={() => remindParticipant(p.id)}
-                          disabled={remindingId === p.id}
-                          className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                          onClick={() => removeParticipant(assessmentId,p.id)}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
                         >
-                          {remindingId === p.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
-                          Remind
+                          <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                          Remove
                         </button>
-                      )}
-                      <button
-                        onClick={() => removeParticipant(assessmentId,p.id)}
-                        className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-                        Remove
-                      </button>
-                    </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -756,14 +791,17 @@ function FeedbackGiversTab({
   nominations,
   assessmentStatus,
   assessmentEndDate,
+  onRefresh,
 }: {
   assessmentId: string;
   participants: Participant[];
   nominations: RaterNominationDto[];
   assessmentStatus: AssessmentStatus;
   assessmentEndDate: string | null;
+  onRefresh: () => void;
 }) {
   const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   function getParticipantName(participantId: string) {
@@ -782,6 +820,19 @@ function FeedbackGiversTab({
       setToast({ message: error.response?.data?.message || 'Failed to send reminder.', type: 'error' });
     } finally {
       setRemindingId(null);
+    }
+  }
+
+  async function removeNomination(nominationId: string) {
+    setRemovingId(nominationId);
+    try {
+      await api.delete(`/assessments/${assessmentId}/360/nominations/${nominationId}`);
+      setToast({ message: 'Feedback giver removed.', type: 'success' });
+      onRefresh();
+    } catch (error: any) {
+      setToast({ message: error.response?.data?.message || 'Failed to remove feedback giver.', type: 'error' });
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -833,7 +884,7 @@ function FeedbackGiversTab({
                 <tr key={n.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <Avatar seed={n.raterEmail} size="sm" />
+                      <Avatar seed={n.raterUserId ?? n.raterEmail} src={n.raterAvatarUrl} size="sm" />
                       <div>
                         <p className="font-medium text-gray-900">{n.raterName ?? 'Unknown'}</p>
                         <p className="text-xs text-gray-500">{n.raterEmail}</p>
@@ -857,16 +908,28 @@ function FeedbackGiversTab({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {outstanding && assessmentStatus === AssessmentStatus.ACTIVE && (
-                      <button
-                        onClick={() => remindNomination(n.id)}
-                        disabled={remindingId === n.id}
-                        className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
-                      >
-                        {remindingId === n.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
-                        Remind
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-3">
+                      {outstanding && assessmentStatus === AssessmentStatus.ACTIVE && (
+                        <button
+                          onClick={() => remindNomination(n.id)}
+                          disabled={remindingId === n.id}
+                          className="text-xs text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {remindingId === n.id ? <Spinner size="sm" className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" strokeWidth={2} />}
+                          Remind
+                        </button>
+                      )}
+                      {n.relationship !== RaterRelationship.SELF && n.status !== 'completed' && (
+                        <button
+                          onClick={() => removeNomination(n.id)}
+                          disabled={removingId === n.id}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {removingId === n.id ? <Spinner size="sm" className="w-3 h-3" /> : <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />}
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 );
@@ -1259,7 +1322,7 @@ export default function AssessmentDetailPage() {
   const is360 = assessment?.assessmentType === AssessmentType.FEEDBACK_360;
   const isPersonality = assessment?.assessmentType === AssessmentType.PERSONALITY;
 
-  const { data: nominations } = useApi<RaterNominationDto[]>(
+  const { data: nominations, mutate: mutateNominations } = useApi<RaterNominationDto[]>(
     is360 ? `/assessments/${id}/360/nominations` : null,
   );
   const { data: reports } = useApi<ReportDto[]>(`/reports?assessmentId=${id}`);
@@ -1275,6 +1338,18 @@ export default function AssessmentDetailPage() {
   const handleCloseAssessment = async () => {
   try {
     await api.post(`/assessments/${id}/close`);
+
+    const res = await api.get(`/assessments/${id}`);
+    setAssessment(res.data.data);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
+
+  const handleArchiveAssessment = async () => {
+  try {
+    await api.post(`/assessments/${id}/archive`);
 
     const res = await api.get(`/assessments/${id}`);
     setAssessment(res.data.data);
@@ -1352,12 +1427,14 @@ export default function AssessmentDetailPage() {
           questions={((assessment.config as any)?.questions ?? []) as AssessmentQuestion[]}
           onGoToReports={() => setActiveTab('reports')}
           onCloseAssessment={handleCloseAssessment}
+          onArchiveAssessment={handleArchiveAssessment}
         />
       )}
 
       {activeTab === 'participants' && (
         <ParticipantsTab
           assessmentId={id}
+          assessmentType={assessment.assessmentType}
           participants={participants}
           onRefresh={loadParticipants}
           assessmentStatus={assessment.status}
@@ -1372,6 +1449,7 @@ export default function AssessmentDetailPage() {
           nominations={nominations ?? []}
           assessmentStatus={assessment.status}
           assessmentEndDate={assessment.endDate}
+          onRefresh={() => mutateNominations()}
         />
       )}
 

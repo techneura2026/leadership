@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import { PageSpinner, Spinner } from '@/components/ui/Spinner';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { AssessmentDto, AssessmentStatus } from '@leaderprism/shared';
 
 export default function EditAssessmentPage() {
@@ -94,22 +95,11 @@ export default function EditAssessmentPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
-            />
+            <DatePicker value={startDate} onChange={setStartDate} placeholder="Select start date" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 hover:border-gray-300 transition-all text-gray-700"
-            />
+            <DatePicker value={endDate} onChange={setEndDate} min={startDate || undefined} placeholder="Select end date" />
           </div>
         </div>
 

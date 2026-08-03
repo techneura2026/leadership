@@ -121,6 +121,9 @@ export interface RaterNominationDto {
   relationship: RaterRelationship;
   status: string;
   completedAt: string | null;
+  /** Best-effort match against an org user with the same email — null if no match. */
+  raterAvatarUrl: string | null;
+  raterUserId: string | null;
 }
 
 // ── Competency ───────────────────────────────────────────────

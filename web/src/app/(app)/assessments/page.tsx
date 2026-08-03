@@ -163,6 +163,7 @@ export default function AssessmentsPage() {
     { key: AssessmentStatus.ACTIVE, label: 'Active' },
     { key: AssessmentStatus.DRAFT, label: 'Draft' },
     { key: AssessmentStatus.CLOSED, label: 'Closed' },
+    { key: AssessmentStatus.ARCHIVED, label: 'Archived' },
   ];
 
   function handleFilterChange(next: FilterTab) {

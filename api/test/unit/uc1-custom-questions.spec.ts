@@ -13,7 +13,9 @@ function makeNomination(customAnswers: Record<string, any> | null): RaterNominat
 
 // aggregateCustomAnswers/shuffle are pure — no repository access — so the other
 // constructor args can be stubbed out.
-const service = new Uc1FeedbackService({} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+const service = new Uc1FeedbackService(
+  {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+);
 
 describe('resolveQuestionMode', () => {
   it('defaults to competency when questionMode is absent, regardless of questions/competencyIds', () => {

@@ -15,6 +15,7 @@ import { RaterResponse } from '../uc1-feedback/entities/rater-response.entity';
 import { ReadinessScoringService } from './readiness-scoring.service';
 import { Uc4ReadinessService } from './uc4-readiness.service';
 import { Uc4ReadinessController } from './uc4-readiness.controller';
+import { EngineModule } from '../engine/engine.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { Uc4ReadinessController } from './uc4-readiness.controller';
       RaterNomination,
       RaterResponse,
     ]),
+    EngineModule,
   ],
   providers: [ReadinessScoringService, Uc4ReadinessService],
   controllers: [Uc4ReadinessController],

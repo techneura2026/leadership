@@ -14,6 +14,7 @@ import { Item } from '../items/entities/item.entity';
 import { BigFiveScoringService, FactorScore } from './big-five-scoring.service';
 import { UserRole } from '@leaderprism/shared';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
+import { EngineService } from '../engine/engine.service';
 
 export interface ItemWithProgress {
   id: string;
@@ -48,6 +49,7 @@ export class Uc3PersonalityService {
     @InjectRepository(Item)
     private readonly itemRepo: Repository<Item>,
     private readonly bigFiveScoring: BigFiveScoringService,
+    private readonly engineService: EngineService,
   ) {}
 
   private async assertAssessmentInOrg(assessmentId: string, orgId: string): Promise<Assessment> {
@@ -208,6 +210,8 @@ export class Uc3PersonalityService {
     participant.status = 'completed';
     participant.completedAt = new Date();
     await this.participantRepo.save(participant);
+
+    await this.engineService.maybeCloseAssessment(assessmentId);
 
     this.logger.log(`Personality questionnaire submitted for participant ${participantId}`);
     return scores;

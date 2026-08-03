@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { TopCenterToast } from '@/components/ui/TopCenterToast';
 import { QuestionCard, isAnswered } from '@/components/QuestionCard';
@@ -88,9 +88,11 @@ function ScaleButton({
 // ── Main Rater Page ───────────────────────────────────────────────────────────
 export default function RaterPage() {
   const params = useParams();
+  const router = useRouter();
   const token = params.token as string;
 
   const [screen, setScreen] = useState<Screen>('loading');
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [landing, setLanding] = useState<RaterLanding | null>(null);
   const [clusters, setClusters] = useState<CompetencyCluster[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
@@ -293,6 +295,34 @@ export default function RaterPage() {
     );
   }
 
+  // ── Exit confirmation ──────────────────────────────────────────────────────
+  if (showExitConfirm) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-sm w-full text-center">
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">Exit feedback?</h1>
+          <p className="text-sm text-gray-500 mb-6">
+            Your progress is saved — you can return anytime using the same link.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowExitConfirm(false)}
+              className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+            >
+              Keep Going
+            </button>
+            <button
+              onClick={() => router.push('/login')}
+              className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              Exit
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Thank You ──────────────────────────────────────────────────────────────
   if (screen === 'thankyou') {
     return (
@@ -304,10 +334,16 @@ export default function RaterPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Thank you for your feedback</h1>
-          <p className="text-gray-500 text-sm leading-relaxed">
+          <p className="text-gray-500 text-sm leading-relaxed mb-6">
             Your responses have been recorded anonymously. They will only be shared as part of a
             group summary to protect your identity.
           </p>
+          <button
+            onClick={() => router.push('/login')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 text-sm transition-colors"
+          >
+            Return to Dashboard
+          </button>
         </div>
       </div>
     );
@@ -383,6 +419,14 @@ export default function RaterPage() {
         {/* Sticky progress header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
           <div className="max-w-2xl mx-auto">
+            <div className="flex justify-end mb-1">
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Exit
+              </button>
+            </div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>Competency {clusterIndex + 1} of {totalClusters}</span>
               <span className="flex items-center gap-1.5">
@@ -487,6 +531,14 @@ export default function RaterPage() {
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
           <div className="max-w-2xl mx-auto">
+            <div className="flex justify-end mb-1">
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Exit
+              </button>
+            </div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>Question {questionIdx + 1} of {totalQuestions}</span>
               <span className="flex items-center gap-1.5">
@@ -547,6 +599,14 @@ export default function RaterPage() {
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0">
           <div className="max-w-2xl mx-auto">
+            <div className="flex justify-end mb-1">
+              <button
+                onClick={() => setShowExitConfirm(true)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Exit
+              </button>
+            </div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>Final step</span>
               <span>95% complete</span>

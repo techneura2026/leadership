@@ -22,7 +22,9 @@ import { RaterResponse } from './entities/rater-response.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Competency } from '../items/entities/competency.entity';
+import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { EngineService } from '../engine/engine.service';
 import { v4 as uuidv4 } from 'uuid';
 
 const MIN_RATERS = 3;
@@ -86,7 +88,10 @@ export class Uc1FeedbackService {
     private readonly participantRepo: Repository<AssessmentParticipant>,
     @InjectRepository(Competency)
     private readonly competencyRepo: Repository<Competency>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly notificationsService: NotificationsService,
+    private readonly engineService: EngineService,
   ) {}
 
   async getNominations(
@@ -95,7 +100,7 @@ export class Uc1FeedbackService {
     orgId: string,
     requestingUserId: string,
     requestingUserRole: UserRole,
-  ): Promise<RaterNomination[]> {
+  ): Promise<Array<RaterNomination & { raterAvatarUrl: string | null; raterUserId: string | null }>> {
     // Validate assessment belongs to org
     const assessment = await this.assessmentRepo.findOne({
       where: { id: assessmentId, organisationId: orgId },
@@ -120,10 +125,27 @@ export class Uc1FeedbackService {
       assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
     }
 
-    return this.nominationRepo.find({
+    const nominations = await this.nominationRepo.find({
       where: participantId ? { assessmentId, participantId } : { assessmentId },
       relations: ['participant', 'participant.user'],
       order: { createdAt: 'ASC' },
+    });
+
+    // Raters are stored as free-form email/name (they aren't necessarily linked to a User
+    // row), so resolve avatars via a best-effort email match against org users instead of a
+    // real relation.
+    const emails = [...new Set(nominations.map((n) => n.raterEmail.toLowerCase()))];
+    const matchedUsers = emails.length
+      ? await this.userRepo.find({ where: { organisationId: orgId, email: In(emails) } })
+      : [];
+    const userByEmail = new Map(matchedUsers.map((u) => [u.email.toLowerCase(), u]));
+
+    return nominations.map((n) => {
+      const matched = userByEmail.get(n.raterEmail.toLowerCase());
+      return Object.assign(n, {
+        raterAvatarUrl: matched?.avatarUrl ?? null,
+        raterUserId: matched?.id ?? null,
+      });
     });
   }
 
@@ -149,6 +171,20 @@ export class Uc1FeedbackService {
       throw new NotFoundException(`Participant ${participantId} not found`);
     }
     assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
+
+    // HR Managers and Managers may only ever be the 360 *subject*, never a rater — reject
+    // the whole batch up front (rather than silently skipping) so the admin gets clear
+    // feedback about which email caused it.
+    for (const rater of raters) {
+      const matchedUser = await this.userRepo.findOne({
+        where: { email: rater.raterEmail.toLowerCase(), organisationId: orgId },
+      });
+      if (matchedUser && (matchedUser.role === UserRole.HR_MANAGER || matchedUser.role === UserRole.MANAGER)) {
+        throw new BadRequestException(
+          `${rater.raterEmail} cannot be added as a feedback giver — HR Managers and Managers can only be assessed, not rate others`,
+        );
+      }
+    }
 
     // Load existing nominations to check for duplicates
     const existing = await this.nominationRepo.find({
@@ -457,6 +493,7 @@ export class Uc1FeedbackService {
     nomination.status = 'completed';
     nomination.completedAt = new Date();
     await this.nominationRepo.save(nomination);
+    await this.onNominationCompleted(nomination);
 
     this.logger.log(`Rater overall submitted for nomination ${nomination.id}`);
     return { nominationId: nomination.id };
@@ -525,10 +562,30 @@ export class Uc1FeedbackService {
     nomination.status = 'completed';
     nomination.completedAt = new Date();
     await this.nominationRepo.save(nomination);
+    await this.onNominationCompleted(nomination);
 
     this.logger.log(`Rater response submitted for nomination ${nomination.id}`);
 
     return { nominationId: nomination.id };
+  }
+
+  /**
+   * Runs after any nomination reaches 'completed': if it was the reviewee's own SELF
+   * perspective, that's the signal the 360 Participants tab (and everything else keyed off
+   * AssessmentParticipant.status) needs — it's otherwise never written for FEEDBACK_360.
+   * Then checks whether the whole assessment can now auto-close.
+   */
+  private async onNominationCompleted(nomination: RaterNomination): Promise<void> {
+    if (nomination.relationship === RaterRelationship.SELF) {
+      const participant = await this.participantRepo.findOne({ where: { id: nomination.participantId } });
+      if (participant && participant.status !== 'completed') {
+        participant.status = 'completed';
+        participant.completedAt = new Date();
+        await this.participantRepo.save(participant);
+      }
+    }
+
+    await this.engineService.maybeCloseAssessment(nomination.assessmentId);
   }
 
   /**
@@ -852,6 +909,33 @@ export class Uc1FeedbackService {
 
     this.logger.log(`Sent targeted reminder to nomination ${nominationId} for assessment ${assessmentId}`);
     return { sent: true };
+  }
+
+  /** Retracts an outstanding rater invitation. Cannot remove the reviewee's own self-assessment, or a rater who already submitted. */
+  async removeNomination(assessmentId: string, nominationId: string, orgId: string): Promise<void> {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id: assessmentId, organisationId: orgId },
+    });
+    if (!assessment) {
+      throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    }
+
+    const nomination = await this.nominationRepo.findOne({
+      where: { id: nominationId, assessmentId },
+    });
+    if (!nomination) {
+      throw new NotFoundException(`Nomination ${nominationId} not found`);
+    }
+
+    if (nomination.relationship === RaterRelationship.SELF) {
+      throw new BadRequestException("The participant's own self-assessment cannot be removed");
+    }
+    if (nomination.status === 'completed') {
+      throw new BadRequestException('Cannot remove a rater who has already submitted feedback');
+    }
+
+    await this.nominationRepo.delete({ id: nominationId, assessmentId });
+    this.logger.log(`Removed rater nomination ${nominationId} from assessment ${assessmentId}`);
   }
 
   private groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {

@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -126,6 +129,19 @@ export class Uc1FeedbackController {
     @Param('nominationId', ParseUUIDPipe) nominationId: string,
   ) {
     return this.uc1Service.remindNomination(assessmentId, nominationId, req.user.orgId);
+  }
+
+  @Delete('assessments/:id/360/nominations/:nominationId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.ORG_ADMIN, UserRole.HR_MANAGER, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove an outstanding rater nomination' })
+  removeNomination(
+    @Request() req: any,
+    @Param('id', ParseUUIDPipe) assessmentId: string,
+    @Param('nominationId', ParseUUIDPipe) nominationId: string,
+  ) {
+    return this.uc1Service.removeNomination(assessmentId, nominationId, req.user.orgId);
   }
 
   // ── Public rater endpoints (no JWT) ───────────────────────────────────

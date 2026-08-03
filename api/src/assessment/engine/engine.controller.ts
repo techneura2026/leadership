@@ -78,6 +78,13 @@ export class EngineController {
     return this.engineService.close(id, req.user.orgId);
   }
 
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Archive assessment (CLOSED → ARCHIVED)' })
+  archive(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    return this.engineService.archive(id, req.user.orgId);
+  }
+
   @Post(':id/participants')
   @ApiOperation({ summary: 'Add a participant to an assessment (accepts email or userId)' })
   addParticipant(

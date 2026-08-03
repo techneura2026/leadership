@@ -11,12 +11,14 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { AssessmentStatus, AssessmentType, Plan, RaterRelationship, UserRole } from '@leaderprism/shared';
 import type { AssessmentConfig, PlanLimits } from '@leaderprism/shared';
+import { v4 as uuidv4 } from 'uuid';
 import { Assessment } from './entities/assessment.entity';
 import { AssessmentParticipant } from './entities/assessment-participant.entity';
 import { Organisation } from '../../core/organisations/entities/organisation.entity';
 import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entity';
 import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
+import { allParticipantsDone, allNominationsDone } from '../shared/completion.util';
 
 // Plan limits map
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -189,6 +191,10 @@ export class EngineService {
 
     if (filters.status) {
       qb.andWhere('a.status = :status', { status: filters.status });
+    } else {
+      // Archived assessments are opt-in only — an explicit ?status=archived filter is the
+      // only way to see them, so they stop cluttering the default/"all" listing.
+      qb.andWhere('a.status != :archived', { archived: AssessmentStatus.ARCHIVED });
     }
     if (filters.assessmentType) {
       qb.andWhere('a.assessment_type = :type', { type: filters.assessmentType });
@@ -311,6 +317,41 @@ export class EngineService {
     return saved;
   }
 
+  async archive(id: string, orgId: string): Promise<Assessment> {
+    const assessment = await this.findOne(id, orgId);
+
+    if (assessment.status !== AssessmentStatus.CLOSED) {
+      throw new BadRequestException('Only closed assessments can be archived');
+    }
+
+    assessment.status = AssessmentStatus.ARCHIVED;
+    const saved = await this.assessmentRepo.save(assessment);
+    this.logger.log(`Archived assessment ${id} org=${orgId}`);
+    return saved;
+  }
+
+  /**
+   * Closes an assessment automatically once everyone relevant has finished: every
+   * participant (completed/withdrawn), plus — for 360 — every rater nomination
+   * (completed/declined). Called from each UC service after it records a completion.
+   */
+  async maybeCloseAssessment(assessmentId: string): Promise<void> {
+    const assessment = await this.assessmentRepo.findOne({ where: { id: assessmentId } });
+    if (!assessment || assessment.status !== AssessmentStatus.ACTIVE) return;
+
+    const participants = await this.participantRepo.find({ where: { assessmentId } });
+    if (!allParticipantsDone(participants)) return;
+
+    if (assessment.assessmentType === AssessmentType.FEEDBACK_360) {
+      const nominations = await this.nominationRepo.find({ where: { assessmentId } });
+      if (!allNominationsDone(nominations)) return;
+    }
+
+    assessment.status = AssessmentStatus.CLOSED;
+    await this.assessmentRepo.save(assessment);
+    this.logger.log(`Auto-closed assessment ${assessmentId} — all participants/raters complete`);
+  }
+
   async addParticipant(
     assessmentId: string,
     orgId: string,
@@ -322,16 +363,25 @@ export class EngineService {
       throw new BadRequestException('Cannot add participants to a closed or archived assessment');
     }
 
-    // Resolve to a userId — accept either a plain UUID or an email address
-    let userId: string = emailOrUserId;
-    if (emailOrUserId.includes('@')) {
-      const user = await this.userRepo.findOne({
-        where: { email: emailOrUserId.toLowerCase(), organisationId: orgId },
-      });
-      if (!user) {
-        throw new NotFoundException(`No user found with email ${emailOrUserId} in this organisation`);
-      }
-      userId = user.id;
+    // Resolve to a full User row (not just an id) — accepts either a plain UUID or an email
+    // address, and we need the row itself (not just its id) to check role eligibility below.
+    const user = emailOrUserId.includes('@')
+      ? await this.userRepo.findOne({ where: { email: emailOrUserId.toLowerCase(), organisationId: orgId } })
+      : await this.userRepo.findOne({ where: { id: emailOrUserId, organisationId: orgId } });
+    if (!user) {
+      throw new NotFoundException(`No matching user found in this organisation`);
+    }
+    const userId = user.id;
+
+    // HR Managers and Managers administer assessments for others — they may only ever be
+    // the subject of a 360 assessment, never of Competency/Personality/Readiness.
+    if (
+      assessment.assessmentType !== AssessmentType.FEEDBACK_360 &&
+      (user.role === UserRole.HR_MANAGER || user.role === UserRole.MANAGER)
+    ) {
+      throw new BadRequestException(
+        'HR Managers and Managers can only be added as participants to 360-degree feedback assessments',
+      );
     }
 
     return this.withOrgLock(orgId, async (manager) => {
@@ -341,6 +391,14 @@ export class EngineService {
       });
       if (existing) {
         throw new BadRequestException(`User is already a participant in this assessment`);
+      }
+
+      // A 360 assessment has exactly one subject, fixed at creation.
+      if (assessment.assessmentType === AssessmentType.FEEDBACK_360) {
+        const count360 = await manager.count(AssessmentParticipant, { where: { assessmentId } });
+        if (count360 >= 1) {
+          throw new BadRequestException('Only one participant is allowed per 360-degree feedback assessment');
+        }
       }
 
       // Plan limits check (only checked during addParticipant for active/non-draft assessments)
@@ -364,6 +422,27 @@ export class EngineService {
       });
 
       const saved = await manager.save(participant);
+
+      // Auto-create the reviewee's own "self" perspective as a RaterNomination — the same
+      // mechanism every other 360 rater uses — so the take-assessment redirect always has
+      // somewhere to send them, instead of relying on an admin remembering to manually add
+      // "self" as a rater (previously the only way this ever got created).
+      if (assessment.assessmentType === AssessmentType.FEEDBACK_360) {
+        const tokenExpires = new Date();
+        tokenExpires.setDate(tokenExpires.getDate() + 14);
+        const selfNomination = manager.create(RaterNomination, {
+          assessmentId,
+          participantId: saved.id,
+          raterEmail: user.email.toLowerCase(),
+          raterName: `${user.firstName} ${user.lastName}`,
+          relationship: RaterRelationship.SELF,
+          token: uuidv4(),
+          status: 'approved',
+          tokenExpires,
+        });
+        await manager.save(selfNomination);
+      }
+
       this.logger.log(`Added participant ${userId} to assessment ${assessmentId}`);
       return saved;
     });
@@ -467,7 +546,12 @@ export class EngineService {
       order: { createdAt: 'DESC' },
     });
 
-    const participantAssessmentIds = new Set(participantItems.map((a) => a.id));
+    // Only exclude a nomination that IS the caller's own self-nomination (already
+    // represented above, with its token attached to the participant item) — not every
+    // nomination on an assessment the caller happens to also participate in. Excluding by
+    // assessmentId alone used to silently drop a legitimate "give feedback on someone else"
+    // invitation whenever the caller was also the 360 subject of that same assessment.
+    const ownParticipantIds = new Set(activeParticipations.map((p) => p.id));
 
     const raterItems = nominations
       .filter(
@@ -477,8 +561,7 @@ export class EngineService {
           n.assessment.status === AssessmentStatus.ACTIVE &&
           n.status !== 'declined' &&
           n.status !== 'pending' &&
-          // skip if user is already listed as a regular participant for same assessment
-          !participantAssessmentIds.has(n.assessmentId),
+          !(n.relationship === RaterRelationship.SELF && ownParticipantIds.has(n.participantId)),
       )
       .map((n) => ({
         ...n.assessment,

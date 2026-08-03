@@ -16,6 +16,7 @@ import { AssessmentParticipant } from '../engine/entities/assessment-participant
 import { Item } from '../items/entities/item.entity';
 import { ReadinessScoringService } from './readiness-scoring.service';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
+import { EngineService } from '../engine/engine.service';
 
 export interface CreateRoleProfileDto {
   title: string;
@@ -56,6 +57,7 @@ export class Uc4ReadinessService {
     @InjectRepository(Item)
     private readonly itemRepo: Repository<Item>,
     private readonly readinessScoringService: ReadinessScoringService,
+    private readonly engineService: EngineService,
   ) {}
 
   async getRoleProfiles(orgId: string): Promise<RoleProfile[]> {
@@ -281,6 +283,8 @@ export class Uc4ReadinessService {
     participantId: string,
     roleProfileId: string | null,
     orgId: string,
+    requestingUserId: string,
+    requestingUserRole: UserRole,
   ): Promise<ReadinessScore> {
     await this.assertAssessmentInOrg(assessmentId, orgId);
 
@@ -288,6 +292,7 @@ export class Uc4ReadinessService {
       where: { id: participantId, assessmentId },
     });
     if (!participant) throw new NotFoundException(`Participant ${participantId} not found`);
+    assertOwnerOrPrivileged(participant.userId, requestingUserId, requestingUserRole);
 
     const score = await this.readinessScoringService.calculateReadiness(
       assessmentId,
@@ -299,6 +304,8 @@ export class Uc4ReadinessService {
     participant.status = 'completed';
     participant.completedAt = new Date();
     await this.participantRepo.save(participant);
+
+    await this.engineService.maybeCloseAssessment(assessmentId);
 
     this.logger.log(
       `Computed readiness for participant ${participantId}: rating=${score.readinessRating} composite=${score.compositeScore}`,

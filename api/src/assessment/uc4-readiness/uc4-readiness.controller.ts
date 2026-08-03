@@ -124,7 +124,7 @@ export class Uc4ReadinessController {
   // ── Readiness Scoring ────────────────────────────────────────────────────
 
   @Post('assessments/:id/readiness/:participantId/compute')
-  @Roles(UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Compute readiness score for a participant against a role profile' })
   computeReadiness(
     @Request() req: any,
@@ -137,6 +137,8 @@ export class Uc4ReadinessController {
       participantId,
       roleProfileId ?? null,
       req.user.orgId,
+      req.user.sub,
+      req.user.role,
     );
   }
 

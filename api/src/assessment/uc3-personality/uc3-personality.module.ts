@@ -9,6 +9,7 @@ import { Item } from '../items/entities/item.entity';
 import { BigFiveScoringService } from './big-five-scoring.service';
 import { Uc3PersonalityService } from './uc3-personality.service';
 import { Uc3PersonalityController } from './uc3-personality.controller';
+import { EngineModule } from '../engine/engine.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { Uc3PersonalityController } from './uc3-personality.controller';
       AssessmentParticipant,
       Item,
     ]),
+    EngineModule,
   ],
   providers: [BigFiveScoringService, Uc3PersonalityService],
   controllers: [Uc3PersonalityController],

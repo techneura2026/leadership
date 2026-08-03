@@ -16,6 +16,7 @@ import { Competency } from '../items/entities/competency.entity';
 import { CompetencyDomain } from '../items/entities/competency-domain.entity';
 import { User } from '../../core/users/entities/user.entity';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
+import { EngineService } from '../engine/engine.service';
 
 interface RatingDto {
   competencyId: string;
@@ -68,6 +69,7 @@ export class Uc2CompetencyService {
     private readonly domainRepo: Repository<CompetencyDomain>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly engineService: EngineService,
   ) {}
 
   /**
@@ -237,6 +239,8 @@ export class Uc2CompetencyService {
       participant.completedAt = new Date();
       await this.participantRepo.save(participant);
     }
+
+    await this.engineService.maybeCloseAssessment(assessmentId);
 
     this.logger.log(`Submitted self-ratings for CA ${caId}`);
     return saved;

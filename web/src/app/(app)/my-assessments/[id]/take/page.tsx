@@ -720,6 +720,12 @@ export default function TakeAssessmentPage() {
           participantId={myParticipantRecord.id}
         />
       )}
+
+      {is360Assessment && !selfNomination?.selfRaterToken && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+          Your self-assessment link isn&apos;t ready yet — please contact your HR admin.
+        </div>
+      )}
     </div>
   );
 }
