@@ -26,9 +26,10 @@ api/        NestJS backend — all backend logic
 web/        Next.js frontend (the product app)
 shared/     Shared TypeScript types, enums, interfaces
 landing/    Next.js public landing site — independent app, own Next/React/Tailwind
-            versions, static-exported and deployed to Azure Static Web Apps (not the Tailwind-only
+            versions, static-exported and served by nginx on the Hostinger VPS (not the Tailwind-only
             / no-CSS-files rule below — it's a self-contained site with its own design system)
-infra/      Terraform IaC (infra/terraform)
+deploy/     deploy/hostinger — compose stack for the dev env on the shared Hostinger VPS
+infra/      Terraform IaC (infra/terraform) for the retired Azure dev environment
 ```
 
 ## Key Commands
@@ -165,5 +166,6 @@ Redis:    localhost:6379
 - [x] Phase 3 — PDF reporting (Puppeteer + Handlebars), BullMQ queue, report templates
 - [x] Phase 4 — UC4 readiness, analytics, succession dashboard (9-box)
 - [x] Phase 5 — 55 unit tests passing, Playwright E2E setup, build verified
-- [x] Landing site — landing page live on Azure Static Web Apps (infra/terraform)
-- [ ] Prod deployment — Azure resources (infra/terraform, VM + Static Web App provisioned for dev)
+- [x] Dev environment — app + landing on the shared Hostinger VPS, deployed by `deploy-dev.yml`
+      on push to `master` (moved off Azure 2026-10-02; see DEPLOYMENT-HOSTINGER.md)
+- [ ] Prod deployment

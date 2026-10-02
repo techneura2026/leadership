@@ -1,0 +1,23 @@
+# Build context for api/, web/ and landing/ Dockerfiles is the repo root. Those
+# Dockerfiles copy output that CI builds first (shared/dist, api/dist, web/.next,
+# web/public, landing/out), so keep everything else out — a bloated context can
+# wedge the Docker daemon on the shared VPS (see /opt/README.md there).
+**/node_modules
+.git
+.github
+.claude
+infra
+docs
+scratch
+test-results
+api/reports
+api/test
+web/tests
+**/coverage
+web/.next/cache
+landing/.next
+*.docx
+
+# Never bake local secrets into an image.
+**/.env
+**/.env.*

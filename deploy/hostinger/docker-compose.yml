@@ -1,0 +1,121 @@
+# LeaderPrism dev environment on the shared Hostinger VPS (187.127.182.104).
+#
+# Lives at /opt/leaderprism/docker-compose.yml on the VPS; .github/workflows/deploy-dev.yml
+# copies it (and api/src/database/init.sql, as ./init.sql) there on every push to
+# master. Follows the shared-VPS pattern in /opt/README.md on that box:
+#   - No published ports. BizOS's Caddy (/opt/bizos) owns 80/443 and
+#     reverse-proxies in over the shared external `edge` network; the site
+#     blocks for leaderprism.* and leaderprism-landing.* live in /opt/bizos/Caddyfile.
+#   - The services on `edge` are named leaderprism-*, because service names
+#     become DNS names on that shared network and plain `api` / `web` are
+#     already taken by other tenants there.
+#   - Secrets live only in /opt/leaderprism/.env on the VPS, never in this repo —
+#     see .env.example next to this file for the full list.
+#
+# Details: DEPLOYMENT-HOSTINGER.md at the repo root.
+
+name: leaderprism
+
+x-urls:
+  # One public host for web + API; Caddy sends /api/* to leaderprism-api.
+  app-url: &app-url https://leaderprism.187-127-182-104.sslip.io
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: leaderprism
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /opt/leaderprism/.env}
+      POSTGRES_DB: leaderprism
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # pgcrypto + pg_trgm, created once when the volume is first initialized.
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U leaderprism -d leaderprism']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Only reachable from this project's own network (not on `edge`), so no password.
+  # BullMQ (report generation queue) needs noeviction, not an LRU policy.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # NestJS API. Migrations and seeds are run by deploy-dev.yml in one-off
+  # containers of this image before it is restarted, not on startup.
+  leaderprism-api:
+    image: ghcr.io/techneura2026/leadership/api:dev-latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      # production turns on TypeORM's SSL; the database is local, so the URL
+      # turns it back off.
+      DATABASE_URL: postgresql://leaderprism:${POSTGRES_PASSWORD}@postgres:5432/leaderprism?sslmode=disable
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in /opt/leaderprism/.env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in /opt/leaderprism/.env}
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 30d
+      BCRYPT_ROUNDS: '10'
+      # CORS origin, and the base of links in emails (rater links, resets, logins).
+      WEB_URL: *app-url
+      APP_URL: *app-url
+      # Email is log-only while the connection string is empty.
+      AZURE_COMMUNICATION_CONNECTION_STRING: ${AZURE_COMMUNICATION_CONNECTION_STRING:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-LeaderPrism}
+    volumes:
+      # PdfService writes generated report PDFs to <cwd>/reports.
+      - reports:/app/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - edge
+
+  # Next.js app. NEXT_PUBLIC_API_URL and the /api rewrite target are baked in at
+  # build time by deploy-dev.yml; INTERNAL_API_URL here is for server-side calls.
+  leaderprism-web:
+    image: ghcr.io/techneura2026/leadership/web:dev-latest
+    restart: unless-stopped
+    environment:
+      INTERNAL_API_URL: http://leaderprism-api:3001
+      # AI assistant (src/app/chat-api); synced from the GitHub secret on deploy.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      - leaderprism-api
+    networks:
+      - default
+      - edge
+
+  # Public landing site — static export served by nginx.
+  leaderprism-landing:
+    image: ghcr.io/techneura2026/leadership/landing:dev-latest
+    restart: unless-stopped
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+
+volumes:
+  pgdata:
+  redisdata:
+  reports:

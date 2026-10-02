@@ -1,18 +1,41 @@
-name: Deploy to Dev VM
+name: Deploy LeaderPrism — Development (Hostinger VPS)
+
+# Dev moved off the Azure VM on 2026-10-02. This builds the api, web and landing
+# images, pushes them to GHCR, then SSHes into the shared Hostinger VPS, runs
+# migrations + seeds and restarts the compose project in /opt/leaderprism.
+# Server setup and secrets: DEPLOYMENT-HOSTINGER.md.
 
 on:
   push:
     branches: [master]
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Never let two deploys restart the same compose project at once.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  VM_HOST: 187.127.182.104
+  VM_USER: bizosadmin
+  APP_DIR: /opt/leaderprism
+  APP_URL: https://leaderprism.187-127-182-104.sslip.io
+  LANDING_URL: https://leaderprism-landing.187-127-182-104.sslip.io
 
 jobs:
-  deploy:
-    name: 'Deploy Apps'
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Build the apps, then package them into images and push to GHCR.
+  # The Dockerfiles copy this job's build output (shared/dist, api/dist,
+  # web/.next, landing/out) rather than building inside Docker.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Images
     runs-on: ubuntu-latest
-    environment: dev
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,106 +53,176 @@ jobs:
           npm run build -w shared
           npm run build -w api
 
+      # NEXT_PUBLIC_* are inlined into the browser bundle, and next.config.mjs
+      # bakes INTERNAL_API_URL into the /api rewrite at build time. It must be
+      # this project's service name: plain `api` on the VPS's shared edge
+      # network is another tenant's container.
       - name: Build web
         env:
-          NEXT_PUBLIC_API_URL: https://leaderprism-dev-app.centralus.cloudapp.azure.com/api/v1
-          INTERNAL_API_URL: http://api:3001
-          NEXT_PUBLIC_LANDING_URL: https://gentle-sea-02e23e510.7.azurestaticapps.net
+          NEXT_PUBLIC_API_URL: ${{ env.APP_URL }}/api/v1
+          INTERNAL_API_URL: http://leaderprism-api:3001
+          NEXT_PUBLIC_LANDING_URL: ${{ env.LANDING_URL }}
         run: npm run build -w web
 
-      - name: Create package tarball
+      - name: Build landing (static export)
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ env.APP_URL }}
+        run: npm run build -w landing
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # `context: .` (not the default git context) so the build output above is
+      # included; .dockerignore keeps node_modules and the rest out.
+      - name: Build and push api image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/api:dev-latest
+            ${{ env.IMAGE_PREFIX }}/api:sha-${{ steps.sha.outputs.short }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/web:dev-latest
+            ${{ env.IMAGE_PREFIX }}/web:sha-${{ steps.sha.outputs.short }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build and push landing image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: landing/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/landing:dev-latest
+            ${{ env.IMAGE_PREFIX }}/landing:sha-${{ steps.sha.outputs.short }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Migrate, seed and restart the compose project on the Hostinger VPS
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Hostinger VPS (dev)
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
         run: |
-          # Create a deployment package excluding unneeded source files and large dev node_modules
-          tar -czf deploy.tar.gz api/dist web/.next web/public shared/dist package.json package-lock.json docker-compose.yml api/package.json web/package.json shared/package.json api/src/database/seeds api/src/database/init.sql api/Dockerfile web/Dockerfile Caddyfile
+          if [ -z "$VM_SSH_KEY" ]; then
+            echo "::error::VM_SSH_KEY is not set — add the bizosadmin private key as a repository secret (see DEPLOYMENT-HOSTINGER.md)."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/id_vm
+          chmod 600 ~/.ssh/id_vm
+          ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
 
-      - name: Copy files to VM
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.DEV_VM_IP }}
-          username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "deploy.tar.gz"
-          target: "/home/ubuntu/app"
+      - name: Sync compose files
+        run: |
+          scp -i ~/.ssh/id_vm deploy/hostinger/docker-compose.yml \
+            "$VM_USER@$VM_HOST:$APP_DIR/docker-compose.yml"
+          scp -i ~/.ssh/id_vm api/src/database/init.sql \
+            "$VM_USER@$VM_HOST:$APP_DIR/init.sql"
 
-      - name: Deploy and start application on VM
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.DEV_VM_IP }}
-          username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -euo pipefail
+      # The one runtime secret kept in GitHub (it predates the move). Sent over
+      # stdin, never on a command line, and only rewritten when it changed.
+      - name: Sync OPENAI_API_KEY into .env
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY secret not set — leaving .env as is."
+            exit 0
+          fi
+          printf '%s' "$OPENAI_API_KEY" | ssh -i ~/.ssh/id_vm "$VM_USER@$VM_HOST" '
+            set -eu
+            cd /opt/leaderprism
+            k=$(cat)
+            grep -qxF "OPENAI_API_KEY=$k" .env && exit 0
+            umask 077
+            { grep -v "^OPENAI_API_KEY=" .env || true; printf "OPENAI_API_KEY=%s\n" "$k"; } > .env.tmp
+            mv .env.tmp .env'
 
-            # Create target folder and extract
-            mkdir -p /home/ubuntu/app
-            cd /home/ubuntu/app
-            tar -xzf deploy.tar.gz
-            rm deploy.tar.gz
-            
-            # Write environment variables
-            cat <<EOT > .env.new
-            DATABASE_URL=postgresql://leaderprism:leaderprism_dev@db:5432/leaderprism?sslmode=disable
-            REDIS_URL=redis://redis:6379
-            JWT_ACCESS_SECRET=${{ secrets.JWT_ACCESS_SECRET }}
-            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-            JWT_ACCESS_EXPIRY=15m
-            JWT_REFRESH_EXPIRY=30d
-            BCRYPT_ROUNDS=10
-            PORT=3001
-            NODE_ENV=production
-            FQDN=leaderprism-dev-app.centralus.cloudapp.azure.com
-            APP_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com
-            WEB_URL=https://leaderprism-dev-app.centralus.cloudapp.azure.com
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
-            AZURE_STORAGE_CONTAINER_REPORTS=reports
-            AZURE_STORAGE_CONTAINER_UPLOADS=uploads
-            AZURE_COMMUNICATION_CONNECTION_STRING=${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}
-            EMAIL_FROM=${{ secrets.EMAIL_FROM }}
-            EMAIL_FROM_NAME=LeaderPrism
-            EOT
+      # Migrations and seeds run in one-off containers of the new API image,
+      # before the running API is replaced. The seeds are idempotent.
+      # The VPS's docker is normally already logged in to GHCR; GHCR_PULL_TOKEN
+      # (a PAT with read:packages) is only needed if that login ever lapses.
+      - name: Pull, migrate, seed and restart
+        env:
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          if [ -n "$GHCR_PULL_TOKEN" ]; then
+            echo "$GHCR_PULL_TOKEN" | ssh -i ~/.ssh/id_vm "$VM_USER@$VM_HOST" \
+              "docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin"
+          fi
+          ssh -i ~/.ssh/id_vm "$VM_USER@$VM_HOST" '
+            set -eu
+            cd /opt/leaderprism
+            docker compose pull leaderprism-api leaderprism-web leaderprism-landing
+            docker compose up -d --wait postgres redis
+            docker compose run --rm --no-deps -T leaderprism-api \
+              npx typeorm migration:run -d api/dist/api/src/database/data-source.js
+            docker compose run --rm --no-deps -T leaderprism-api \
+              node api/dist/api/src/database/seeds/run-seeds.js
+            docker compose run --rm --no-deps -T leaderprism-api \
+              node api/dist/api/src/database/seeds/run-thrivehive-seed.js
+            docker compose up -d --remove-orphans
+            # Superseded dev-latest images of this repo only — never a blanket prune
+            # on this shared box (see /opt/README.md).
+            docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/techneura2026/leadership"'
 
-            if [ -f .env ]; then
-              if [ -z "${{ secrets.AZURE_COMMUNICATION_CONNECTION_STRING }}" ]; then
-                EXISTING_ACS=$(grep '^AZURE_COMMUNICATION_CONNECTION_STRING=' .env | cut -d'=' -f2- || true)
-                if [ -n "$EXISTING_ACS" ]; then
-                  sed -i "s|^AZURE_COMMUNICATION_CONNECTION_STRING=.*|AZURE_COMMUNICATION_CONNECTION_STRING=$EXISTING_ACS|" .env.new
-                fi
+      # There is no health endpoint: any non-5xx answer from a guarded API route
+      # (normally 401) means Nest is up. Caddy answers 502 while it is not.
+      - name: Health check
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$APP_URL/api/v1/organisations/me" || true)
+            if [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then
+              echo "✅ API up (HTTP $code)"
+              if ! curl -fsS --max-time 15 -o /dev/null "$APP_URL/login"; then
+                echo "::error::Web not responding — check: cd $APP_DIR && docker compose logs leaderprism-web"
+                exit 1
               fi
-              if [ -z "${{ secrets.EMAIL_FROM }}" ]; then
-                EXISTING_FROM=$(grep '^EMAIL_FROM=' .env | cut -d'=' -f2- || true)
-                if [ -n "$EXISTING_FROM" ]; then
-                  sed -i "s|^EMAIL_FROM=.*|EMAIL_FROM=$EXISTING_FROM|" .env.new
-                fi
+              echo "✅ Web responding"
+              if ! curl -fsS --max-time 15 -o /dev/null "$LANDING_URL/"; then
+                echo "::error::Landing not responding — check: cd $APP_DIR && docker compose logs leaderprism-landing"
+                exit 1
               fi
-              if [ -z "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" ]; then
-                EXISTING_ST=$(grep '^AZURE_STORAGE_CONNECTION_STRING=' .env | cut -d'=' -f2- || true)
-                if [ -n "$EXISTING_ST" ]; then
-                  sed -i "s|^AZURE_STORAGE_CONNECTION_STRING=.*|AZURE_STORAGE_CONNECTION_STRING=$EXISTING_ST|" .env.new
-                fi
-              fi
+              echo "✅ Landing responding"
+              exit 0
             fi
-            mv .env.new .env
-            
-            # Stop existing PM2 processes if any
-            pm2 delete all || true
-            pm2 save || true
-            
-            # Start everything via Docker Compose
-            docker compose up --build -d
-            
-            # Wait for DB to be healthy
-            echo "Waiting for database to be ready..."
-            until docker compose exec -T db pg_isready -U leaderprism; do
-              sleep 1
-            done
-            
-            # Wait for API to be up before running migrations (it usually connects to DB)
-            sleep 5
-            
-            # Run database migrations
-            docker compose exec -T api npx typeorm migration:run -d api/dist/api/src/database/data-source.js
-
-            # Run database seeds
-            docker compose exec -T api node api/dist/api/src/database/seeds/run-seeds.js
-            docker compose exec -T api node api/dist/api/src/database/seeds/run-thrivehive-seed.js
+            echo "Waiting for API ($i/30, last HTTP $code)..."
+            sleep 10
+          done
+          echo "::error::API did not come up — check: cd $APP_DIR && docker compose logs leaderprism-api"
+          ssh -i ~/.ssh/id_vm "$VM_USER@$VM_HOST" "cd $APP_DIR && docker compose ps && docker compose logs --tail 80 leaderprism-api"
+          exit 1

@@ -20,11 +20,11 @@ export function getLandingUrl(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      return 'https://gentle-sea-02e23e510.7.azurestaticapps.net';
+      return 'https://leaderprism-landing.187-127-182-104.sslip.io';
     }
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://gentle-sea-02e23e510.7.azurestaticapps.net';
+    return 'https://leaderprism-landing.187-127-182-104.sslip.io';
   }
   return 'http://localhost:3002';
 }
