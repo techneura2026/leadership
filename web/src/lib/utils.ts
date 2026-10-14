@@ -20,11 +20,11 @@ export function getLandingUrl(): string {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      return 'https://leaderprism-landing.187-127-182-104.sslip.io';
+      return 'https://leaderprism-landing.techneura.ai';
     }
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://leaderprism-landing.187-127-182-104.sslip.io';
+    return 'https://leaderprism-landing.techneura.ai';
   }
   return 'http://localhost:3002';
 }

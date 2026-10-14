@@ -20,8 +20,8 @@ env:
   VM_HOST: 187.127.182.104
   VM_USER: bizosadmin
   APP_DIR: /opt/leaderprism
-  APP_URL: https://leaderprism.187-127-182-104.sslip.io
-  LANDING_URL: https://leaderprism-landing.187-127-182-104.sslip.io
+  APP_URL: https://leaderprism.techneura.ai
+  LANDING_URL: https://leaderprism-landing.techneura.ai
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────

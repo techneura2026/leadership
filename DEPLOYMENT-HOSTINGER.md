@@ -14,9 +14,9 @@ anything outside `/opt/leaderprism/`.
 
 | | |
 | :--- | :--- |
-| App (web + API) | https://leaderprism.187-127-182-104.sslip.io |
-| API base | https://leaderprism.187-127-182-104.sslip.io/api/v1 |
-| Landing | https://leaderprism-landing.187-127-182-104.sslip.io |
+| App (web + API) | https://leaderprism.techneura.ai |
+| API base | https://leaderprism.techneura.ai/api/v1 |
+| Landing | https://leaderprism-landing.techneura.ai |
 | VPS | `187.127.182.104`, SSH as `bizosadmin` (key-only; get the key from the team vault) |
 | Directory | `/opt/leaderprism/` — `docker-compose.yml`, `init.sql`, `.env` |
 | Deployed by | `.github/workflows/deploy-dev.yml` on every push to `master` |
