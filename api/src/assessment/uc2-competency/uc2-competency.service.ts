@@ -432,6 +432,66 @@ export class Uc2CompetencyService {
     return results;
   }
 
+  /**
+   * Self and manager levels per competency, with the manager's evidence and development comment —
+   * for the HRIS export (internal callers only; org-checked by the assessment's organisationId).
+   */
+  async getRatingsDetail(
+    assessmentId: string,
+    participantId: string,
+    orgId: string,
+  ): Promise<
+    Array<{
+      competencyId: string;
+      competencyName: string;
+      domainName: string;
+      selfLevel: number | null;
+      managerLevel: number | null;
+      managerEvidence: string | null;
+      developmentComment: string | null;
+    }>
+  > {
+    const assessment = await this.assessmentRepo.findOne({ where: { id: assessmentId, organisationId: orgId } });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+
+    const cas = await this.caRepo.find({
+      where: { assessmentId, participantId },
+      relations: ['ratings', 'ratings.competency', 'ratings.competency.domain'],
+    });
+    const self = cas.find((c) => c.assessorType === 'self' && c.submittedAt);
+    const manager = cas.find((c) => c.assessorType === 'manager' && c.submittedAt);
+
+    const rows = new Map<string, {
+      competencyId: string; competencyName: string; domainName: string;
+      selfLevel: number | null; managerLevel: number | null;
+      managerEvidence: string | null; developmentComment: string | null;
+    }>();
+    const row = (r: CompetencyRating) => {
+      let e = rows.get(r.competencyId);
+      if (!e) {
+        e = {
+          competencyId: r.competencyId,
+          competencyName: r.competency?.name ?? '',
+          domainName: r.competency?.domain?.name ?? '',
+          selfLevel: null,
+          managerLevel: null,
+          managerEvidence: null,
+          developmentComment: null,
+        };
+        rows.set(r.competencyId, e);
+      }
+      return e;
+    };
+    for (const r of self?.ratings ?? []) row(r).selfLevel = r.levelRated;
+    for (const r of manager?.ratings ?? []) {
+      const e = row(r);
+      e.managerLevel = r.levelRated;
+      e.managerEvidence = r.evidenceText;
+      e.developmentComment = r.developmentComment;
+    }
+    return [...rows.values()];
+  }
+
   async getCompetencyProfile(
     assessmentId: string,
     participantId: string,
