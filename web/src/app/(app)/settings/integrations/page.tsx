@@ -3,6 +3,7 @@
 import { UserRole } from '@leaderprism/shared';
 import { useAuthStore } from '@/store/auth.store';
 import { ApiKeysSection } from './_components/ApiKeysSection';
+import { WebhooksSection } from './_components/WebhooksSection';
 
 export default function IntegrationsSettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -25,6 +26,7 @@ export default function IntegrationsSettingsPage() {
         </p>
       </div>
       <ApiKeysSection />
+      <WebhooksSection />
     </div>
   );
 }

@@ -42,4 +42,22 @@ test.describe('Settings → Integrations', () => {
     await row.getByRole('button', { name: 'Revoke' }).click();
     await expect(row).toContainText('Revoked');
   });
+
+  test('admin adds a webhook endpoint, sees its secret once, and a test ping is logged', async ({ page }) => {
+    await registerAdmin(page);
+    await page.goto('/settings/integrations');
+    await expect(page.getByRole('heading', { name: 'Webhooks' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add endpoint' }).click();
+    await page.getByLabel('Endpoint URL').fill('http://localhost:4599/leaderprism-hook');
+    await page.getByLabel('assessment.closed').check();
+    await page.getByRole('button', { name: 'Save endpoint' }).click();
+
+    await expect(page.getByTestId('new-webhook-secret')).toHaveText(/^whsec_/);
+    const endpointRow = page.getByRole('row', { name: /localhost:4599/ });
+    await expect(endpointRow).toContainText('assessment.closed');
+
+    await endpointRow.getByRole('button', { name: 'Send test' }).click();
+    await expect(page.getByTestId('deliveries').getByRole('row', { name: /ping/ })).toBeVisible();
+  });
 });
