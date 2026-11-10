@@ -16,7 +16,8 @@ import { Uc1FeedbackModule } from '../assessment/uc1-feedback/uc1-feedback.modul
 import { Uc2CompetencyModule } from '../assessment/uc2-competency/uc2-competency.module';
 import { Uc4ReadinessModule } from '../assessment/uc4-readiness/uc4-readiness.module';
 import { ItemsModule } from '../assessment/items/items.module';
-import { HrisResultsController } from './hris/hris-results.controller';
+import { HrisReportFilesController, HrisResultsController } from './hris/hris-results.controller';
+import { ReportingModule } from '../reporting/reporting.module';
 import { HrisResultsService } from './hris/hris-results.service';
 
 /**
@@ -25,8 +26,9 @@ import { HrisResultsService } from './hris/hris-results.service';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule, UsersModule, EngineModule, Uc1FeedbackModule,
-    Uc2CompetencyModule, Uc4ReadinessModule, ItemsModule],
+    Uc2CompetencyModule, Uc4ReadinessModule, ItemsModule, ReportingModule],
   providers: [ApiClientsService, ApiKeyGuard, HrisSyncService, HrisAssessmentsService, HrisResultsService],
-  controllers: [ApiClientsController, HrisPingController, HrisSyncController, HrisAssessmentsController, HrisResultsController],
+  controllers: [ApiClientsController, HrisPingController, HrisSyncController, HrisAssessmentsController, HrisResultsController,
+    HrisReportFilesController],
 })
 export class IntegrationsModule {}

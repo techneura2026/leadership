@@ -151,6 +151,51 @@ describe('[HRIS-RES] results export', () => {
     await getResults(other.key, 'cycleRef=2027-H1&employeeRef=R-1').expect(404);
   });
 
+  describe('report links (Task 13)', () => {
+    let reportUrl: string;
+
+    it('POST reports queues a competency report; once ready, results.reports carries a signed URL', async () => {
+      const res = await req(app).post('/api/v1/integrations/hris/reports').set('X-Api-Key', key)
+        .send({ cycleRef: '2027-H1', employeeRef: 'R-1', type: 'competency' });
+      expect([200, 201]).toContain(res.status);
+      expect(res.body.data.reportId).toBeDefined();
+
+      const deadline = Date.now() + 45_000;
+      let links: any[] = [];
+      while (Date.now() < deadline) {
+        links = (await getResults(key, 'cycleRef=2027-H1&employeeRef=R-1').expect(200)).body.data.reports;
+        if (links.length > 0) break;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      expect(links).toHaveLength(1);
+      expect(links[0]).toMatchObject({ reportId: res.body.data.reportId, type: 'competency' });
+      expect(links[0].url).toMatch(/\/api\/v1\/integrations\/hris\/report-files\/.+\?exp=\d+&sig=[0-9a-f]{64}$/);
+      expect(new Date(links[0].expiresAt).getTime()).toBeGreaterThan(Date.now());
+      reportUrl = links[0].url;
+    });
+
+    it('the signed URL downloads the PDF without an API key', async () => {
+      const u = new URL(reportUrl);
+      const res = await req(app).get(u.pathname + u.search).expect(200);
+      expect(res.headers['content-type']).toContain('application/pdf');
+    });
+
+    it('a tampered signature → 403', async () => {
+      const u = new URL(reportUrl);
+      const sig = u.searchParams.get('sig')!;
+      u.searchParams.set('sig', (sig[0] === 'a' ? 'b' : 'a') + sig.slice(1));
+      await req(app).get(u.pathname + u.search).expect(403);
+    });
+
+    it('an unknown employee for a report request → 404, and reports:read is required', async () => {
+      await req(app).post('/api/v1/integrations/hris/reports').set('X-Api-Key', key)
+        .send({ cycleRef: '2027-H1', employeeRef: 'M-1', type: 'competency' }).expect(404);
+      const ro = await authPost(app, org.admin, '/api/v1/integrations/api-clients', { name: 'R', scopes: ['results:read'] }).expect(201);
+      await req(app).post('/api/v1/integrations/hris/reports').set('X-Api-Key', ro.body.data.rawKey)
+        .send({ cycleRef: '2027-H1', employeeRef: 'R-1', type: 'competency' }).expect(403);
+    });
+  });
+
   it('requires the results:read scope', async () => {
     const res = await authPost(app, org.admin, '/api/v1/integrations/api-clients', { name: 'W', scopes: ['employees:write'] }).expect(201);
     await getResults(res.body.data.rawKey, 'cycleRef=2027-H1&employeeRef=R-1').expect(403);

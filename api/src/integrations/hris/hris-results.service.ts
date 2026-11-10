@@ -1,5 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { AssessmentStatus, AssessmentType } from '@leaderprism/shared';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AssessmentStatus, AssessmentType, ReportType } from '@leaderprism/shared';
+import { ReportingService } from '../../reporting/reporting.service';
+import type { IntegrationPrincipal } from '../api-clients/api-clients.service';
+import { signReportUrl, verifyReportSignature } from './signed-url';
 import type { AssessmentConfig, EmployeeResultDto, ResultsPageDto } from '@leaderprism/shared';
 import { EngineService } from '../../assessment/engine/engine.service';
 import { Assessment } from '../../assessment/engine/entities/assessment.entity';
@@ -14,6 +18,7 @@ import { ExportNomination, toOthersAggregate } from './feedback-export';
 const DEFAULT_RATER_THRESHOLD = 3;
 const DEFAULT_360_SCALE = 5;
 const FINAL_STATUSES: AssessmentStatus[] = [AssessmentStatus.CLOSED, AssessmentStatus.ARCHIVED];
+const REPORT_LINK_TTL_SECONDS = 900;
 
 /** Builds the spec §6 results payload (O-1, O-2, O-3) for an HRIS review cycle. */
 @Injectable()
@@ -27,6 +32,8 @@ export class HrisResultsService {
     private readonly competency: Uc2CompetencyService,
     private readonly readiness: Uc4ReadinessService,
     private readonly items: ItemsService,
+    private readonly reporting: ReportingService,
+    private readonly config: ConfigService,
   ) {}
 
   async getEmployeeResult(orgId: string, cycleRef: string, employeeRef: string): Promise<EmployeeResultDto> {
@@ -128,6 +135,16 @@ export class HrisResultsService {
       });
     }
 
+    const reports: EmployeeResultDto['reports'] = [];
+    for (const a of mine) {
+      const participantId = participantIn(a).id;
+      for (const r of await this.reporting.listReports(orgId, a.id)) {
+        if (r.status !== 'ready' || r.participantId !== participantId) continue;
+        const { url, expiresAt } = signReportUrl(this.publicUrl(), r.id, REPORT_LINK_TTL_SECONDS, this.signingSecret());
+        reports.push({ reportId: r.id, type: r.reportType, url, expiresAt });
+      }
+    }
+
     return {
       employeeRef,
       cycleRef,
@@ -135,8 +152,47 @@ export class HrisResultsService {
       assessmentIds: mine.map((a) => a.id),
       competency,
       feedback360,
-      reports: [],
+      reports,
     };
+  }
+
+  /** Queues a PDF report for one employee in a cycle (O-8). It appears in `reports` once ready. */
+  async requestReport(
+    principal: IntegrationPrincipal,
+    dto: { cycleRef: string; employeeRef: string; type: 'competency' | 'individual_360' },
+  ): Promise<{ reportId: string; status: string }> {
+    const orgId = principal.orgId;
+    const cycle = await this.loadCycle(orgId, dto.cycleRef);
+    const userId = cycle.userIdByRef.get(dto.employeeRef);
+    if (!userId) throw new NotFoundException(`Employee ${dto.employeeRef} is not part of cycle ${dto.cycleRef}`);
+    const assessmentType = dto.type === 'competency' ? AssessmentType.COMPETENCY : AssessmentType.FEEDBACK_360;
+    const assessment = cycle.assessments.find(
+      (a) => a.assessmentType === assessmentType && (a.participants ?? []).some((p) => p.userId === userId),
+    );
+    if (!assessment) throw new NotFoundException(`No ${dto.type} assessment for ${dto.employeeRef} in cycle ${dto.cycleRef}`);
+    const participant = assessment.participants.find((p) => p.userId === userId)!;
+    const generatedBy = principal.createdBy ?? (await this.users.findFirstOrgAdminId(orgId)) ?? assessment.createdBy;
+    const reportType = dto.type === 'competency' ? ReportType.COMPETENCY : ReportType.INDIVIDUAL_360;
+    const report = await this.reporting.requestReport(orgId, assessment.id, participant.id, reportType, 'en', generatedBy);
+    return { reportId: report.id, status: report.status };
+  }
+
+  /** Resolves a verified signed link to the stored file (local path or blob URL). */
+  async resolveSignedReport(reportId: string, exp: string, sig: string): Promise<string> {
+    if (!verifyReportSignature(reportId, exp, sig, this.signingSecret())) {
+      throw new ForbiddenException('Invalid or expired report link');
+    }
+    const path = await this.reporting.getDownloadPathForSignedLink(reportId);
+    if (!path) throw new NotFoundException('Report not found');
+    return path;
+  }
+
+  private signingSecret(): string {
+    return this.config.getOrThrow<string>('INTEGRATION_URL_SIGNING_SECRET');
+  }
+
+  private publicUrl(): string {
+    return this.config.get<string>('API_PUBLIC_URL', 'http://localhost:3001');
   }
 
   private async roleProfile(orgId: string, id: string, cache: Map<string, ExportRoleProfile | null>) {
