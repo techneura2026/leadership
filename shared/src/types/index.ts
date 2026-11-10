@@ -2,6 +2,7 @@ import { AssessmentStatus, AssessmentType, Language, Plan, RaterRelationship, Re
 import { FormQuestion } from './formQuestion';
 
 export * from './formQuestion';
+export * from './integrations';
 
 // ── API Response envelope ────────────────────────────────────
 

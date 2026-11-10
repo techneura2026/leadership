@@ -18,6 +18,7 @@ import { Uc4ReadinessModule } from './assessment/uc4-readiness/uc4-readiness.mod
 import { ReportingModule } from './reporting/reporting.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SuccessionModule } from './succession/succession.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { MustChangePasswordGuard } from './core/auth/guards/must-change-password.guard';
 
 @Module({
@@ -62,6 +63,7 @@ import { MustChangePasswordGuard } from './core/auth/guards/must-change-password
     ReportingModule,
     AnalyticsModule,
     SuccessionModule,
+    IntegrationsModule,
   ],
   providers: [
     // Binds the ThrottlerModule's per-route @Throttle() decorators (and the
