@@ -433,10 +433,11 @@ export class ReportingService {
    * Download path for a report reached through an HRIS signed link. Deliberately not org-scoped:
    * the caller must have verified the link's HMAC signature first (integrations/hris/signed-url.ts).
    */
-  async getDownloadPathForSignedLink(id: string): Promise<string | null> {
+  async getDownloadPathForSignedLink(id: string): Promise<{ path: string; orgId: string } | null> {
     const report = await this.reportRepo.findOne({ where: { id } });
     if (!report || report.status !== 'ready') return null;
-    return report.localPath ?? report.blobUrl ?? null;
+    const path = report.localPath ?? report.blobUrl;
+    return path ? { path, orgId: report.organisationId } : null;
   }
 
   async listReports(orgId: string, assessmentId?: string): Promise<Report[]> {

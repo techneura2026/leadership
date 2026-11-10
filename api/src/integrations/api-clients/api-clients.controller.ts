@@ -43,7 +43,7 @@ export class ApiClientsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke an integration API client' })
-  async revoke(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
-    await this.apiClients.revoke(orgId, id);
+  async revoke(@CurrentOrgId() orgId: string, @CurrentUser() user: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
+    await this.apiClients.revoke(orgId, id, user.sub);
   }
 }

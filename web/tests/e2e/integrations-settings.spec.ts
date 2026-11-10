@@ -43,6 +43,24 @@ test.describe('Settings → Integrations', () => {
     await expect(row).toContainText('Revoked');
   });
 
+  test('the audit log shows integration changes and can be filtered', async ({ page }) => {
+    await registerAdmin(page);
+    await page.goto('/settings/integrations');
+    await page.getByRole('button', { name: 'Create API key' }).click();
+    await page.getByLabel('Key name').fill('Audited HRIS');
+    await page.getByLabel('results:read').check();
+    await page.getByRole('button', { name: 'Create key' }).click();
+    await expect(page.getByTestId('new-api-key')).toBeVisible();
+
+    await page.goto('/settings/audit-log');
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+    const row = page.getByRole('row', { name: /integration\.api_client\.created/ });
+    await expect(row).toBeVisible();
+    await page.getByLabel('Action').fill('nothing.matches');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page.getByText('No audit entries match.')).toBeVisible();
+  });
+
   test('admin adds a webhook endpoint, sees its secret once, and a test ping is logged', async ({ page }) => {
     await registerAdmin(page);
     await page.goto('/settings/integrations');

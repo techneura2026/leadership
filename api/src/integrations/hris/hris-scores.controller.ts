@@ -5,7 +5,9 @@ import { ArrayMaxSize, IsArray, IsDateString, IsNumber, IsOptional, IsString, Ma
 import type { SyncRowResult } from '@leaderprism/shared';
 import { ApiKeyGuard } from '../api-clients/api-key.guard';
 import { RequireScopes } from '../api-clients/require-scopes.decorator';
-import { IntegrationOrgId } from '../api-clients/integration-context.decorator';
+import { IntegrationContext } from '../api-clients/integration-context.decorator';
+import type { IntegrationPrincipal } from '../api-clients/api-clients.service';
+import { AuditService } from '../../core/audit/audit.service';
 import { UsersService } from '../../core/users/users.service';
 import { Uc4ReadinessService } from '../../assessment/uc4-readiness/uc4-readiness.service';
 
@@ -40,13 +42,15 @@ export class HrisScoresController {
   constructor(
     private readonly users: UsersService,
     private readonly readiness: Uc4ReadinessService,
+    private readonly audit: AuditService,
   ) {}
 
   @Put('performance-scores')
   @HttpCode(HttpStatus.OK)
   @RequireScopes('scores:write')
   @ApiOperation({ summary: 'Final calibrated performance scores per employee for a cycle — sets the 9-box performance axis' })
-  async put(@IntegrationOrgId() orgId: string, @Body() dto: PerformanceScoresDto): Promise<{ results: SyncRowResult[] }> {
+  async put(@IntegrationContext() principal: IntegrationPrincipal, @Body() dto: PerformanceScoresDto): Promise<{ results: SyncRowResult[] }> {
+    const orgId = principal.orgId;
     const found = await this.users.findByExternalRefs(orgId, dto.scores.map((s) => s.employeeRef));
     const byRef = new Map(found.map((u) => [u.externalRef as string, u.id]));
     const results: SyncRowResult[] = [];
@@ -61,6 +65,11 @@ export class HrisScoresController {
       }
     }
     await this.readiness.upsertExternalPerformanceScores(orgId, rows);
+    await this.audit.record({
+      orgId, actorType: 'api_client', actorId: principal.clientId, action: 'integration.performance_scores.received',
+      entityType: 'cycle', entityId: dto.cycleRef,
+      metadata: { rows: dto.scores.length, applied: rows.length, errors: results.filter((r) => r.status === 'error').length },
+    });
     return { results };
   }
 }

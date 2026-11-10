@@ -6,6 +6,7 @@ import type { ApiClientDto, CreatedApiClientDto, IntegrationScope } from '@leade
 import { ApiClient } from './api-client.entity';
 import { generateApiKey, hashSecret, parseApiKey } from './key-format';
 import { OrganisationsService } from '../../core/organisations/organisations.service';
+import { AuditService } from '../../core/audit/audit.service';
 
 export interface IntegrationPrincipal {
   orgId: string;
@@ -25,6 +26,7 @@ export class ApiClientsService {
     @InjectRepository(ApiClient)
     private readonly clientRepo: Repository<ApiClient>,
     private readonly orgsService: OrganisationsService,
+    private readonly audit: AuditService,
   ) {}
 
   async create(
@@ -44,6 +46,7 @@ export class ApiClientsService {
       }),
     );
     this.logger.log(`Created API client ${client.id} org=${orgId} scopes=${client.scopes.join(',')}`);
+    await this.audit.record({ orgId, actorType: 'user', actorId: userId, action: 'integration.api_client.created', entityType: 'api_client', entityId: client.id, after: { name: client.name, scopes: client.scopes } });
     return { ...this.toDto(client), rawKey: key.raw };
   }
 
@@ -52,13 +55,14 @@ export class ApiClientsService {
     return clients.map((c) => this.toDto(c));
   }
 
-  async revoke(orgId: string, id: string): Promise<void> {
+  async revoke(orgId: string, id: string, userId: string): Promise<void> {
     const client = await this.clientRepo.findOne({ where: { id, organisationId: orgId } });
     if (!client) throw new NotFoundException('API client not found');
     if (!client.revokedAt) {
       client.revokedAt = new Date();
       await this.clientRepo.save(client);
       this.logger.log(`Revoked API client ${id} org=${orgId}`);
+      await this.audit.record({ orgId, actorType: 'user', actorId: userId, action: 'integration.api_client.revoked', entityType: 'api_client', entityId: id });
     }
   }
 

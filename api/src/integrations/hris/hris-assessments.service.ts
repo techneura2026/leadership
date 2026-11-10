@@ -3,6 +3,7 @@ import { AssessmentStatus, AssessmentType, RaterRelationship, UserRole } from '@
 import type { AssessmentConfig } from '@leaderprism/shared';
 import { EngineService } from '../../assessment/engine/engine.service';
 import { Uc1FeedbackService } from '../../assessment/uc1-feedback/uc1-feedback.service';
+import { AuditService } from '../../core/audit/audit.service';
 import { Assessment } from '../../assessment/engine/entities/assessment.entity';
 import { User } from '../../core/users/entities/user.entity';
 import { UsersService } from '../../core/users/users.service';
@@ -20,6 +21,7 @@ export class HrisAssessmentsService {
     private readonly engine: EngineService,
     private readonly users: UsersService,
     private readonly feedback: Uc1FeedbackService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Creates (or extends, idempotently) the LeaderPrism assessments for one HRIS review cycle. */
@@ -89,6 +91,11 @@ export class HrisAssessmentsService {
     this.logger.log(
       `HRIS assessment request org=${orgId} cycle=${dto.cycleRef} types=${dto.types.join(',')} employees=${employees.length}`,
     );
+    await this.audit.record({
+      orgId, actorType: 'api_client', actorId: principal.clientId, action: 'integration.assessments.requested', entityType: 'cycle',
+      entityId: dto.cycleRef,
+      metadata: { types: dto.types, employees: employees.length, created: result.assessments.filter((a) => a.created).map((a) => a.assessmentId) },
+    });
     return result;
   }
 

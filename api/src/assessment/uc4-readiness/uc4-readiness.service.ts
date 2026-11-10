@@ -13,6 +13,7 @@ import { LearningAgilityResponse } from './entities/learning-agility-response.en
 import { ReadinessScore, effectiveGridPerformance, performanceSource } from './entities/readiness-score.entity';
 import { ExternalPerformanceScore } from './entities/external-performance-score.entity';
 import { DomainEvent, DomainEventBus, ReadinessComputedPayload } from '../../shared/events/domain-events';
+import { AuditService } from '../../core/audit/audit.service';
 
 export interface TalentSnapshot {
   readiness: {
@@ -80,6 +81,7 @@ export class Uc4ReadinessService {
     private readonly readinessScoringService: ReadinessScoringService,
     private readonly engineService: EngineService,
     private readonly events: DomainEventBus,
+    private readonly audit: AuditService,
   ) {}
 
   /** HRIS final performance scores (one per employee per cycle; a repeat overwrites, e.g. after an appeal). */
@@ -680,6 +682,7 @@ export class Uc4ReadinessService {
     if (!score || score.assessment?.organisationId !== orgId) {
       throw new NotFoundException(`Readiness score ${readinessScoreId} not found`);
     }
+    const before = { manualGridPerformance: score.manualGridPerformance, manualPerformanceNote: score.manualPerformanceNote };
 
     if (gridPerformance === null) {
       score.manualGridPerformance = null;
@@ -697,6 +700,17 @@ export class Uc4ReadinessService {
     this.logger.log(
       `${gridPerformance === null ? 'Cleared' : 'Set'} performance override on readiness score ${readinessScoreId}`,
     );
+    await this.audit.record({
+      orgId,
+      actorType: 'user',
+      actorId: setById,
+      action: gridPerformance === null ? 'talent.performance_override.cleared' : 'talent.performance_override.set',
+      entityType: 'readiness_score',
+      entityId: readinessScoreId,
+      before,
+      after: { manualGridPerformance: saved.manualGridPerformance, manualPerformanceNote: saved.manualPerformanceNote },
+      reason: note,
+    });
     return saved;
   }
 }

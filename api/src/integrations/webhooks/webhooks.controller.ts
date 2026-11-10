@@ -2,10 +2,11 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ArrayMinSize, IsArray, IsString, MaxLength } from 'class-validator';
-import { UserRole } from '@leaderprism/shared';
+import { AccessTokenPayload, UserRole } from '@leaderprism/shared';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
-import { CurrentOrgId } from '../../shared/decorators/current-user.decorator';
+import { CurrentOrgId, CurrentUser } from '../../shared/decorators/current-user.decorator';
+import { AuditService } from '../../core/audit/audit.service';
 import { WebhooksService } from './webhooks.service';
 import { DomainEventListener } from './domain-event.listener';
 
@@ -25,12 +26,18 @@ export class WebhooksController {
   constructor(
     private readonly webhooks: WebhooksService,
     private readonly listener: DomainEventListener,
+    private readonly audit: AuditService,
   ) {}
 
   @Post()
   @ApiOperation({ summary: 'Register a webhook endpoint (the signing secret is returned only once)' })
-  create(@CurrentOrgId() orgId: string, @Body() dto: CreateWebhookDto) {
-    return this.webhooks.create(orgId, dto);
+  async create(@CurrentOrgId() orgId: string, @CurrentUser() user: AccessTokenPayload, @Body() dto: CreateWebhookDto) {
+    const created = await this.webhooks.create(orgId, dto);
+    await this.audit.record({
+      orgId, actorType: 'user', actorId: user.sub, action: 'integration.webhook.created', entityType: 'webhook_endpoint',
+      entityId: created.id, after: { url: created.url, events: created.events },
+    });
+    return created;
   }
 
   @Get()
@@ -54,7 +61,8 @@ export class WebhooksController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a webhook endpoint' })
-  async remove(@CurrentOrgId() orgId: string, @Param('id', ParseUUIDPipe) id: string) {
+  async remove(@CurrentOrgId() orgId: string, @CurrentUser() user: AccessTokenPayload, @Param('id', ParseUUIDPipe) id: string) {
     await this.webhooks.remove(orgId, id);
+    await this.audit.record({ orgId, actorType: 'user', actorId: user.sub, action: 'integration.webhook.deleted', entityType: 'webhook_endpoint', entityId: id });
   }
 }

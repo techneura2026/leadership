@@ -9,6 +9,7 @@ import { RequireScopes } from '../api-clients/require-scopes.decorator';
 import { IntegrationContext, IntegrationOrgId } from '../api-clients/integration-context.decorator';
 import type { IntegrationPrincipal } from '../api-clients/api-clients.service';
 import { HrisResultsService } from './hris-results.service';
+import { AuditService } from '../../core/audit/audit.service';
 
 class ReportRequestDto {
   @IsString() @MinLength(1) @MaxLength(100)
@@ -42,15 +43,25 @@ class ResultsQueryDto {
 @UseGuards(ApiKeyGuard)
 @Controller('integrations/hris')
 export class HrisResultsController {
-  constructor(private readonly results: HrisResultsService) {}
+  constructor(
+    private readonly results: HrisResultsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get('results')
   @RequireScopes('results:read')
   @ApiOperation({ summary: 'Competency and 360 results for a review cycle — one employee (employeeRef) or a page (cursor, limit ≤ 100)' })
-  getResults(@IntegrationContext() principal: IntegrationPrincipal, @Query() q: ResultsQueryDto) {
+  async getResults(@IntegrationContext() principal: IntegrationPrincipal, @Query() q: ResultsQueryDto) {
     const opts = { talent: principal.scopes.includes('talent:read') };
-    if (q.employeeRef) return this.results.getEmployeeResult(principal.orgId, q.cycleRef, q.employeeRef, opts);
-    return this.results.getResultsPage(principal.orgId, q.cycleRef, q.cursor, q.limit ?? 50, opts);
+    const body = q.employeeRef
+      ? await this.results.getEmployeeResult(principal.orgId, q.cycleRef, q.employeeRef, opts)
+      : await this.results.getResultsPage(principal.orgId, q.cycleRef, q.cursor, q.limit ?? 50, opts);
+    await this.audit.record({
+      orgId: principal.orgId, actorType: 'api_client', actorId: principal.clientId, action: 'integration.results.read',
+      entityType: 'cycle', entityId: q.cycleRef,
+      metadata: { cycleRef: q.cycleRef, employees: 'data' in body ? body.data.length : 1, talent: opts.talent, employeeRef: q.employeeRef ?? null },
+    });
+    return body;
   }
 
   @Get('succession')
@@ -79,7 +90,10 @@ export class HrisResultsController {
 @ApiTags('HRIS Integration')
 @Controller('integrations/hris/report-files')
 export class HrisReportFilesController {
-  constructor(private readonly results: HrisResultsService) {}
+  constructor(
+    private readonly results: HrisResultsService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get(':id')
   @ApiOperation({ summary: 'Download a report PDF through a signed link from results.reports' })
@@ -89,7 +103,8 @@ export class HrisReportFilesController {
     @Query('sig') sig: string,
     @Res() res: Response,
   ) {
-    const path = await this.results.resolveSignedReport(id, exp, sig);
+    const { path, orgId } = await this.results.resolveSignedReport(id, exp, sig);
+    await this.audit.record({ orgId, actorType: 'system', action: 'integration.report.downloaded', entityType: 'report', entityId: id, metadata: { via: 'signed_link' } });
     if (path.startsWith('http')) return res.redirect(path);
     if (!fs.existsSync(path)) throw new NotFoundException('Report file not found');
     res.setHeader('Content-Type', 'application/pdf');

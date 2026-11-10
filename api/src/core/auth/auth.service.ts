@@ -15,6 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/entities/user.entity';
 import { RegisterOrgDto } from './dto/register-org.dto';
 import { SsoTicketService } from './sso/sso-ticket.service';
+import { AuditService } from '../audit/audit.service';
 import { AccessTokenPayload, AuthResponseDto, UserRole, UserDto, OrganisationDto } from '@leaderprism/shared';
 
 @Injectable()
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly ssoTickets: SsoTicketService,
+    private readonly audit: AuditService,
   ) {}
 
   /** HRIS hand-off: exchanges a one-time SSO ticket for a normal session (access token + refresh cookie). */
@@ -48,6 +50,7 @@ export class AuthService {
     await this.usersService.updateLastLogin(user.id);
     const tokens = (await this.issueTokens(user, org.id, req)) as AuthResponseDto & { refreshToken: string };
     this.logger.log(`SSO hand-off login user=${user.id} org=${org.id}`);
+    await this.audit.record({ orgId: org.id, actorType: 'user', actorId: user.id, action: 'auth.sso_login', entityType: 'user', entityId: user.id });
     return { ...tokens, redirectPath: consumed.redirectPath };
   }
 

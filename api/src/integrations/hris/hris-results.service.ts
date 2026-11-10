@@ -231,13 +231,13 @@ export class HrisResultsService {
   }
 
   /** Resolves a verified signed link to the stored file (local path or blob URL). */
-  async resolveSignedReport(reportId: string, exp: string, sig: string): Promise<string> {
+  async resolveSignedReport(reportId: string, exp: string, sig: string): Promise<{ path: string; orgId: string }> {
     if (!verifyReportSignature(reportId, exp, sig, this.signingSecret())) {
       throw new ForbiddenException('Invalid or expired report link');
     }
-    const path = await this.reporting.getDownloadPathForSignedLink(reportId);
-    if (!path) throw new NotFoundException('Report not found');
-    return path;
+    const found = await this.reporting.getDownloadPathForSignedLink(reportId);
+    if (!found) throw new NotFoundException('Report not found');
+    return found;
   }
 
   private signingSecret(): string {
