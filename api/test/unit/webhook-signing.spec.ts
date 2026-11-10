@@ -1,5 +1,12 @@
 import { createHmac, randomBytes } from 'crypto';
-import { decryptSecret, encryptSecret, signPayload, validateWebhookUrl } from '../../src/integrations/webhooks/webhook-signing';
+import {
+  checkDeliveryTarget,
+  decryptSecret,
+  encryptSecret,
+  isPrivateAddress,
+  signPayload,
+  validateWebhookUrl,
+} from '../../src/integrations/webhooks/webhook-signing';
 
 const KEY = randomBytes(32).toString('base64');
 
@@ -35,6 +42,45 @@ describe('webhook secret encryption', () => {
 
   it('rejects a key that is not 32 bytes', () => {
     expect(() => encryptSecret('x', Buffer.from('short').toString('base64'))).toThrow(/32 bytes/);
+  });
+});
+
+describe('isPrivateAddress (DNS-resolved delivery targets)', () => {
+  it('flags loopback, private, link-local, CGNAT and unspecified IPv4', () => {
+    for (const ip of ['127.0.0.1', '10.0.0.8', '172.16.4.4', '192.168.0.2', '169.254.169.254', '100.64.1.1', '0.0.0.0']) {
+      expect(isPrivateAddress(ip)).toBe(true);
+    }
+  });
+  it('flags IPv6 loopback, unique-local, link-local and IPv4-mapped private addresses', () => {
+    for (const ip of ['::1', 'fd12:3456::1', 'fc00::1', 'fe80::1', '::ffff:10.0.0.1', '::']) {
+      expect(isPrivateAddress(ip)).toBe(true);
+    }
+  });
+  it('allows public addresses', () => {
+    for (const ip of ['8.8.8.8', '172.32.0.1', '100.128.0.1', '2606:4700::1111', '::ffff:8.8.8.8']) {
+      expect(isPrivateAddress(ip)).toBe(false);
+    }
+  });
+});
+
+describe('checkDeliveryTarget (DNS re-check at delivery time)', () => {
+  const lookup = (map: Record<string, string[]>) => async (host: string) => (map[host] ?? []).map((address) => ({ address }));
+
+  it('in production rejects a public hostname that resolves to a private address', async () => {
+    await expect(checkDeliveryTarget('https://hooks.evil.example/x', true, lookup({ 'hooks.evil.example': ['169.254.169.254'] })))
+      .resolves.toMatch(/private/);
+    await expect(checkDeliveryTarget('https://mixed.example/x', true, lookup({ 'mixed.example': ['8.8.8.8', '10.0.0.5'] })))
+      .resolves.toMatch(/private/);
+  });
+
+  it('allows hostnames that resolve only to public addresses', async () => {
+    await expect(checkDeliveryTarget('https://hris.example.lk/x', true, lookup({ 'hris.example.lk': ['203.94.1.10'] }))).resolves.toBeNull();
+  });
+
+  it('skips the check outside production and reports unresolvable hosts', async () => {
+    await expect(checkDeliveryTarget('http://127.0.0.1:4000/x', false, lookup({}))).resolves.toBeNull();
+    await expect(checkDeliveryTarget('https://nowhere.example/x', true, async () => { throw new Error('ENOTFOUND'); }))
+      .resolves.toMatch(/resolve/);
   });
 });
 

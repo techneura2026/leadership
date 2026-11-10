@@ -76,6 +76,15 @@ describe('[HRIS-SSO] SSO tickets', () => {
     await issue({ employeeRef: 'R-1' }, ro.body.data.rawKey).expect(403);
   });
 
+  it('never issues tickets for an org admin, even one linked to an employeeRef', async () => {
+    await req(app).put('/api/v1/integrations/hris/employees').set('X-Api-Key', key).send({
+      employees: [{ employeeRef: 'ADM-1', email: org.admin.email, firstName: 'Org', lastName: 'Admin', employmentStatus: 'active' }],
+    }).expect(200);
+    const res = await issue({ employeeRef: 'ADM-1' }).expect(403);
+    expect(res.body.error.code).toBe('SSO_NOT_ALLOWED');
+    expect(await ds.query(`SELECT 1 FROM sso_tickets WHERE user_id = $1`, [org.admin.userId])).toHaveLength(0);
+  });
+
   it('another organisation’s key cannot issue tickets for this organisation’s employees', async () => {
     const other = await setupHrisOrg(app, ds, ['X-1']);
     await issue({ employeeRef: 'R-1' }, other.key).expect(404);

@@ -29,7 +29,39 @@ export function decryptSecret(enc: string, keyB64: string): string {
 const PRIVATE_V4 = [
   /^127\./, /^10\./, /^192\.168\./, /^169\.254\./, /^0\./,
   /^172\.(1[6-9]|2\d|3[01])\./,
+  /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./, // carrier-grade NAT 100.64.0.0/10
 ];
+
+/** True for an IP address webhooks must never be delivered to (loopback, private, link-local, …). */
+export function isPrivateAddress(ip: string): boolean {
+  const addr = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(addr);
+  if (mapped) return isPrivateAddress(mapped[1]);
+  if (addr.includes(':')) {
+    return addr === '::' || addr === '::1' || addr.startsWith('fe80:') || /^f[cd][0-9a-f]{0,2}:/.test(addr);
+  }
+  return PRIVATE_V4.some((re) => re.test(addr));
+}
+
+type Lookup = (host: string) => Promise<Array<{ address: string }>>;
+
+/**
+ * Delivery-time SSRF guard (production only): resolves the hostname and refuses delivery when any
+ * resolved address is private — create-time validation alone can be bypassed by DNS. Returns an
+ * error message, or null when the target may be called.
+ */
+export async function checkDeliveryTarget(rawUrl: string, production: boolean, lookup: Lookup): Promise<string | null> {
+  if (!production) return null;
+  const host = new URL(rawUrl).hostname.replace(/^\[|\]$/g, '');
+  let addresses: Array<{ address: string }>;
+  try {
+    addresses = /^[\d.]+$/.test(host) || host.includes(':') ? [{ address: host }] : await lookup(host);
+  } catch {
+    return 'Could not resolve the webhook host';
+  }
+  if (addresses.length === 0) return 'Could not resolve the webhook host';
+  return addresses.some((a) => isPrivateAddress(a.address)) ? 'Webhook host resolves to a private address' : null;
+}
 
 /**
  * Returns an error message, or null when the URL is acceptable. In production the URL must be

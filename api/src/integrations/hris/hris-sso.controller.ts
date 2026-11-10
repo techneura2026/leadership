@@ -1,4 +1,5 @@
-import { Body, Controller, NotFoundException, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, NotFoundException, Post, UseGuards } from '@nestjs/common';
+import { UserRole } from '@leaderprism/shared';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
@@ -35,6 +36,13 @@ export class HrisSsoController {
     const [user] = await this.users.findByExternalRefs(orgId, [dto.employeeRef]);
     if (!user || !user.isActive || user.employmentStatus === 'left') {
       throw new NotFoundException(`No active employee ${dto.employeeRef}`);
+    }
+    // A leaked HRIS key must never be able to open the organisation's admin accounts.
+    if (user.role === UserRole.ORG_ADMIN || user.role === UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException({
+        message: 'Single sign-on is not available for organisation admin accounts; they sign in with their password.',
+        error: 'SSO_NOT_ALLOWED',
+      });
     }
     const { ticket, expiresAt } = await this.tickets.issue(orgId, user.id, dto.redirectPath ?? '/my-assessments');
     const base = this.config.get<string>('APP_URL', 'http://localhost:3000').replace(/\/+$/, '');

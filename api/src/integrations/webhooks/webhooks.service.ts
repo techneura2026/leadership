@@ -7,7 +7,8 @@ import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import { WebhookEndpoint } from './webhook-endpoint.entity';
 import { WebhookDelivery } from './webhook-delivery.entity';
-import { decryptSecret, encryptSecret, signPayload, validateWebhookUrl } from './webhook-signing';
+import { lookup as dnsLookup } from 'dns/promises';
+import { checkDeliveryTarget, decryptSecret, encryptSecret, signPayload, validateWebhookUrl } from './webhook-signing';
 
 export const WEBHOOK_EVENTS = [
   'assessment.launched',
@@ -106,6 +107,16 @@ export class WebhooksService {
       .getOne();
     if (!endpoint || !endpoint.isActive) {
       await this.deliveries.update({ id: delivery.id }, { status: 'failed', lastError: 'Endpoint removed or inactive' });
+      return;
+    }
+
+    const blocked = await checkDeliveryTarget(endpoint.url, this.config.get('NODE_ENV') === 'production', (host) =>
+      dnsLookup(host, { all: true }),
+    );
+    if (blocked) {
+      // Not retried: the target is refused, not temporarily unreachable.
+      await this.deliveries.update({ id: delivery.id }, { status: 'failed', attempts: delivery.attempts + 1, lastError: blocked });
+      this.logger.warn(`Webhook delivery ${delivery.id} refused: ${blocked}`);
       return;
     }
 
