@@ -91,6 +91,7 @@ describe('AuthService', () => {
       mockNotificationsService as any,
       mockJwtService as any,
       mockConfigService as any,
+      { issue: jest.fn(), consume: jest.fn() } as any,
     );
   });
 

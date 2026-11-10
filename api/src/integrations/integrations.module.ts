@@ -26,6 +26,8 @@ import { WEBHOOK_QUEUE, WebhooksService } from './webhooks/webhooks.service';
 import { WebhooksController } from './webhooks/webhooks.controller';
 import { WebhookProcessor } from './webhooks/webhook.processor';
 import { DomainEventListener } from './webhooks/domain-event.listener';
+import { HrisSsoController } from './hris/hris-sso.controller';
+import { AuthModule } from '../core/auth/auth.module';
 
 /**
  * Everything an external HRIS touches: API clients, sync, assessment requests, results export,
@@ -43,6 +45,7 @@ import { DomainEventListener } from './webhooks/domain-event.listener';
     Uc4ReadinessModule,
     ItemsModule,
     ReportingModule,
+    AuthModule,
   ],
   providers: [
     ApiClientsService,
@@ -62,6 +65,7 @@ import { DomainEventListener } from './webhooks/domain-event.listener';
     HrisResultsController,
     HrisReportFilesController,
     WebhooksController,
+    HrisSsoController,
   ],
 })
 export class IntegrationsModule {}
