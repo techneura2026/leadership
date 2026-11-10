@@ -19,6 +19,7 @@ import { ReportingModule } from './reporting/reporting.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SuccessionModule } from './succession/succession.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { DomainEventsModule } from './shared/events/domain-events';
 import { MustChangePasswordGuard } from './core/auth/guards/must-change-password.guard';
 
 @Module({
@@ -50,6 +51,7 @@ import { MustChangePasswordGuard } from './core/auth/guards/must-change-password
       }),
     }),
     DatabaseModule,
+    DomainEventsModule,
     AuthModule,
     OrganisationsModule,
     UsersModule,

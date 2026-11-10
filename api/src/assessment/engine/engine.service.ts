@@ -19,6 +19,7 @@ import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entit
 import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { allParticipantsDone, allNominationsDone } from '../shared/completion.util';
+import { AssessmentEventPayload, DomainEvent, DomainEventBus, DomainEventName } from '../../shared/events/domain-events';
 
 // Plan limits map
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -128,7 +129,22 @@ export class EngineService {
     private readonly notificationsService: NotificationsService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly events: DomainEventBus,
   ) { }
+
+  /** Publishes assessment.launched / assessment.closed after the status change is saved. */
+  private async emitAssessmentEvent(name: DomainEventName, assessment: Assessment): Promise<void> {
+    const participants = await this.participantRepo.find({ where: { assessmentId: assessment.id }, select: ['userId'] });
+    const payload: AssessmentEventPayload = {
+      orgId: assessment.organisationId,
+      assessmentId: assessment.id,
+      assessmentType: assessment.assessmentType,
+      cycleRef: assessment.cycleRef ?? null,
+      participantUserIds: participants.map((p) => p.userId),
+      occurredAt: new Date().toISOString(),
+    };
+    this.events.emit(name, payload);
+  }
 
   /**
    * Serializes concurrent plan-limit-checking mutations for one org via a Postgres advisory
@@ -295,7 +311,7 @@ export class EngineService {
   async launch(id: string, orgId: string): Promise<Assessment> {
     await this.findOne(id, orgId); // existence/ownership check
 
-    return this.withOrgLock(orgId, async (manager) => {
+    const launched = await this.withOrgLock(orgId, async (manager) => {
       const assessment = await manager.findOne(Assessment, { where: { id, organisationId: orgId } });
       if (!assessment) throw new NotFoundException(`Assessment ${id} not found`);
 
@@ -342,6 +358,8 @@ export class EngineService {
       this.logger.log(`Launched assessment ${id} org=${orgId} participants=${participantCount}`);
       return saved;
     });
+    await this.emitAssessmentEvent(DomainEvent.AssessmentLaunched, launched);
+    return launched;
   }
 
   async close(id: string, orgId: string): Promise<Assessment> {
@@ -354,6 +372,7 @@ export class EngineService {
     assessment.status = AssessmentStatus.CLOSED;
     const saved = await this.assessmentRepo.save(assessment);
     this.logger.log(`Closed assessment ${id} org=${orgId}`);
+    await this.emitAssessmentEvent(DomainEvent.AssessmentClosed, saved);
     return saved;
   }
 
@@ -394,6 +413,7 @@ export class EngineService {
     assessment.status = AssessmentStatus.CLOSED;
     await this.assessmentRepo.save(assessment);
     this.logger.log(`Auto-closed assessment ${assessmentId} — all participants/raters complete`);
+    await this.emitAssessmentEvent(DomainEvent.AssessmentClosed, assessment);
   }
 
   async addParticipant(

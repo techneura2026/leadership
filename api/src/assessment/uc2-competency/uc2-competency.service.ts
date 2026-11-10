@@ -17,6 +17,7 @@ import { CompetencyDomain } from '../items/entities/competency-domain.entity';
 import { User } from '../../core/users/entities/user.entity';
 import { assertOwnerOrPrivileged } from '../../shared/ownership.util';
 import { EngineService } from '../engine/engine.service';
+import { DomainEvent, DomainEventBus, ResultsReadyPayload } from '../../shared/events/domain-events';
 
 interface RatingDto {
   competencyId: string;
@@ -70,6 +71,7 @@ export class Uc2CompetencyService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly engineService: EngineService,
+    private readonly events: DomainEventBus,
   ) {}
 
   /**
@@ -347,6 +349,22 @@ export class Uc2CompetencyService {
     ca.submittedAt = new Date();
     const saved = await this.caRepo.save(ca);
     this.logger.log(`Submitted manager ratings for CA ${caId}`);
+
+    // The manager rating is what the HRIS export reads, so results for this employee are usable now.
+    const [assessment, participant] = await Promise.all([
+      this.assessmentRepo.findOne({ where: { id: assessmentId, organisationId: orgId } }),
+      this.participantRepo.findOne({ where: { id: ca.participantId, assessmentId } }),
+    ]);
+    if (assessment && participant) {
+      const payload: ResultsReadyPayload = {
+        orgId,
+        assessmentId,
+        cycleRef: assessment.cycleRef ?? null,
+        userId: participant.userId,
+        occurredAt: new Date().toISOString(),
+      };
+      this.events.emit(DomainEvent.ResultsReady, payload);
+    }
     return saved;
   }
 

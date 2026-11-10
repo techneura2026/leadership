@@ -10,6 +10,7 @@ import { IsNull, Repository } from 'typeorm';
 import { AssessmentConfig, ReportType, resolveQuestionMode } from '@leaderprism/shared';
 import { Report } from './report.entity';
 import { PdfService } from './pdf.service';
+import { DomainEvent, DomainEventBus, ReportReadyPayload } from '../shared/events/domain-events';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../assessment/engine/entities/assessment-participant.entity';
 import { User } from '../core/users/entities/user.entity';
@@ -46,6 +47,7 @@ export class ReportingService {
     private readonly notificationsService: NotificationsService,
     @InjectQueue('reports')
     private readonly reportsQueue: Queue,
+    private readonly events: DomainEventBus,
   ) {}
 
   /**
@@ -366,6 +368,18 @@ export class ReportingService {
       await this.reportRepo.save(savedReport);
 
       this.logger.log(`Report ${savedReport.id} generated: ${localPath}`);
+      const subject = savedReport.participantId
+        ? await this.participantRepo.findOne({ where: { id: savedReport.participantId }, select: ['id', 'userId'] })
+        : null;
+      const payload: ReportReadyPayload = {
+        orgId: savedReport.organisationId,
+        reportId: savedReport.id,
+        assessmentId: savedReport.assessmentId,
+        participantUserId: subject?.userId ?? null,
+        reportType: savedReport.reportType,
+        occurredAt: new Date().toISOString(),
+      };
+      this.events.emit(DomainEvent.ReportReady, payload);
     } catch (err) {
       savedReport.status = 'failed';
       savedReport.error = err instanceof Error ? err.message : String(err);
