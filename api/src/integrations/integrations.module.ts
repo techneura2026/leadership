@@ -6,6 +6,8 @@ import { ApiClientsService } from './api-clients/api-clients.service';
 import { ApiClientsController } from './api-clients/api-clients.controller';
 import { ApiKeyGuard } from './api-clients/api-key.guard';
 import { HrisPingController } from './hris/hris-ping.controller';
+import { HrisSyncController } from './hris/hris-sync.controller';
+import { HrisSyncService } from './hris/hris-sync.service';
 
 /**
  * Everything an external HRIS touches: API clients, sync, assessment requests, results export,
@@ -13,7 +15,7 @@ import { HrisPingController } from './hris/hris-ping.controller';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule],
-  providers: [ApiClientsService, ApiKeyGuard],
-  controllers: [ApiClientsController, HrisPingController],
+  providers: [ApiClientsService, ApiKeyGuard, HrisSyncService],
+  controllers: [ApiClientsController, HrisPingController, HrisSyncController],
 })
 export class IntegrationsModule {}

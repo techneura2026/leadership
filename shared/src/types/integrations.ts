@@ -24,6 +24,22 @@ export interface ApiClientDto {
   createdAt: string;
 }
 
+/** Per-row outcome of an HRIS sync call. The call returns 200 even when some rows fail. */
+export interface SyncRowResult {
+  ref: string;
+  status: 'created' | 'updated' | 'unchanged' | 'error';
+  id?: string;
+  error?: string;
+  warnings?: string[];
+}
+
+export interface DepartmentSyncRow {
+  departmentRef: string;
+  name: string;
+  parentRef?: string | null;
+  isActive?: boolean;
+}
+
 /** Returned once, on creation only. */
 export interface CreatedApiClientDto extends ApiClientDto {
   rawKey: string;
