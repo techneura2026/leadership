@@ -19,6 +19,7 @@ import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entit
 import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { allParticipantsDone, allNominationsDone } from '../shared/completion.util';
+import { isReminderDue } from '../shared/reminder-schedule';
 import { AssessmentEventPayload, DomainEvent, DomainEventBus, DomainEventName } from '../../shared/events/domain-events';
 
 // Plan limits map
@@ -219,6 +220,20 @@ export class EngineService {
       relations: ['participants'],
       order: { createdAt: 'ASC' },
     });
+  }
+
+  /**
+   * Active assessments (all organisations) whose config.reminderDays says "remind today" — for the
+   * daily scheduler job only; callers act per assessment with its own organisationId.
+   */
+  async findDueForReminder(today: Date): Promise<Assessment[]> {
+    const active = await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.status = :status', { status: AssessmentStatus.ACTIVE })
+      .andWhere('a.end_date IS NOT NULL')
+      .andWhere(`jsonb_array_length(COALESCE(a.config->'reminderDays', '[]'::jsonb)) > 0`)
+      .getMany();
+    return active.filter((a) => isReminderDue(a.endDate, (a.config as AssessmentConfig | undefined)?.reminderDays, today));
   }
 
   /** Every assessment an HRIS cycle created in this organisation. */

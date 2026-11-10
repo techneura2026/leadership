@@ -21,6 +21,7 @@ import { SuccessionModule } from './succession/succession.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { DomainEventsModule } from './shared/events/domain-events';
 import { AuditModule } from './core/audit/audit.module';
+import { SchedulerModule } from './core/scheduler/scheduler.module';
 import { MustChangePasswordGuard } from './core/auth/guards/must-change-password.guard';
 
 @Module({
@@ -68,6 +69,7 @@ import { MustChangePasswordGuard } from './core/auth/guards/must-change-password
     AnalyticsModule,
     SuccessionModule,
     IntegrationsModule,
+    SchedulerModule,
   ],
   providers: [
     // Binds the ThrottlerModule's per-route @Throttle() decorators (and the
