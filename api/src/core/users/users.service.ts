@@ -10,7 +10,29 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from './entities/user.entity';
 import { Session } from './entities/session.entity';
-import { UserRole } from '@leaderprism/shared';
+import { Language, UserRole } from '@leaderprism/shared';
+import type { SyncRowResult } from '@leaderprism/shared';
+
+/** HRIS employee row with departmentRef already resolved by the caller. */
+export interface EmployeeUpsertRow {
+  employeeRef: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  /** undefined = leave unchanged; null = clear. */
+  departmentId?: string | null;
+  managerRef?: string | null;
+  designationRef?: string | null;
+  jobTitle?: string | null;
+  employmentStatus: 'active' | 'probation' | 'left';
+  language?: Language;
+  role?: UserRole;
+  /** Warnings collected while pre-resolving the row (e.g. department_not_found). */
+  warnings?: string[];
+}
+
+/** Roles an HRIS sync must never change. */
+const PROTECTED_ROLES: UserRole[] = [UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN];
 
 /** Unambiguous charset (no 0/O/1/I/l) — generated passwords are read aloud/typed by admins relaying them. */
 const PASSWORD_CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
@@ -162,6 +184,181 @@ export class UsersService {
       cursor = next?.managerId ?? null;
       hops++;
     }
+  }
+
+  /**
+   * HRIS employee sync, in one transaction. Matching order: externalRef → same email with no
+   * externalRef (linked) → create. Pass 2 resolves managerRef against the org plus the batch.
+   * Rows that would form a management cycle are rejected before anything is written.
+   * `departmentId` is pre-resolved by the caller (undefined = leave unchanged).
+   */
+  async upsertEmployeesByRef(
+    organisationId: string,
+    rows: EmployeeUpsertRow[],
+    opts: { fullSync: boolean },
+  ): Promise<SyncRowResult[]> {
+    return this.userRepo.manager.transaction(async (em) => {
+      const repo = em.getRepository(User);
+      const sessions = em.getRepository(Session);
+      const all = await repo.find({ where: { organisationId }, withDeleted: true });
+      const live = all.filter((u) => !u.deletedAt);
+      const byRef = new Map(live.filter((u) => u.externalRef).map((u) => [u.externalRef as string, u]));
+      const byId = new Map(live.map((u) => [u.id, u]));
+      const byEmail = new Map(all.map((u) => [u.email.toLowerCase(), u]));
+
+      const batchManager = new Map(rows.map((r) => [r.employeeRef, r.managerRef]));
+      const managerRefOf = (ref: string): string | null => {
+        const proposed = batchManager.get(ref);
+        if (proposed !== undefined) return proposed;
+        const u = byRef.get(ref);
+        const m = u?.managerId ? byId.get(u.managerId) : undefined;
+        return m?.externalRef ?? null;
+      };
+      const inCycle = (ref: string): boolean => {
+        let cur = managerRefOf(ref);
+        for (let i = 0; cur && i <= rows.length + live.length; i++) {
+          if (cur === ref) return true;
+          cur = managerRefOf(cur);
+        }
+        return false;
+      };
+
+      const snapshot = (u: User) =>
+        JSON.stringify([u.email, u.firstName, u.lastName, u.departmentId, u.managerId, u.jobTitle, u.designationRef,
+          u.employmentStatus, u.isActive, u.languagePref, u.role, u.externalRef, u.hrisManaged]);
+
+      const results: SyncRowResult[] = [];
+      const before = new Map<string, string>();
+      const touched: User[] = [];
+      const deactivated = new Set<string>();
+
+      // Pass 1 — identity fields.
+      for (const row of rows) {
+        const email = row.email.toLowerCase();
+        const warnings = [...(row.warnings ?? [])];
+        if (inCycle(row.employeeRef)) {
+          results.push({ ref: row.employeeRef, status: 'error', error: 'manager_cycle' });
+          continue;
+        }
+
+        let user = byRef.get(row.employeeRef);
+        const emailOwner = byEmail.get(email);
+        if (!user && emailOwner && !emailOwner.deletedAt && !emailOwner.externalRef) user = emailOwner; // link
+        if (emailOwner && emailOwner !== user) {
+          results.push({ ref: row.employeeRef, status: 'error', error: 'email_conflict' });
+          continue;
+        }
+
+        const isNew = !user;
+        if (!user) {
+          const password = crypto.randomBytes(32).toString('base64url');
+          user = repo.create({
+            organisationId,
+            // Unusable random password — HRIS users sign in through SSO (low cost factor: the secret is unguessable).
+            passwordHash: await bcrypt.hash(password, 4),
+            emailVerified: true,
+            mustChangePassword: false,
+            role: UserRole.PARTICIPANT,
+          });
+        } else {
+          before.set(user.id, snapshot(user));
+        }
+
+        const wasActive = isNew ? true : user.isActive;
+        user.externalRef = row.employeeRef;
+        user.hrisManaged = true;
+        user.email = email;
+        user.firstName = row.firstName;
+        user.lastName = row.lastName;
+        if (row.departmentId !== undefined) user.departmentId = row.departmentId;
+        if (row.jobTitle !== undefined) user.jobTitle = row.jobTitle;
+        if (row.designationRef !== undefined) user.designationRef = row.designationRef;
+        if (row.language) user.languagePref = row.language;
+        user.employmentStatus = row.employmentStatus;
+        user.isActive = row.employmentStatus !== 'left';
+        if (row.role && !PROTECTED_ROLES.includes(user.role)) user.role = row.role;
+
+        user = await repo.save(user);
+        if (wasActive && !user.isActive) {
+          await sessions.delete({ userId: user.id });
+          deactivated.add(user.id);
+        }
+        byRef.set(row.employeeRef, user);
+        byId.set(user.id, user);
+        byEmail.set(email, user);
+        touched.push(user);
+        results.push({ ref: row.employeeRef, status: isNew ? 'created' : 'unchanged', id: user.id, ...(warnings.length ? { warnings } : {}) });
+      }
+
+      // Pass 2 — reporting lines.
+      for (const [i, row] of rows.entries()) {
+        const result = results[i];
+        if (result.status === 'error' || row.managerRef === undefined) continue;
+        const user = byRef.get(row.employeeRef)!;
+        let managerId: string | null = null;
+        if (row.managerRef !== null) {
+          const manager = byRef.get(row.managerRef);
+          if (manager) managerId = manager.id;
+          else result.warnings = [...(result.warnings ?? []), 'manager_not_found'];
+        }
+        if (user.managerId !== managerId) {
+          user.managerId = managerId;
+          await repo.update({ id: user.id }, { managerId });
+        }
+      }
+
+      // Participants who now have direct reports become managers (never demoted automatically).
+      const managerIds = new Set([...byId.values()].filter((u) => u.isActive && u.managerId).map((u) => u.managerId));
+      for (const user of touched) {
+        if (user.role === UserRole.PARTICIPANT && managerIds.has(user.id)) {
+          user.role = UserRole.MANAGER;
+          await repo.update({ id: user.id }, { role: UserRole.MANAGER });
+        }
+      }
+
+      for (const [i, row] of rows.entries()) {
+        const result = results[i];
+        if (result.status !== 'unchanged') continue;
+        const user = byRef.get(row.employeeRef)!;
+        if (before.get(user.id) !== snapshot(user)) result.status = 'updated';
+      }
+
+      if (opts.fullSync) {
+        const seen = new Set(rows.map((r) => r.employeeRef));
+        for (const user of live) {
+          if (!user.hrisManaged || !user.isActive || !user.externalRef || seen.has(user.externalRef)) continue;
+          await repo.update({ id: user.id }, { isActive: false, employmentStatus: 'left' });
+          await sessions.delete({ userId: user.id });
+          results.push({ ref: user.externalRef, status: 'updated', id: user.id, warnings: ['deactivated_missing_from_full_sync'] });
+        }
+      }
+
+      return results;
+    });
+  }
+
+  /** Users in the organisation with the given HRIS employeeRefs (unknown refs are absent). */
+  async findByExternalRefs(organisationId: string, refs: string[]): Promise<User[]> {
+    if (refs.length === 0) return [];
+    return this.userRepo
+      .createQueryBuilder('u')
+      .where('u.organisation_id = :organisationId', { organisationId })
+      .andWhere('u.external_ref IN (:...refs)', { refs: [...new Set(refs)] })
+      .getMany();
+  }
+
+  /** userId → employeeRef for users that have one. */
+  async getExternalRefs(organisationId: string, userIds: string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const users = await this.userRepo
+      .createQueryBuilder('u')
+      .withDeleted()
+      .select(['u.id', 'u.externalRef'])
+      .where('u.organisation_id = :organisationId', { organisationId })
+      .andWhere('u.id IN (:...ids)', { ids: [...new Set(userIds)] })
+      .andWhere('u.external_ref IS NOT NULL')
+      .getMany();
+    return new Map(users.map((u) => [u.id, u.externalRef as string]));
   }
 
   async updateLastLogin(userId: string): Promise<void> {

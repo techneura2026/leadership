@@ -40,6 +40,21 @@ export interface DepartmentSyncRow {
   isActive?: boolean;
 }
 
+export interface EmployeeSyncRow {
+  employeeRef: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  departmentRef?: string | null;
+  managerRef?: string | null;
+  designationRef?: string | null;
+  jobTitle?: string | null;
+  employmentStatus: 'active' | 'probation' | 'left';
+  joiningDate?: string;
+  language?: 'en' | 'si' | 'ta';
+  role?: 'participant' | 'manager' | 'hr_manager';
+}
+
 /** Returned once, on creation only. */
 export interface CreatedApiClientDto extends ApiClientDto {
   rawKey: string;

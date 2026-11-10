@@ -166,6 +166,18 @@ export class OrganisationsService {
     });
   }
 
+  /** Maps HRIS departmentRefs to department ids within the organisation (unknown refs are absent). */
+  async getDepartmentIdsByRefs(organisationId: string, refs: string[]): Promise<Map<string, string>> {
+    if (refs.length === 0) return new Map();
+    const depts = await this.deptRepo
+      .createQueryBuilder('d')
+      .select(['d.id', 'd.externalRef'])
+      .where('d.organisation_id = :organisationId', { organisationId })
+      .andWhere('d.external_ref IN (:...refs)', { refs: [...new Set(refs)] })
+      .getMany();
+    return new Map(depts.map((d) => [d.externalRef as string, d.id]));
+  }
+
   async deleteDepartment(organisationId: string, id: string): Promise<void> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');

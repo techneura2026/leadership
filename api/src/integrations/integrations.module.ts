@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganisationsModule } from '../core/organisations/organisations.module';
+import { UsersModule } from '../core/users/users.module';
 import { ApiClient } from './api-clients/api-client.entity';
 import { ApiClientsService } from './api-clients/api-clients.service';
 import { ApiClientsController } from './api-clients/api-clients.controller';
@@ -14,7 +15,7 @@ import { HrisSyncService } from './hris/hris-sync.service';
  * report links, SSO tickets and webhooks. Talks to other modules through their exported services only.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule],
+  imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule, UsersModule],
   providers: [ApiClientsService, ApiKeyGuard, HrisSyncService],
   controllers: [ApiClientsController, HrisPingController, HrisSyncController],
 })
