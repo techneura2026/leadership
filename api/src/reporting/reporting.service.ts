@@ -19,7 +19,7 @@ import { Uc1FeedbackService } from '../assessment/uc1-feedback/uc1-feedback.serv
 import { Uc2CompetencyService } from '../assessment/uc2-competency/uc2-competency.service';
 import { Uc3PersonalityService } from '../assessment/uc3-personality/uc3-personality.service';
 import { Uc4ReadinessService } from '../assessment/uc4-readiness/uc4-readiness.service';
-import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-score.entity';
+import { ReadinessScore, effectiveGridPerformance } from '../assessment/uc4-readiness/entities/readiness-score.entity';
 import { NotificationsService } from '../core/notifications/notifications.service';
 
 @Injectable()
@@ -334,6 +334,10 @@ export class ReportingService {
           });
 
           if (!readinessScore) throw new NotFoundException('Readiness score not computed yet');
+          const subject = await this.participantRepo.findOne({ where: { id: participantId }, select: ['id', 'userId'] });
+          const external = subject
+            ? (await this.uc4Service.getLatestExternalScores(orgId, [subject.userId])).get(subject.userId)
+            : undefined;
 
           localPath = await this.pdfService.generateReadinessReport({
             ...commonData,
@@ -345,7 +349,7 @@ export class ReportingService {
             sjtScore: Number(readinessScore.sjtScore),
             learningAgilityScore: Number(readinessScore.learningAgilityScore),
             personalityFitScore: Number(readinessScore.personalityFitScore),
-            gridPerformance: readinessScore.gridPerformance,
+            gridPerformance: effectiveGridPerformance(readinessScore, external),
             gridPotential: readinessScore.gridPotential,
             developmentActions: [
               { priority: 1, area: 'Competency Development', action: 'Focus on lowest-rated competencies identified in the competency assessment.', timeline: '3-6 months' },

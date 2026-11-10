@@ -90,9 +90,31 @@ export class ReadinessScore {
   calculatedAt: Date;
 }
 
-/** Single source of truth for "what performance placement should the 9-box actually use" — every consumer (dashboard, succession candidates, PDF exports) imports this instead of duplicating the `??` fallback. */
+/** Bands a 0–100 HRIS performance score onto the 9-box axis (same thresholds as readiness scoring). */
+export function bandPerformanceScore(finalScore: number): 'high' | 'medium' | 'low' {
+  if (finalScore >= 70) return 'high';
+  if (finalScore >= 40) return 'medium';
+  return 'low';
+}
+
+/**
+ * Single source of truth for "what performance placement should the 9-box actually use" — every
+ * consumer (dashboard, succession candidates, PDF exports) imports this instead of duplicating the
+ * fallback. Order: HR's manual override → the HRIS final performance score → the 360-derived value.
+ */
 export function effectiveGridPerformance(
   s: Pick<ReadinessScore, 'gridPerformance' | 'manualGridPerformance'>,
+  external?: { finalScore: number } | null,
 ): 'high' | 'medium' | 'low' {
-  return s.manualGridPerformance ?? s.gridPerformance;
+  if (s.manualGridPerformance) return s.manualGridPerformance;
+  if (external) return bandPerformanceScore(Number(external.finalScore));
+  return s.gridPerformance;
+}
+
+export function performanceSource(
+  s: Pick<ReadinessScore, 'manualGridPerformance'>,
+  external?: { finalScore: number } | null,
+): 'manual' | 'hris' | 'feedback360' {
+  if (s.manualGridPerformance) return 'manual';
+  return external ? 'hris' : 'feedback360';
 }

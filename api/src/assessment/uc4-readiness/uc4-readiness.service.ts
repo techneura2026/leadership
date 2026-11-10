@@ -10,7 +10,8 @@ import { AssessmentType, ReadinessRating, UserRole } from '@leaderprism/shared';
 import { RoleProfile } from './entities/role-profile.entity';
 import { SjtResponse } from './entities/sjt-response.entity';
 import { LearningAgilityResponse } from './entities/learning-agility-response.entity';
-import { ReadinessScore, effectiveGridPerformance } from './entities/readiness-score.entity';
+import { ReadinessScore, effectiveGridPerformance, performanceSource } from './entities/readiness-score.entity';
+import { ExternalPerformanceScore } from './entities/external-performance-score.entity';
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Item } from '../items/entities/item.entity';
@@ -56,9 +57,40 @@ export class Uc4ReadinessService {
     private readonly participantRepo: Repository<AssessmentParticipant>,
     @InjectRepository(Item)
     private readonly itemRepo: Repository<Item>,
+    @InjectRepository(ExternalPerformanceScore)
+    private readonly externalScoreRepo: Repository<ExternalPerformanceScore>,
     private readonly readinessScoringService: ReadinessScoringService,
     private readonly engineService: EngineService,
   ) {}
+
+  /** HRIS final performance scores (one per employee per cycle; a repeat overwrites, e.g. after an appeal). */
+  async upsertExternalPerformanceScores(
+    orgId: string,
+    rows: Array<{ userId: string; cycleRef: string; finalScore: number; ratingBand: string | null; finalisedAt: Date }>,
+  ): Promise<number> {
+    if (rows.length === 0) return 0;
+    await this.externalScoreRepo.upsert(
+      rows.map((r) => ({ organisationId: orgId, ...r })),
+      { conflictPaths: ['organisationId', 'userId', 'cycleRef'] },
+    );
+    return rows.length;
+  }
+
+  /** Most recently finalised HRIS score per user. */
+  async getLatestExternalScores(orgId: string, userIds: string[]): Promise<Map<string, ExternalPerformanceScore>> {
+    const result = new Map<string, ExternalPerformanceScore>();
+    if (userIds.length === 0) return result;
+    const rows = await this.externalScoreRepo
+      .createQueryBuilder('s')
+      .where('s.organisation_id = :orgId', { orgId })
+      .andWhere('s.user_id IN (:...userIds)', { userIds: [...new Set(userIds)] })
+      .orderBy('s.finalised_at', 'DESC')
+      .getMany();
+    for (const r of rows) {
+      if (!result.has(r.userId)) result.set(r.userId, { ...r, finalScore: Number(r.finalScore) });
+    }
+    return result;
+  }
 
   async getRoleProfiles(orgId: string): Promise<RoleProfile[]> {
     return this.roleProfileRepo.find({
@@ -426,6 +458,7 @@ export class Uc4ReadinessService {
         gridPerformance: string;
         manualGridPerformance: string | null;
         effectiveGridPerformance: string;
+        performanceSource: 'manual' | 'hris' | 'feedback360';
         gridPotential: string;
       }>;
     }>;
@@ -442,6 +475,10 @@ export class Uc4ReadinessService {
     }
 
     const scores = await qb.getMany();
+    const external = await this.getLatestExternalScores(
+      orgId,
+      scores.map((s) => s.participant?.userId).filter((id): id is string => !!id),
+    );
     const roleProfiles = await this.roleProfileRepo.find({
       where: { organisationId: orgId },
     });
@@ -500,7 +537,8 @@ export class Uc4ReadinessService {
           compositeScore: Number(c.compositeScore),
           gridPerformance: c.gridPerformance,
           manualGridPerformance: c.manualGridPerformance,
-          effectiveGridPerformance: effectiveGridPerformance(c),
+          effectiveGridPerformance: effectiveGridPerformance(c, external.get(c.participant?.userId ?? '')),
+          performanceSource: performanceSource(c, external.get(c.participant?.userId ?? '')),
           gridPotential: c.gridPotential,
         };
       }),

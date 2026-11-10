@@ -27,6 +27,7 @@ import { WebhooksController } from './webhooks/webhooks.controller';
 import { WebhookProcessor } from './webhooks/webhook.processor';
 import { DomainEventListener } from './webhooks/domain-event.listener';
 import { HrisSsoController } from './hris/hris-sso.controller';
+import { HrisScoresController } from './hris/hris-scores.controller';
 import { AuthModule } from '../core/auth/auth.module';
 
 /**
@@ -66,6 +67,7 @@ import { AuthModule } from '../core/auth/auth.module';
     HrisReportFilesController,
     WebhooksController,
     HrisSsoController,
+    HrisScoresController,
   ],
 })
 export class IntegrationsModule {}
