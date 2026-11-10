@@ -161,8 +161,12 @@ export class HrisResultsService {
     let competency: EmployeeResultDto['competency'] = null;
     if (comp) {
       const ratings = await this.competency.getRatingsDetail(comp.id, participantIn(comp).id, orgId);
+      // Role profile: the cycle's explicit targetRoleId, else the profile linked to the employee's HRIS designation.
       const targetRoleId = (comp.config as AssessmentConfig | undefined)?.targetRoleId;
-      competency = buildCompetencyBlock(ratings, targetRoleId ? await this.roleProfile(orgId, targetRoleId, profileCache) : null);
+      const profile = targetRoleId
+        ? await this.roleProfile(orgId, targetRoleId, profileCache)
+        : await this.profileForEmployee(orgId, employeeRef);
+      competency = buildCompetencyBlock(ratings, profile);
     }
 
     const fb = mine.find((a) => a.assessmentType === AssessmentType.FEEDBACK_360);
@@ -242,6 +246,16 @@ export class HrisResultsService {
 
   private publicUrl(): string {
     return this.config.get<string>('API_PUBLIC_URL', 'http://localhost:3001');
+  }
+
+  /** Most recently updated role profile linked to the employee's designationRef, if any. */
+  private async profileForEmployee(orgId: string, employeeRef: string): Promise<ExportRoleProfile | null> {
+    const [user] = await this.users.findByExternalRefs(orgId, [employeeRef]);
+    if (!user?.designationRef) return null;
+    const match = (await this.readiness.getRoleProfiles(orgId))
+      .filter((p) => (p.designationRefs ?? []).includes(user.designationRef as string))
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
+    return match ? { id: match.id, title: match.title, requiredCompetencies: match.requiredCompetencies ?? [] } : null;
   }
 
   private async roleProfile(orgId: string, id: string, cache: Map<string, ExportRoleProfile | null>) {

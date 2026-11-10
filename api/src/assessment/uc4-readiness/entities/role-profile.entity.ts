@@ -49,6 +49,10 @@ export class RoleProfile {
   @Column({ name: 'personality_fit', type: 'jsonb', default: {} })
   personalityFit: Record<string, PersonalityFitRequirement>;
 
+  /** HRIS designation codes this profile applies to (employees' designationRef). */
+  @Column({ name: 'designation_refs', type: 'text', array: true, default: () => "'{}'" })
+  designationRefs: string[];
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

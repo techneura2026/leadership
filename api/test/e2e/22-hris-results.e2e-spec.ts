@@ -196,6 +196,40 @@ describe('[HRIS-RES] results export', () => {
     });
   });
 
+  describe('role profiles linked to HRIS designations (Task 22)', () => {
+    it('an employee whose designationRef is linked to a role profile gets requiredLevel from it', async () => {
+      const profile = await authPost(app, org.admin, '/api/v1/role-profiles', {
+        title: 'Senior Engineer',
+        designationRefs: ['SE-2'],
+        requiredCompetencies: competencyIds.map((id) => ({ competencyId: id, minLevel: 3, weight: 0.5 })),
+      }).expect(201);
+      expect(profile.body.data.designationRefs).toEqual(['SE-2']);
+
+      const email = (await ds.query(`SELECT email FROM users WHERE organisation_id = $1 AND external_ref = 'R-1'`, [org.id]))[0].email;
+      await req(app).put('/api/v1/integrations/hris/employees').set('X-Api-Key', key).send({
+        employees: [{ employeeRef: 'R-1', email, firstName: 'Emp', lastName: 'R-1', designationRef: 'SE-2', employmentStatus: 'active' }],
+      }).expect(200);
+
+      const r = (await getResults(key, 'cycleRef=2027-H1&employeeRef=R-1').expect(200)).body.data;
+      expect(r.competency.roleProfile).toEqual({ ref: profile.body.data.id, title: 'Senior Engineer' });
+      expect(r.competency.items[0]).toMatchObject({ requiredLevel: 3, weightInRole: 0.5, gapVsRequired: -1 });
+      expect(r.competency.summary.achievementVsRequiredPct).toBe(66.7);
+    });
+
+    it('an explicit roleProfileId on the cycle wins over the designation link', async () => {
+      const explicit = await authPost(app, org.admin, '/api/v1/role-profiles', {
+        title: 'Principal Engineer',
+        requiredCompetencies: competencyIds.map((id) => ({ competencyId: id, minLevel: 4, weight: 1 })),
+      }).expect(201);
+      await req(app).post('/api/v1/integrations/hris/assessment-requests').set('X-Api-Key', key).send({
+        cycleRef: '2027-H2', title: 'H2', types: ['competency'], startDate: '2027-07-01', endDate: '2027-12-31',
+        employeeRefs: ['R-1'], competencyIds, roleProfileId: explicit.body.data.id,
+      }).expect(201);
+      const r = (await getResults(key, 'cycleRef=2027-H2&employeeRef=R-1').expect(200)).body.data;
+      expect(r.competency.roleProfile.title).toBe('Principal Engineer');
+    });
+  });
+
   it('requires the results:read scope', async () => {
     const res = await authPost(app, org.admin, '/api/v1/integrations/api-clients', { name: 'W', scopes: ['employees:write'] }).expect(201);
     await getResults(res.body.data.rawKey, 'cycleRef=2027-H1&employeeRef=R-1').expect(403);

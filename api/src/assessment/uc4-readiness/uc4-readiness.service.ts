@@ -38,6 +38,8 @@ import { EngineService } from '../engine/engine.service';
 export interface CreateRoleProfileDto {
   title: string;
   level?: string;
+  /** HRIS designation codes this profile applies to. */
+  designationRefs?: string[];
   requiredCompetencies?: Array<{
     competencyId: string;
     minLevel: number;
@@ -168,6 +170,7 @@ export class Uc4ReadinessService {
       level: dto.level ?? null,
       requiredCompetencies: dto.requiredCompetencies ?? [],
       personalityFit: dto.personalityFit ?? {},
+      designationRefs: [...new Set(dto.designationRefs ?? [])],
     });
 
     const saved = await this.roleProfileRepo.save(profile);
