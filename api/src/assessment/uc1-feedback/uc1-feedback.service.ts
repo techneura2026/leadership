@@ -686,6 +686,21 @@ export class Uc1FeedbackService {
   }
 
   /**
+   * Org-checked variant of getCompletedNominationsWithResponses for the HRIS export. Callers must
+   * aggregate before releasing anything (see integrations/hris/feedback-export.ts) — never return
+   * these rows as-is, they identify raters.
+   */
+  async getCompletedNominationsForExport(
+    assessmentId: string,
+    participantId: string,
+    orgId: string,
+  ): Promise<RaterNomination[]> {
+    const assessment = await this.assessmentRepo.findOne({ where: { id: assessmentId, organisationId: orgId } });
+    if (!assessment) throw new NotFoundException(`Assessment ${assessmentId} not found`);
+    return this.getCompletedNominationsWithResponses(assessmentId, participantId);
+  }
+
+  /**
    * Returns completed nominations with their responses for a participant.
    * Used by the reporting service to gather open comments.
    */
