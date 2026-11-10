@@ -60,3 +60,6 @@ web/playwright-report/
 terraform.tfvars
 terraform.tfvars.json
 .terraform.lock.hcl
+
+# superpowers plan workspaces
+.superpowers/
