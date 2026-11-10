@@ -19,6 +19,7 @@ import { AssessmentParticipant } from './assessment-participant.entity';
 @Index(['organisationId'])
 @Index(['status'])
 @Index(['assessmentType'])
+@Index(['organisationId', 'cycleRef'])
 export class Assessment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -54,6 +55,17 @@ export class Assessment {
 
   @Column({ name: 'end_date', type: 'timestamptz', nullable: true })
   endDate: Date | null;
+
+  /** HRIS review-cycle reference (cycleRef) for assessments requested by the HRIS. */
+  @Column({ name: 'cycle_ref', type: 'varchar', length: 100, nullable: true })
+  cycleRef: string | null;
+
+  /** HRIS employeeRef of the subject — 360 assessments only (one subject per assessment). */
+  @Column({ name: 'subject_ref', type: 'varchar', length: 100, nullable: true })
+  subjectRef: string | null;
+
+  @Column({ type: 'varchar', length: 20, default: 'app' })
+  source: 'app' | 'hris';
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

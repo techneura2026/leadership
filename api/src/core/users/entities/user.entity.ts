@@ -18,6 +18,7 @@ import { Department } from '../../organisations/entities/department.entity';
 @Entity('users')
 @Unique(['organisationId', 'email'])
 @Index(['organisationId'])
+@Index('UQ_users_org_external_ref', ['organisationId', 'externalRef'], { unique: true, where: '"external_ref" IS NOT NULL' })
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -87,6 +88,20 @@ export class User {
 
   @Column({ name: 'password_reset_expires_at', type: 'timestamptz', nullable: true })
   passwordResetExpiresAt: Date | null;
+
+  /** HRIS employee reference (employeeRef). Unique per organisation when set. */
+  @Column({ name: 'external_ref', type: 'varchar', length: 100, nullable: true })
+  externalRef: string | null;
+
+  /** True when the HRIS owns this user's identity fields (see HRIS integration). */
+  @Column({ name: 'hris_managed', default: false })
+  hrisManaged: boolean;
+
+  @Column({ name: 'employment_status', type: 'varchar', length: 20, default: 'active' })
+  employmentStatus: 'active' | 'probation' | 'left';
+
+  @Column({ name: 'designation_ref', type: 'varchar', length: 100, nullable: true })
+  designationRef: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

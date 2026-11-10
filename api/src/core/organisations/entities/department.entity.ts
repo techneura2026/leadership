@@ -12,6 +12,7 @@ import { Organisation } from './organisation.entity';
 
 @Entity('departments')
 @Index(['organisationId'])
+@Index('UQ_departments_org_external_ref', ['organisationId', 'externalRef'], { unique: true, where: '"external_ref" IS NOT NULL' })
 export class Department {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -41,6 +42,13 @@ export class Department {
 
   @OneToMany(() => Department, (dept) => dept.parent)
   children: Department[];
+
+  /** HRIS department reference (departmentRef). Unique per organisation when set. */
+  @Column({ name: 'external_ref', type: 'varchar', length: 100, nullable: true })
+  externalRef: string | null;
+
+  @Column({ name: 'hris_managed', default: false })
+  hrisManaged: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
