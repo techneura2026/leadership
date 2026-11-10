@@ -5,7 +5,7 @@ import { Organisation } from './entities/organisation.entity';
 import { Department } from './entities/department.entity';
 import { Plan } from '@leaderprism/shared';
 import type { DepartmentSyncRow, SyncRowResult } from '@leaderprism/shared';
-import { UsersService } from '../users/users.service';
+import { UsersService, hrisManagedConflict } from '../users/users.service';
 
 @Injectable()
 export class OrganisationsService {
@@ -68,6 +68,10 @@ export class OrganisationsService {
   ): Promise<Department> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');
+    if (dept.hrisManaged) {
+      const changed = (['name', 'isActive'] as const).filter((f) => data[f] !== undefined && data[f] !== dept[f]);
+      if (changed.length > 0) throw hrisManagedConflict('department', changed);
+    }
     Object.assign(dept, data);
     return this.deptRepo.save(dept);
   }
@@ -181,6 +185,7 @@ export class OrganisationsService {
   async deleteDepartment(organisationId: string, id: string): Promise<void> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');
+    if (dept.hrisManaged) throw hrisManagedConflict('department', ['isActive']);
 
     const assignedUsers = await this.usersService.findAll(organisationId, { departmentId: id, limit: 1 });
     const userCount = Array.isArray(assignedUsers) ? assignedUsers.length : assignedUsers.total;

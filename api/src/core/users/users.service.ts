@@ -31,6 +31,18 @@ export interface EmployeeUpsertRow {
   warnings?: string[];
 }
 
+/** Fields the HRIS owns on HRIS-managed users; the app may not change them. */
+const HRIS_OWNED_USER_FIELDS = ['firstName', 'lastName', 'departmentId', 'managerId', 'jobTitle', 'isActive'] as const;
+
+/** 409 for an attempt to change a field the HRIS owns. Shared with OrganisationsService for departments. */
+export function hrisManagedConflict(entity: 'user' | 'department', fields: readonly string[]): ConflictException {
+  return new ConflictException({
+    message: `This ${entity} is managed by the HRIS; change ${fields.join(', ')} in the HRIS instead.`,
+    error: 'HRIS_MANAGED_FIELD',
+    details: { fields: [...fields] },
+  });
+}
+
 /** Roles an HRIS sync must never change. */
 const PROTECTED_ROLES: UserRole[] = [UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN];
 
@@ -137,6 +149,13 @@ export class UsersService {
     }>,
   ): Promise<User> {
     const user = await this.findById(id, organisationId);
+
+    if (user.hrisManaged) {
+      const changed = HRIS_OWNED_USER_FIELDS.filter(
+        (f) => data[f] !== undefined && (data[f] ?? null) !== (user[f] ?? null),
+      );
+      if (changed.length > 0) throw hrisManagedConflict('user', changed);
+    }
 
     if (data.managerId) {
       await this.assertManagerAssignmentValid(id, data.managerId, organisationId);
@@ -275,7 +294,12 @@ export class UsersService {
         if (row.designationRef !== undefined) user.designationRef = row.designationRef;
         if (row.language) user.languagePref = row.language;
         user.employmentStatus = row.employmentStatus;
-        user.isActive = row.employmentStatus !== 'left';
+        if (row.employmentStatus === 'left' && PROTECTED_ROLES.includes(user.role)) {
+          // Never let a sync lock the organisation out of its own admin account.
+          warnings.push('protected_role_not_deactivated');
+        } else {
+          user.isActive = row.employmentStatus !== 'left';
+        }
         if (row.role && !PROTECTED_ROLES.includes(user.role)) user.role = row.role;
 
         user = await repo.save(user);
@@ -327,6 +351,7 @@ export class UsersService {
         const seen = new Set(rows.map((r) => r.employeeRef));
         for (const user of live) {
           if (!user.hrisManaged || !user.isActive || !user.externalRef || seen.has(user.externalRef)) continue;
+          if (PROTECTED_ROLES.includes(user.role)) continue;
           await repo.update({ id: user.id }, { isActive: false, employmentStatus: 'left' });
           await sessions.delete({ userId: user.id });
           results.push({ ref: user.externalRef, status: 'updated', id: user.id, warnings: ['deactivated_missing_from_full_sync'] });
@@ -447,6 +472,8 @@ export class UsersService {
   }
 
   async hardDelete(id: string, organisationId: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id, organisationId }, withDeleted: true });
+    if (user?.hrisManaged) throw hrisManagedConflict('user', ['isActive']);
     const result = await this.userRepo.delete({ id, organisationId });
     if (!result.affected) throw new NotFoundException('User not found');
   }

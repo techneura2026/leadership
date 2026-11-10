@@ -4,7 +4,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { getApp } from './setup/app';
-import { authPost, createUserInOrg, login, registerOrg, req, TestOrg } from './setup/helpers';
+import { authDelete, authPatch, authPost, createUserInOrg, login, registerOrg, req, TestOrg } from './setup/helpers';
 import { ORGS } from './setup/factories';
 
 let _n = 0;
@@ -134,6 +134,13 @@ describe('[HRIS-EMP] employee sync', () => {
     expect((await userByRef('E-001')).is_active).toBe(true);
   });
 
+  it('sync never deactivates an org_admin (fullSync or employmentStatus left)', async () => {
+    expect((await userByRef('E-ADMIN')).is_active).toBe(true);
+    const res = await put({ employees: [emp('E-ADMIN', { email: org.admin.email, employmentStatus: 'left' })] }).expect(200);
+    expect(res.body.data.results[0].warnings).toContain('protected_role_not_deactivated');
+    expect((await userByRef('E-ADMIN')).is_active).toBe(true);
+  });
+
   it('a synced user cannot log in with a password', async () => {
     const email = (await userByRef('E-001')).email;
     await req(app).post('/api/v1/auth/login').send({ email, password: 'Anything1!' }).expect(401);
@@ -142,5 +149,40 @@ describe('[HRIS-EMP] employee sync', () => {
   it('validates the payload', async () => {
     await put({ employees: [{ employeeRef: 'E-X', email: 'not-an-email', firstName: 'a', lastName: 'b', employmentStatus: 'active' }] }).expect(400);
     await put({ employees: [emp('E-X', { employmentStatus: 'retired' })] }).expect(400);
+  });
+
+  describe('HRIS-managed fields are read-only in the app (Task 7)', () => {
+    it('changing an HRIS-owned field on an HRIS-managed user → 409 HRIS_MANAGED_FIELD', async () => {
+      const u = await userByRef('E-100');
+      const res = await authPatch(app, org.admin, `/api/v1/users/${u.id}`, { firstName: 'Changed' }).expect(409);
+      expect(res.body.error.code).toBe('HRIS_MANAGED_FIELD');
+      expect(res.body.error.details).toEqual({ fields: ['firstName'] });
+    });
+
+    it('re-sending unchanged HRIS-owned values and changing role is allowed', async () => {
+      const u = await userByRef('E-100');
+      await authPatch(app, org.admin, `/api/v1/users/${u.id}`, { firstName: u.first_name, role: 'hr_manager' }).expect(200);
+      await authPatch(app, org.admin, `/api/v1/users/${u.id}`, { role: 'participant' }).expect(200);
+    });
+
+    it('app-created users stay fully editable', async () => {
+      const email = `editable${uid()}@stp.lk`;
+      const id = await createUserInOrg(ds, org.id, { email, firstName: 'Ed', lastName: 'It', role: 'participant', password: 'Editable2026!' });
+      await authPatch(app, org.admin, `/api/v1/users/${id}`, { firstName: 'Edited' }).expect(200);
+    });
+
+    it('deactivating or permanently deleting an HRIS-managed user → 409', async () => {
+      const u = await userByRef('E-100');
+      await authDelete(app, org.admin, `/api/v1/users/${u.id}`).expect(409);
+      await authDelete(app, org.admin, `/api/v1/users/${u.id}/permanent`).expect(409);
+    });
+
+    it('HRIS-managed departments: rename and delete → 409, description edit allowed', async () => {
+      const d = (await ds.query(`SELECT id FROM departments WHERE organisation_id = $1 AND external_ref = 'D-ENG'`, [org.id]))[0];
+      const rename = await authPatch(app, org.admin, `/api/v1/organisations/me/departments/${d.id}`, { name: 'Renamed' }).expect(409);
+      expect(rename.body.error.code).toBe('HRIS_MANAGED_FIELD');
+      await authDelete(app, org.admin, `/api/v1/organisations/me/departments/${d.id}`).expect(409);
+      await authPatch(app, org.admin, `/api/v1/organisations/me/departments/${d.id}`, { description: 'Builds the product' }).expect(200);
+    });
   });
 });

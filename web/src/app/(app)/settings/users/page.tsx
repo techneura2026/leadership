@@ -384,16 +384,23 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
   }
 
   const isAdminUser = user?.role === UserRole.ORG_ADMIN;
+  const hris = !!user?.hrisManaged;
 
   return (
     <Modal open={!!user} onClose={onClose} title="Edit User">
       <div className="space-y-4">
+        {hris && (
+          <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            Managed by HRIS — name, job title, department and manager can only be changed in your HRIS. You can still change the role.
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Field label="First name" required>
             <input
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               className={inputCls}
+              disabled={hris}
               autoFocus
             />
           </Field>
@@ -402,6 +409,7 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               className={inputCls}
+              disabled={hris}
             />
           </Field>
         </div>
@@ -423,6 +431,7 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             className={inputCls}
+            disabled={hris}
             placeholder="e.g. Senior Manager"
           />
         </Field>
@@ -433,6 +442,7 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
               value={departmentId}
               onChange={setDepartmentId}
               options={deptOptions}
+              disabled={hris}
             />
           </Field>
           <Field label="Reports to">
@@ -440,6 +450,7 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
               value={managerId}
               onChange={setManagerId}
               options={managerOptions}
+              disabled={hris}
             />
           </Field>
         </div>
@@ -922,6 +933,11 @@ export default function UsersSettingsPage() {
                               {isSelf && (
                                 <span className="ml-1.5 text-xs text-gray-400">(you)</span>
                               )}
+                              {u.hrisManaged && (
+                                <Badge variant="info" className="ml-1.5" title="Name, department, manager, job title and status are managed by your HRIS">
+                                  Managed by HRIS
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -964,7 +980,7 @@ export default function UsersSettingsPage() {
                               <KeyRound className="w-4 h-4" strokeWidth={2} />
                             </button>
                           )}
-                          {!isSelf && !isAdmin && u.isActive && (
+                          {!isSelf && !isAdmin && !u.hrisManaged && u.isActive && (
                             <button
                               onClick={() => setDeactivateUser(u)}
                               className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
@@ -973,7 +989,7 @@ export default function UsersSettingsPage() {
                               <Ban className="w-4 h-4" strokeWidth={2} />
                             </button>
                           )}
-                          {!isSelf && !isAdmin && !u.isActive && (
+                          {!isSelf && !isAdmin && !u.hrisManaged && !u.isActive && (
                             <button
                               onClick={() => setReactivateUser(u)}
                               className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
@@ -982,7 +998,7 @@ export default function UsersSettingsPage() {
                               <RotateCcw className="w-4 h-4" strokeWidth={2} />
                             </button>
                           )}
-                          {!isSelf && !isAdmin && (
+                          {!isSelf && !isAdmin && !u.hrisManaged && (
                             <button
                               onClick={() => setDeleteUser(u)}
                               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
