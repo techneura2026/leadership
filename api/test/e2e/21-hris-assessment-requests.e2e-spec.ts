@@ -79,6 +79,69 @@ describe('[HRIS-REQ] assessment requests', () => {
     await post(key, { ...competencyRequest(['M-1']), employeeRefs: [] }).expect(400);
   });
 
+  describe('360 requests (Task 9)', () => {
+    const peers = (tag: string) => [1, 2, 3].map((i) => ({ email: `peer${i}.${tag}@client.lk`, name: `Peer ${i}`, relationship: 'peer' }));
+    const request360 = (employeeRefs: string[], raters?: Record<string, any[]>, cycleRef = '2027-H1') => ({
+      cycleRef,
+      title: 'H1 2027 360',
+      types: ['360_feedback'],
+      startDate: '2027-01-01',
+      endDate: '2027-06-30',
+      employeeRefs,
+      competencyIds,
+      ...(raters ? { raters } : {}),
+    });
+    const nominations = async (assessmentId: string) =>
+      ds.query(`SELECT rater_email, relationship, status FROM rater_nominations WHERE assessment_id = $1 ORDER BY rater_email`, [assessmentId]);
+
+    let first: any[];
+
+    it('creates one 360 assessment per employee, tagged with subjectRef', async () => {
+      const res = await post(key, request360(['R-1', 'R-2'], { 'R-1': peers('r1') })).expect(201);
+      first = res.body.data.assessments;
+      expect(first.map((a: any) => [a.type, a.employeeRefs])).toEqual([
+        ['360_feedback', ['R-1']],
+        ['360_feedback', ['R-2']],
+      ]);
+      const rows = await ds.query(
+        `SELECT subject_ref, cycle_ref, status FROM assessments WHERE id = ANY($1) ORDER BY subject_ref`,
+        [first.map((a: any) => a.assessmentId)],
+      );
+      expect(rows).toEqual([
+        { subject_ref: 'R-1', cycle_ref: '2027-H1', status: 'active' },
+        { subject_ref: 'R-2', cycle_ref: '2027-H1', status: 'active' },
+      ]);
+    });
+
+    it('nominates the given raters as approved, plus the self perspective', async () => {
+      const rows = await nominations(first[0].assessmentId);
+      expect(rows.filter((r: any) => r.relationship === 'peer')).toHaveLength(3);
+      expect(rows.every((r: any) => r.status === 'approved')).toBe(true);
+      expect(rows.filter((r: any) => r.relationship === 'self')).toHaveLength(1);
+    });
+
+    it('a repeat call creates nothing new and does not duplicate raters', async () => {
+      const res = await post(key, request360(['R-1', 'R-2'], { 'R-1': peers('r1') })).expect(200);
+      expect(res.body.data.assessments.map((a: any) => a.assessmentId)).toEqual(first.map((a: any) => a.assessmentId));
+      expect(res.body.data.assessments.every((a: any) => a.created === false)).toBe(true);
+      expect(await nominations(first[0].assessmentId)).toHaveLength(4);
+    });
+
+    it('mixed types return one competency entry plus one 360 entry per employee', async () => {
+      const res = await post(key, { ...request360(['M-1', 'R-3'], undefined, '2027-Q3'), types: ['competency', '360_feedback'] }).expect(201);
+      expect(res.body.data.assessments.map((a: any) => a.type)).toEqual(['competency', '360_feedback', '360_feedback']);
+    });
+
+    it('raters who are LeaderPrism managers are rejected up front with 422 RATERS_NOT_ALLOWED', async () => {
+      const managerEmail = (await ds.query(`SELECT email FROM users WHERE organisation_id = $1 AND external_ref = 'M-1'`, [org.id]))[0].email;
+      const res = await post(key, request360(['R-3'], { 'R-3': [{ email: managerEmail, name: 'Boss', relationship: 'supervisor' }] }, '2027-Q4')).expect(422);
+      expect(res.body.error.code).toBe('RATERS_NOT_ALLOWED');
+      expect(res.body.error.details).toEqual({ emails: [managerEmail] });
+      const rows = await ds.query(`SELECT id FROM assessments WHERE organisation_id = $1 AND cycle_ref = '2027-Q4'`, [org.id]);
+      expect(rows).toHaveLength(0);
+    });
+  });
+
   it('requires the assessments:write scope', async () => {
     const res = await authPost(app, org.admin, '/api/v1/integrations/api-clients', { name: 'RO', scopes: ['results:read'] }).expect(201);
     await post(res.body.data.rawKey, competencyRequest(['M-1'])).expect(403);

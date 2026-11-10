@@ -362,6 +362,16 @@ export class UsersService {
     });
   }
 
+  /** Users in the organisation with any of these emails (case-insensitive). */
+  async findByEmails(organisationId: string, emails: string[]): Promise<User[]> {
+    if (emails.length === 0) return [];
+    return this.userRepo
+      .createQueryBuilder('u')
+      .where('u.organisation_id = :organisationId', { organisationId })
+      .andWhere('u.email IN (:...emails)', { emails: [...new Set(emails.map((e) => e.toLowerCase()))] })
+      .getMany();
+  }
+
   /** Earliest active org admin — fallback attribution for records an integration creates. */
   async findFirstOrgAdminId(organisationId: string): Promise<string | null> {
     const admin = await this.userRepo.findOne({

@@ -12,13 +12,14 @@ import { HrisSyncService } from './hris/hris-sync.service';
 import { HrisAssessmentsController } from './hris/hris-assessments.controller';
 import { HrisAssessmentsService } from './hris/hris-assessments.service';
 import { EngineModule } from '../assessment/engine/engine.module';
+import { Uc1FeedbackModule } from '../assessment/uc1-feedback/uc1-feedback.module';
 
 /**
  * Everything an external HRIS touches: API clients, sync, assessment requests, results export,
  * report links, SSO tickets and webhooks. Talks to other modules through their exported services only.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule, UsersModule, EngineModule],
+  imports: [TypeOrmModule.forFeature([ApiClient]), OrganisationsModule, UsersModule, EngineModule, Uc1FeedbackModule],
   providers: [ApiClientsService, ApiKeyGuard, HrisSyncService, HrisAssessmentsService],
   controllers: [ApiClientsController, HrisPingController, HrisSyncController, HrisAssessmentsController],
 })
