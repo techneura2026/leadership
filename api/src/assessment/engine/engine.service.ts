@@ -377,14 +377,12 @@ export class EngineService {
     }
     const userId = user.id;
 
-    // HR Managers and Managers administer assessments for others — they may only ever be
-    // the subject of a 360 assessment, never of Competency/Personality/Readiness.
-    if (
-      assessment.assessmentType !== AssessmentType.FEEDBACK_360 &&
-      (user.role === UserRole.HR_MANAGER || user.role === UserRole.MANAGER)
-    ) {
+    // HR Managers administer assessments for others — they may only ever be the subject of a
+    // 360 assessment. People managers (MANAGER) can be assessed in every type: they are rated by
+    // their own manager (User.managerId), which is what HRIS leadership KPIs need.
+    if (assessment.assessmentType !== AssessmentType.FEEDBACK_360 && user.role === UserRole.HR_MANAGER) {
       throw new BadRequestException(
-        'HR Managers and Managers can only be added as participants to 360-degree feedback assessments',
+        'HR Managers can only be added as participants to 360-degree feedback assessments',
       );
     }
 
