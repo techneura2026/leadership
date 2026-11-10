@@ -111,6 +111,20 @@ export interface EmployeeResultDto {
   competency: CompetencyBlockDto | null;
   feedback360: Feedback360BlockDto | null;
   reports: ReportLinkDto[];
+  /** Only present for API keys with the talent:read scope. */
+  readiness?: {
+    rating: string;
+    compositeScore: number;
+    components: { competency: number; feedback: number; sjt: number; learningAgility: number; personalityFit: number };
+    roleProfile: { ref: string; title: string } | null;
+  } | null;
+  /** Only present for API keys with the talent:read scope. */
+  nineBox?: {
+    performance: 'high' | 'medium' | 'low';
+    potential: 'high' | 'medium' | 'low';
+    performanceSource: 'manual' | 'hris' | 'feedback360';
+    overrideNote: string | null;
+  } | null;
 }
 
 export interface ResultsPageDto {

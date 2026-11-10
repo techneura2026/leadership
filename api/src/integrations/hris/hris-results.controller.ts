@@ -47,9 +47,17 @@ export class HrisResultsController {
   @Get('results')
   @RequireScopes('results:read')
   @ApiOperation({ summary: 'Competency and 360 results for a review cycle — one employee (employeeRef) or a page (cursor, limit ≤ 100)' })
-  getResults(@IntegrationOrgId() orgId: string, @Query() q: ResultsQueryDto) {
-    if (q.employeeRef) return this.results.getEmployeeResult(orgId, q.cycleRef, q.employeeRef);
-    return this.results.getResultsPage(orgId, q.cycleRef, q.cursor, q.limit ?? 50);
+  getResults(@IntegrationContext() principal: IntegrationPrincipal, @Query() q: ResultsQueryDto) {
+    const opts = { talent: principal.scopes.includes('talent:read') };
+    if (q.employeeRef) return this.results.getEmployeeResult(principal.orgId, q.cycleRef, q.employeeRef, opts);
+    return this.results.getResultsPage(principal.orgId, q.cycleRef, q.cursor, q.limit ?? 50, opts);
+  }
+
+  @Get('succession')
+  @RequireScopes('talent:read')
+  @ApiOperation({ summary: 'Key roles and nominated successors by employeeRef (O-6)' })
+  getSuccession(@IntegrationOrgId() orgId: string) {
+    return this.results.getSuccession(orgId);
   }
 
   @Get('framework')

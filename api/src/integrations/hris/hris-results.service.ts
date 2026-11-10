@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AssessmentStatus, AssessmentType, ReportType } from '@leaderprism/shared';
+import { AssessmentStatus, AssessmentType, ReadinessRating, ReportType } from '@leaderprism/shared';
+import { SuccessionService } from '../../succession/succession.service';
 import { ReportingService } from '../../reporting/reporting.service';
 import type { IntegrationPrincipal } from '../api-clients/api-clients.service';
 import { signReportUrl, verifyReportSignature } from './signed-url';
@@ -34,25 +35,73 @@ export class HrisResultsService {
     private readonly items: ItemsService,
     private readonly reporting: ReportingService,
     private readonly config: ConfigService,
+    private readonly succession: SuccessionService,
   ) {}
 
-  async getEmployeeResult(orgId: string, cycleRef: string, employeeRef: string): Promise<EmployeeResultDto> {
+  /** `talent` (scope talent:read) adds readiness and 9-box placement (O-4, O-5); otherwise those keys are absent. */
+  async getEmployeeResult(
+    orgId: string,
+    cycleRef: string,
+    employeeRef: string,
+    opts: { talent: boolean } = { talent: false },
+  ): Promise<EmployeeResultDto> {
     const cycle = await this.loadCycle(orgId, cycleRef);
     const userId = cycle.userIdByRef.get(employeeRef);
     if (!userId) throw new NotFoundException(`Employee ${employeeRef} is not part of cycle ${cycleRef}`);
-    return this.build(orgId, cycleRef, employeeRef, userId, cycle.assessments, new Map());
+    const result = await this.build(orgId, cycleRef, employeeRef, userId, cycle.assessments, new Map());
+    if (opts.talent) await this.attachTalent(orgId, [[userId, result]]);
+    return result;
   }
 
-  async getResultsPage(orgId: string, cycleRef: string, cursor: string | undefined, limit: number): Promise<ResultsPageDto> {
+  async getResultsPage(
+    orgId: string,
+    cycleRef: string,
+    cursor: string | undefined,
+    limit: number,
+    opts: { talent: boolean } = { talent: false },
+  ): Promise<ResultsPageDto> {
     const cycle = await this.loadCycle(orgId, cycleRef);
     const refs = [...cycle.userIdByRef.keys()].sort().filter((r) => cursor === undefined || r > cursor);
     const page = refs.slice(0, limit);
     const profiles = new Map<string, ExportRoleProfile | null>();
-    const data: EmployeeResultDto[] = [];
+    const built: Array<[string, EmployeeResultDto]> = [];
     for (const ref of page) {
-      data.push(await this.build(orgId, cycleRef, ref, cycle.userIdByRef.get(ref) as string, cycle.assessments, profiles));
+      const userId = cycle.userIdByRef.get(ref) as string;
+      built.push([userId, await this.build(orgId, cycleRef, ref, userId, cycle.assessments, profiles)]);
     }
-    return { data, nextCursor: refs.length > limit ? page[page.length - 1] : null };
+    if (opts.talent) await this.attachTalent(orgId, built);
+    return { data: built.map(([, r]) => r), nextCursor: refs.length > limit ? page[page.length - 1] : null };
+  }
+
+  /** O-6: key roles with their nominated successors, identified by employeeRef. */
+  async getSuccession(orgId: string) {
+    const keyRoles = await this.succession.listKeyRoles(orgId);
+    const userIds = keyRoles.flatMap((k) => k.successors.map((s) => s.candidateUserId).filter((id): id is string => !!id));
+    const refs = await this.users.getExternalRefs(orgId, userIds);
+    return {
+      keyRoles: keyRoles.map((k) => ({
+        id: k.id,
+        title: k.title,
+        criticality: k.criticality,
+        departmentName: k.departmentName,
+        incumbentRef: k.incumbentId ? (refs.get(k.incumbentId) ?? null) : null,
+        readyNowCount: k.successors.filter((s) => s.readinessRating === ReadinessRating.READY_NOW).length,
+        successors: k.successors.map((s) => ({
+          employeeRef: s.candidateUserId ? (refs.get(s.candidateUserId) ?? null) : null,
+          readinessRating: s.readinessRating,
+          compositeScore: s.compositeScore,
+        })),
+      })),
+    };
+  }
+
+  private async attachTalent(orgId: string, rows: Array<[string, EmployeeResultDto]>): Promise<void> {
+    const snapshots = await this.readiness.getTalentSnapshots(orgId, rows.map(([userId]) => userId));
+    for (const [userId, result] of rows) {
+      const snap = snapshots.get(userId);
+      result.readiness = snap?.readiness ?? null;
+      result.nineBox = snap?.nineBox ?? null;
+    }
   }
 
   /** O-9: the competency framework and role profiles the HRIS builds leadership KPIs from. */

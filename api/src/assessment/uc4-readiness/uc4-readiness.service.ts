@@ -12,6 +12,22 @@ import { SjtResponse } from './entities/sjt-response.entity';
 import { LearningAgilityResponse } from './entities/learning-agility-response.entity';
 import { ReadinessScore, effectiveGridPerformance, performanceSource } from './entities/readiness-score.entity';
 import { ExternalPerformanceScore } from './entities/external-performance-score.entity';
+import { DomainEvent, DomainEventBus, ReadinessComputedPayload } from '../../shared/events/domain-events';
+
+export interface TalentSnapshot {
+  readiness: {
+    rating: ReadinessRating;
+    compositeScore: number;
+    components: { competency: number; feedback: number; sjt: number; learningAgility: number; personalityFit: number };
+    roleProfile: { ref: string; title: string } | null;
+  };
+  nineBox: {
+    performance: 'high' | 'medium' | 'low';
+    potential: 'high' | 'medium' | 'low';
+    performanceSource: 'manual' | 'hris' | 'feedback360';
+    overrideNote: string | null;
+  };
+}
 import { Assessment } from '../engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../engine/entities/assessment-participant.entity';
 import { Item } from '../items/entities/item.entity';
@@ -61,6 +77,7 @@ export class Uc4ReadinessService {
     private readonly externalScoreRepo: Repository<ExternalPerformanceScore>,
     private readonly readinessScoringService: ReadinessScoringService,
     private readonly engineService: EngineService,
+    private readonly events: DomainEventBus,
   ) {}
 
   /** HRIS final performance scores (one per employee per cycle; a repeat overwrites, e.g. after an appeal). */
@@ -74,6 +91,51 @@ export class Uc4ReadinessService {
       { conflictPaths: ['organisationId', 'userId', 'cycleRef'] },
     );
     return rows.length;
+  }
+
+  /**
+   * Latest readiness score and effective 9-box placement per user (O-4, O-5) — for the HRIS talent
+   * export. Users with no readiness score are absent from the map.
+   */
+  async getTalentSnapshots(orgId: string, userIds: string[]): Promise<Map<string, TalentSnapshot>> {
+    const result = new Map<string, TalentSnapshot>();
+    if (userIds.length === 0) return result;
+    const scores = await this.readinessScoreRepo
+      .createQueryBuilder('rs')
+      .innerJoinAndSelect('rs.participant', 'p')
+      .leftJoinAndSelect('rs.roleProfile', 'rp')
+      .innerJoin('p.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('p.user_id IN (:...userIds)', { userIds: [...new Set(userIds)] })
+      .orderBy('rs.calculated_at', 'DESC')
+      .getMany();
+    const external = await this.getLatestExternalScores(orgId, userIds);
+    for (const s of scores) {
+      const userId = s.participant.userId;
+      if (result.has(userId)) continue;
+      const ext = external.get(userId);
+      result.set(userId, {
+        readiness: {
+          rating: s.readinessRating,
+          compositeScore: Number(s.compositeScore),
+          components: {
+            competency: Number(s.competencyScore),
+            feedback: Number(s.feedbackScore),
+            sjt: Number(s.sjtScore),
+            learningAgility: Number(s.learningAgilityScore),
+            personalityFit: Number(s.personalityFitScore),
+          },
+          roleProfile: s.roleProfile ? { ref: s.roleProfile.id, title: s.roleProfile.title } : null,
+        },
+        nineBox: {
+          performance: effectiveGridPerformance(s, ext),
+          potential: s.gridPotential,
+          performanceSource: performanceSource(s, ext),
+          overrideNote: s.manualGridPerformance ? s.manualPerformanceNote : null,
+        },
+      });
+    }
+    return result;
   }
 
   /** Most recently finalised HRIS score per user. */
@@ -367,6 +429,16 @@ export class Uc4ReadinessService {
     this.logger.log(
       `Computed readiness for participant ${participantId}: rating=${score.readinessRating} composite=${score.compositeScore}`,
     );
+
+    const assessment = await this.assessmentRepo.findOne({ where: { id: assessmentId, organisationId: orgId } });
+    const payload: ReadinessComputedPayload = {
+      orgId,
+      assessmentId,
+      cycleRef: assessment?.cycleRef ?? null,
+      userId: participant.userId,
+      occurredAt: new Date().toISOString(),
+    };
+    this.events.emit(DomainEvent.ReadinessComputed, payload);
 
     return score;
   }

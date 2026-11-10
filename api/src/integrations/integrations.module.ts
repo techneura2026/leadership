@@ -9,6 +9,7 @@ import { Uc2CompetencyModule } from '../assessment/uc2-competency/uc2-competency
 import { Uc4ReadinessModule } from '../assessment/uc4-readiness/uc4-readiness.module';
 import { ItemsModule } from '../assessment/items/items.module';
 import { ReportingModule } from '../reporting/reporting.module';
+import { SuccessionModule } from '../succession/succession.module';
 import { ApiClient } from './api-clients/api-client.entity';
 import { ApiClientsService } from './api-clients/api-clients.service';
 import { ApiClientsController } from './api-clients/api-clients.controller';
@@ -47,6 +48,7 @@ import { AuthModule } from '../core/auth/auth.module';
     ItemsModule,
     ReportingModule,
     AuthModule,
+    SuccessionModule,
   ],
   providers: [
     ApiClientsService,
