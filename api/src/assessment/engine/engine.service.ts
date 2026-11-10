@@ -143,7 +143,16 @@ export class EngineService {
     });
   }
 
-  async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
+  /**
+   * `origin` is internal-only (not part of the public DTO): it tags assessments created for an
+   * HRIS review cycle with the cycle reference and, for 360, the subject's employeeRef.
+   */
+  async create(
+    orgId: string,
+    userId: string,
+    dto: CreateAssessmentDto,
+    origin?: { cycleRef: string; subjectRef?: string | null; source: 'hris' },
+  ): Promise<Assessment> {
     const org = await this.orgRepo.findOne({ where: { id: orgId } });
     if (!org) {
       throw new NotFoundException('Organisation not found');
@@ -167,11 +176,42 @@ export class EngineService {
       config: dto.config ?? {},
       startDate: dto.startDate ? new Date(dto.startDate) : null,
       endDate: dto.endDate ? new Date(dto.endDate) : null,
+      cycleRef: origin?.cycleRef ?? null,
+      subjectRef: origin?.subjectRef ?? null,
+      source: origin?.source ?? 'app',
     });
 
     const saved = await this.assessmentRepo.save(assessment);
     this.logger.log(`Created assessment ${saved.id} type=${saved.assessmentType} org=${orgId}`);
     return saved;
+  }
+
+  /** The assessment an HRIS cycle already created for this type (and 360 subject), if any. */
+  async findByCycleRef(
+    orgId: string,
+    cycleRef: string,
+    type: AssessmentType,
+    subjectRef?: string,
+  ): Promise<Assessment | null> {
+    return this.assessmentRepo.findOne({
+      where: {
+        organisationId: orgId,
+        cycleRef,
+        assessmentType: type,
+        ...(subjectRef !== undefined ? { subjectRef } : {}),
+      },
+      relations: ['participants'],
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /** Every assessment an HRIS cycle created in this organisation. */
+  async findAllByCycleRef(orgId: string, cycleRef: string): Promise<Assessment[]> {
+    return this.assessmentRepo.find({
+      where: { organisationId: orgId, cycleRef },
+      relations: ['participants'],
+      order: { createdAt: 'ASC' },
+    });
   }
 
   async findAll(

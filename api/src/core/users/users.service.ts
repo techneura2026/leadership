@@ -362,6 +362,16 @@ export class UsersService {
     });
   }
 
+  /** Earliest active org admin — fallback attribution for records an integration creates. */
+  async findFirstOrgAdminId(organisationId: string): Promise<string | null> {
+    const admin = await this.userRepo.findOne({
+      where: { organisationId, role: UserRole.ORG_ADMIN, isActive: true },
+      order: { createdAt: 'ASC' },
+      select: ['id'],
+    });
+    return admin?.id ?? null;
+  }
+
   /** Users in the organisation with the given HRIS employeeRefs (unknown refs are absent). */
   async findByExternalRefs(organisationId: string, refs: string[]): Promise<User[]> {
     if (refs.length === 0) return [];

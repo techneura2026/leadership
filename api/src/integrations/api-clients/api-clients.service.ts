@@ -11,6 +11,8 @@ export interface IntegrationPrincipal {
   orgId: string;
   clientId: string;
   scopes: IntegrationScope[];
+  /** User who created the API key — records created by the HRIS are attributed to them. */
+  createdBy: string | null;
 }
 
 const LAST_USED_WRITE_INTERVAL_MS = 60_000;
@@ -85,7 +87,7 @@ export class ApiClientsService {
       await this.clientRepo.update({ id: client.id, revokedAt: IsNull() }, { lastUsedAt: new Date() });
     }
 
-    return { orgId: client.organisationId, clientId: client.id, scopes: client.scopes };
+    return { orgId: client.organisationId, clientId: client.id, scopes: client.scopes, createdBy: client.createdBy };
   }
 
   private toDto(c: ApiClient): ApiClientDto {
