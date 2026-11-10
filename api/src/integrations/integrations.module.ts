@@ -10,6 +10,7 @@ import { Uc4ReadinessModule } from '../assessment/uc4-readiness/uc4-readiness.mo
 import { ItemsModule } from '../assessment/items/items.module';
 import { ReportingModule } from '../reporting/reporting.module';
 import { SuccessionModule } from '../succession/succession.module';
+import { Uc3PersonalityModule } from '../assessment/uc3-personality/uc3-personality.module';
 import { ApiClient } from './api-clients/api-client.entity';
 import { ApiClientsService } from './api-clients/api-clients.service';
 import { ApiClientsController } from './api-clients/api-clients.controller';
@@ -49,6 +50,7 @@ import { AuthModule } from '../core/auth/auth.module';
     ReportingModule,
     AuthModule,
     SuccessionModule,
+    Uc3PersonalityModule,
   ],
   providers: [
     ApiClientsService,

@@ -279,7 +279,76 @@ the employee's browser (a new tab is fine). The ticket is **single-use** and exp
 
 ---
 
-## 7. Limits
+## 7. Talent data (Phase 2) and personality (Phase 3)
+
+### `PUT /performance-scores` (scope `scores:write`)
+
+```json
+{ "cycleRef": "2027-H1",
+  "scores": [ { "employeeRef": "E-100", "finalScore": 82.5, "ratingBand": "Exceeds", "finalisedAt": "2027-07-20T10:00:00Z" } ] }
+```
+
+Sends the final, calibrated performance score for each employee.
+
+**How it affects the 9-box.** The latest score, by `finalisedAt`, sets the performance axis of
+LeaderPrism's 9-box:
+- `≥ 70` → high
+- `≥ 40` → medium
+- anything lower → low
+
+A manual override by HR in LeaderPrism still wins.
+
+**Resending.** Sending the same cycle again overwrites the stored score, for example after an appeal.
+
+**Row results.** The response uses the same row results as the sync calls. Row errors are
+`employee_not_found` and `invalid_score` (the score must be between 0 and 100).
+
+### Readiness and 9-box in results (scope `talent:read`)
+
+API keys with `talent:read` also get these fields on every result:
+
+```json
+"readiness": { "rating": "1_2_years", "compositeScore": 62,
+               "components": { "competency": 70, "feedback": 55, "sjt": 60, "learningAgility": 65, "personalityFit": 50 },
+               "roleProfile": { "ref": "…", "title": "Engineering Manager" } },
+"nineBox":   { "performance": "high", "potential": "high", "performanceSource": "hris", "overrideNote": null }
+```
+
+- `performanceSource` says where the performance value came from: `manual` (HR override), `hris` (your score) or `feedback360` (LeaderPrism's 360 result).
+- **Use these for development and succession only, never as performance scores.**
+- Without the scope, these keys are absent.
+- `GET /succession` (scope `talent:read`) lists key roles with their successors by `employeeRef`, and the number of successors who are ready now (`readyNowCount`).
+
+### Role profiles linked to designations
+
+A role profile can list `designationRefs`, for example `["SE-2"]`. When a cycle has no explicit
+`roleProfileId`, each employee's `requiredLevel` comes from the profile linked to their synced
+`designationRef`.
+
+### Personality (scope `personality:read`)
+
+A single-employee read (`employeeRef=…`) also returns the employee's latest Big Five profile:
+
+```json
+"personality": { "assessedAt": "…", "usage": "development_only",
+                 "factors": [ { "factor": "openness", "tScore": 62, "percentile": 88 } ] }
+```
+
+> **Permitted use.** Personality data is for coaching and development conversations only. It must
+> never be an input to performance scores, rankings, improvement-plan triggers, pay or other
+> employment decisions. Make it visible only to the employee and HR. For this reason it is never
+> included in bulk result pages.
+
+### Audit and reminders
+
+Every integration call that changes or reads data is recorded in LeaderPrism's audit log, under
+Settings → Audit log. This covers syncs, deactivations, assessment requests, results reads,
+report downloads and score pushes.
+
+Assessments with `config.reminderDays` send automatic reminders at 08:00 (Asia/Colombo) on those
+days before `endDate`.
+
+## 8. Limits
 
 | Item | Limit |
 |---|---|
@@ -291,7 +360,7 @@ the employee's browser (a new tab is fine). The ticket is **single-use** and exp
 | Webhook attempts | 6 |
 | General rate limit | 100 requests per minute per client IP |
 
-## 8. Server configuration
+## 9. Server configuration
 
 | Variable | Purpose |
 |---|---|

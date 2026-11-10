@@ -218,6 +218,31 @@ export class Uc3PersonalityService {
   }
 
   /**
+   * The user's most recent Big Five profile in this organisation (HRIS export, development use
+   * only). Null when the user has no personality scores.
+   */
+  async getLatestScoresForUser(
+    orgId: string,
+    userId: string,
+  ): Promise<{ assessedAt: Date; factors: Array<{ factor: string; tScore: number; percentile: number }> } | null> {
+    const scores = await this.scoreRepo
+      .createQueryBuilder('ps')
+      .innerJoin('ps.participant', 'p')
+      .innerJoin('ps.assessment', 'a')
+      .where('a.organisation_id = :orgId', { orgId })
+      .andWhere('p.user_id = :userId', { userId })
+      .orderBy('ps.calculated_at', 'DESC')
+      .getMany();
+    if (scores.length === 0) return null;
+    const latest = scores[0].assessmentId;
+    const mine = scores.filter((s) => s.assessmentId === latest);
+    return {
+      assessedAt: mine[0].calculatedAt,
+      factors: mine.map((s) => ({ factor: s.factor, tScore: Number(s.tScore), percentile: Number(s.percentile) })),
+    };
+  }
+
+  /**
    * requestingUserId/requestingUserRole are optional: omitted when called internally by the
    * report-generation worker (no per-request caller — the Report row's own creation was
    * already authorized), required (and enforced) when called from the controller on behalf

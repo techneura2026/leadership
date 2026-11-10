@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { AssessmentStatus, AssessmentType, ReadinessRating, ReportType } from '@leaderprism/shared';
 import { SuccessionService } from '../../succession/succession.service';
+import { Uc3PersonalityService } from '../../assessment/uc3-personality/uc3-personality.service';
 import { ReportingService } from '../../reporting/reporting.service';
 import type { IntegrationPrincipal } from '../api-clients/api-clients.service';
 import { signReportUrl, verifyReportSignature } from './signed-url';
@@ -36,6 +37,7 @@ export class HrisResultsService {
     private readonly reporting: ReportingService,
     private readonly config: ConfigService,
     private readonly succession: SuccessionService,
+    private readonly personality: Uc3PersonalityService,
   ) {}
 
   /** `talent` (scope talent:read) adds readiness and 9-box placement (O-4, O-5); otherwise those keys are absent. */
@@ -43,13 +45,20 @@ export class HrisResultsService {
     orgId: string,
     cycleRef: string,
     employeeRef: string,
-    opts: { talent: boolean } = { talent: false },
+    opts: { talent: boolean; personality?: boolean } = { talent: false },
   ): Promise<EmployeeResultDto> {
     const cycle = await this.loadCycle(orgId, cycleRef);
     const userId = cycle.userIdByRef.get(employeeRef);
     if (!userId) throw new NotFoundException(`Employee ${employeeRef} is not part of cycle ${cycleRef}`);
     const result = await this.build(orgId, cycleRef, employeeRef, userId, cycle.assessments, new Map());
     if (opts.talent) await this.attachTalent(orgId, [[userId, result]]);
+    // O-7: single-employee reads only — never bulk — and never an input to scoring (spec §12).
+    if (opts.personality) {
+      const profile = await this.personality.getLatestScoresForUser(orgId, userId);
+      result.personality = profile
+        ? { assessedAt: profile.assessedAt.toISOString(), factors: profile.factors, usage: 'development_only' }
+        : null;
+    }
     return result;
   }
 

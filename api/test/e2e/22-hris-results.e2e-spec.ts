@@ -230,6 +230,48 @@ describe('[HRIS-RES] results export', () => {
     });
   });
 
+  describe('personality export (Task 25)', () => {
+    let personalityKey: string;
+
+    beforeAll(async () => {
+      const userId = (await ds.query(`SELECT id FROM users WHERE organisation_id = $1 AND external_ref = 'R-1'`, [org.id]))[0].id;
+      const [a] = await ds.query(
+        `INSERT INTO assessments (organisation_id, created_by, title, assessment_type, status) VALUES ($1, $2, 'Big Five', 'personality', 'closed') RETURNING id`,
+        [org.id, org.admin.userId]);
+      const [p] = await ds.query(`INSERT INTO assessment_participants (assessment_id, user_id, status) VALUES ($1, $2, 'completed') RETURNING id`, [a.id, userId]);
+      for (const [factor, t, pct] of [['openness', 62, 88], ['conscientiousness', 48, 42]] as const) {
+        await ds.query(
+          `INSERT INTO personality_scores (assessment_id, participant_id, factor, raw_score, t_score, percentile) VALUES ($1, $2, $3, 30, $4, $5)`,
+          [a.id, p.id, factor, t, pct]);
+      }
+      personalityKey = (await authPost(app, org.admin, '/api/v1/integrations/api-clients', {
+        name: 'Coaching', scopes: ['results:read', 'personality:read'],
+      }).expect(201)).body.data.rawKey;
+    });
+
+    it('is absent without the personality:read scope', async () => {
+      const body = (await getResults(key, 'cycleRef=2027-H1&employeeRef=R-1').expect(200)).body.data;
+      expect('personality' in body).toBe(false);
+    });
+
+    it('is present on a single-employee read with the scope, marked development-only', async () => {
+      const body = (await getResults(personalityKey, 'cycleRef=2027-H1&employeeRef=R-1').expect(200)).body.data;
+      expect(body.personality).toEqual({
+        assessedAt: expect.any(String),
+        usage: 'development_only',
+        factors: expect.arrayContaining([
+          { factor: 'openness', tScore: 62, percentile: 88 },
+          { factor: 'conscientiousness', tScore: 48, percentile: 42 },
+        ]),
+      });
+    });
+
+    it('is never included in bulk pages, even with the scope', async () => {
+      const page = (await getResults(personalityKey, 'cycleRef=2027-H1&limit=10').expect(200)).body.data;
+      expect(page.data.every((r: any) => !('personality' in r))).toBe(true);
+    });
+  });
+
   it('requires the results:read scope', async () => {
     const res = await authPost(app, org.admin, '/api/v1/integrations/api-clients', { name: 'W', scopes: ['employees:write'] }).expect(201);
     await getResults(res.body.data.rawKey, 'cycleRef=2027-H1&employeeRef=R-1').expect(403);

@@ -118,6 +118,12 @@ export interface EmployeeResultDto {
     components: { competency: number; feedback: number; sjt: number; learningAgility: number; personalityFit: number };
     roleProfile: { ref: string; title: string } | null;
   } | null;
+  /** Single-employee reads with the personality:read scope only. Development use only — never for scoring. */
+  personality?: {
+    assessedAt: string;
+    factors: Array<{ factor: string; tScore: number; percentile: number }>;
+    usage: 'development_only';
+  } | null;
   /** Only present for API keys with the talent:read scope. */
   nineBox?: {
     performance: 'high' | 'medium' | 'low';

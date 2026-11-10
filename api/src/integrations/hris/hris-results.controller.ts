@@ -54,7 +54,10 @@ export class HrisResultsController {
   async getResults(@IntegrationContext() principal: IntegrationPrincipal, @Query() q: ResultsQueryDto) {
     const opts = { talent: principal.scopes.includes('talent:read') };
     const body = q.employeeRef
-      ? await this.results.getEmployeeResult(principal.orgId, q.cycleRef, q.employeeRef, opts)
+      ? await this.results.getEmployeeResult(principal.orgId, q.cycleRef, q.employeeRef, {
+          ...opts,
+          personality: principal.scopes.includes('personality:read'),
+        })
       : await this.results.getResultsPage(principal.orgId, q.cycleRef, q.cursor, q.limit ?? 50, opts);
     await this.audit.record({
       orgId: principal.orgId, actorType: 'api_client', actorId: principal.clientId, action: 'integration.results.read',
