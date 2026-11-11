@@ -10,6 +10,7 @@ import { IsNull, Repository } from 'typeorm';
 import { AssessmentConfig, ReportType, resolveQuestionMode } from '@leaderprism/shared';
 import { Report } from './report.entity';
 import { PdfService } from './pdf.service';
+import { DomainEvent, DomainEventBus, ReportReadyPayload } from '../shared/events/domain-events';
 import { Assessment } from '../assessment/engine/entities/assessment.entity';
 import { AssessmentParticipant } from '../assessment/engine/entities/assessment-participant.entity';
 import { User } from '../core/users/entities/user.entity';
@@ -18,7 +19,7 @@ import { Uc1FeedbackService } from '../assessment/uc1-feedback/uc1-feedback.serv
 import { Uc2CompetencyService } from '../assessment/uc2-competency/uc2-competency.service';
 import { Uc3PersonalityService } from '../assessment/uc3-personality/uc3-personality.service';
 import { Uc4ReadinessService } from '../assessment/uc4-readiness/uc4-readiness.service';
-import { ReadinessScore } from '../assessment/uc4-readiness/entities/readiness-score.entity';
+import { ReadinessScore, effectiveGridPerformance } from '../assessment/uc4-readiness/entities/readiness-score.entity';
 import { NotificationsService } from '../core/notifications/notifications.service';
 
 @Injectable()
@@ -46,6 +47,7 @@ export class ReportingService {
     private readonly notificationsService: NotificationsService,
     @InjectQueue('reports')
     private readonly reportsQueue: Queue,
+    private readonly events: DomainEventBus,
   ) {}
 
   /**
@@ -332,6 +334,10 @@ export class ReportingService {
           });
 
           if (!readinessScore) throw new NotFoundException('Readiness score not computed yet');
+          const subject = await this.participantRepo.findOne({ where: { id: participantId }, select: ['id', 'userId'] });
+          const external = subject
+            ? (await this.uc4Service.getLatestExternalScores(orgId, [subject.userId])).get(subject.userId)
+            : undefined;
 
           localPath = await this.pdfService.generateReadinessReport({
             ...commonData,
@@ -343,7 +349,7 @@ export class ReportingService {
             sjtScore: Number(readinessScore.sjtScore),
             learningAgilityScore: Number(readinessScore.learningAgilityScore),
             personalityFitScore: Number(readinessScore.personalityFitScore),
-            gridPerformance: readinessScore.gridPerformance,
+            gridPerformance: effectiveGridPerformance(readinessScore, external),
             gridPotential: readinessScore.gridPotential,
             developmentActions: [
               { priority: 1, area: 'Competency Development', action: 'Focus on lowest-rated competencies identified in the competency assessment.', timeline: '3-6 months' },
@@ -366,6 +372,18 @@ export class ReportingService {
       await this.reportRepo.save(savedReport);
 
       this.logger.log(`Report ${savedReport.id} generated: ${localPath}`);
+      const subject = savedReport.participantId
+        ? await this.participantRepo.findOne({ where: { id: savedReport.participantId }, select: ['id', 'userId'] })
+        : null;
+      const payload: ReportReadyPayload = {
+        orgId: savedReport.organisationId,
+        reportId: savedReport.id,
+        assessmentId: savedReport.assessmentId,
+        participantUserId: subject?.userId ?? null,
+        reportType: savedReport.reportType,
+        occurredAt: new Date().toISOString(),
+      };
+      this.events.emit(DomainEvent.ReportReady, payload);
     } catch (err) {
       savedReport.status = 'failed';
       savedReport.error = err instanceof Error ? err.message : String(err);
@@ -409,6 +427,17 @@ export class ReportingService {
 
     // Local dev: return file path; prod: would return signed blob URL
     return report.localPath ?? report.blobUrl ?? '';
+  }
+
+  /**
+   * Download path for a report reached through an HRIS signed link. Deliberately not org-scoped:
+   * the caller must have verified the link's HMAC signature first (integrations/hris/signed-url.ts).
+   */
+  async getDownloadPathForSignedLink(id: string): Promise<{ path: string; orgId: string } | null> {
+    const report = await this.reportRepo.findOne({ where: { id } });
+    if (!report || report.status !== 'ready') return null;
+    const path = report.localPath ?? report.blobUrl;
+    return path ? { path, orgId: report.organisationId } : null;
   }
 
   async listReports(orgId: string, assessmentId?: string): Promise<Report[]> {

@@ -101,7 +101,10 @@ api/src/
 │
 ├── reporting/         # PDF generation (Puppeteer, BullMQ)
 ├── analytics/         # Org-level aggregations, heatmaps
-└── shared/            # Decorators, filters, interceptors, base entities
+├── integrations/      # HRIS integration: API keys (X-Api-Key), sync, assessment requests,
+│                      #   results export, signed report links, SSO tickets, webhooks
+│                      #   (see docs/integrations/hris-api.md)
+└── shared/            # Decorators, filters, interceptors, base entities, DomainEventBus
 ```
 
 ## User Roles
@@ -168,4 +171,7 @@ Redis:    localhost:6379
 - [x] Phase 5 — 55 unit tests passing, Playwright E2E setup, build verified
 - [x] Dev environment — app + landing on the shared Hostinger VPS, deployed by `deploy-dev.yml`
       on push to `master` (moved off Azure 2026-10-02; see DEPLOYMENT-HOSTINGER.md)
+- [x] HRIS integration MVP — API keys, employee/department sync, cycle assessment requests,
+      results export (competency + anonymity-safe 360), signed report links, webhooks, SSO tickets
+      (plan: docs/superpowers/plans/2026-11-10-hris-integration.md)
 - [ ] Prod deployment

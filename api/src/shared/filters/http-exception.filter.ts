@@ -22,6 +22,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let code: string = ErrorCode.VALIDATION_ERROR;
     let message = 'Internal server error';
     let fields: Record<string, string[]> | undefined;
+    let details: Record<string, unknown> | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -31,6 +32,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const r = exceptionResponse as Record<string, unknown>;
         message = (r['message'] as string) ?? exception.message;
         code = (r['error'] as string) ?? this.statusToCode(status);
+        // Structured, machine-readable context for API clients (e.g. which fields or refs were rejected).
+        if (r['details'] && typeof r['details'] === 'object') details = r['details'] as Record<string, unknown>;
         if (Array.isArray(r['message'])) {
           fields = this.parseValidationErrors(r['message'] as string[]);
           message = 'Validation failed';
@@ -49,6 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         code,
         message,
         ...(fields ? { fields } : {}),
+        ...(details ? { details } : {}),
       },
       meta: { timestamp: new Date().toISOString(), path: request.url },
     });

@@ -18,7 +18,7 @@ import { SaveResponseDto } from './dto/save-response.dto';
 
 @ApiTags('Personality Assessment — Big Five (UC3)')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+@Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
 @Controller('assessments')
 export class Uc3PersonalityController {
   constructor(private readonly uc3Service: Uc3PersonalityService) {}

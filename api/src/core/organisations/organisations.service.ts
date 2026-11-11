@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { Organisation } from './entities/organisation.entity';
 import { Department } from './entities/department.entity';
 import { Plan } from '@leaderprism/shared';
-import { UsersService } from '../users/users.service';
+import type { DepartmentSyncRow, SyncRowResult } from '@leaderprism/shared';
+import { UsersService, hrisManagedConflict } from '../users/users.service';
 
 @Injectable()
 export class OrganisationsService {
@@ -67,13 +68,124 @@ export class OrganisationsService {
   ): Promise<Department> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');
+    if (dept.hrisManaged) {
+      const changed = (['name', 'isActive'] as const).filter((f) => data[f] !== undefined && data[f] !== dept[f]);
+      if (changed.length > 0) throw hrisManagedConflict('department', changed);
+    }
     Object.assign(dept, data);
     return this.deptRepo.save(dept);
+  }
+
+  /**
+   * HRIS department sync. Upserts by external_ref inside one transaction. Pass 1 writes names and
+   * status; pass 2 resolves parentRef against existing departments plus the batch. Rows that
+   * would form a parent cycle are rejected before anything is written.
+   */
+  async upsertDepartmentsByRef(organisationId: string, rows: DepartmentSyncRow[]): Promise<SyncRowResult[]> {
+    return this.deptRepo.manager.transaction(async (em) => {
+      const repo = em.getRepository(Department);
+      const all = await repo.find({ where: { organisationId } });
+      const byRef = new Map(all.filter((d) => d.externalRef).map((d) => [d.externalRef as string, d]));
+      const byId = new Map(all.map((d) => [d.id, d]));
+
+      // Proposed parent graph by ref: batch rows use their parentRef; others keep their DB parent.
+      const batchParent = new Map<string, string | null | undefined>(rows.map((r) => [r.departmentRef, r.parentRef]));
+      const parentRefOf = (ref: string): string | null => {
+        if (batchParent.has(ref)) {
+          const p = batchParent.get(ref);
+          if (p !== undefined) return p;
+        }
+        const d = byRef.get(ref);
+        const parent = d?.parentId ? byId.get(d.parentId) : undefined;
+        return parent?.externalRef ?? null;
+      };
+      const inCycle = (ref: string): boolean => {
+        let cur = parentRefOf(ref);
+        for (let i = 0; cur && i <= rows.length + all.length; i++) {
+          if (cur === ref) return true;
+          cur = parentRefOf(cur);
+        }
+        return false;
+      };
+
+      const results: SyncRowResult[] = [];
+      const changed = new Set<string>();
+
+      // Pass 1 — create/update without parents.
+      for (const row of rows) {
+        if (inCycle(row.departmentRef)) {
+          results.push({ ref: row.departmentRef, status: 'error', error: 'parent_cycle' });
+          continue;
+        }
+        let dept = byRef.get(row.departmentRef);
+        if (!dept) {
+          dept = await repo.save(
+            repo.create({
+              organisationId,
+              name: row.name,
+              externalRef: row.departmentRef,
+              hrisManaged: true,
+              isActive: row.isActive ?? true,
+              parentId: null,
+            }),
+          );
+          byRef.set(row.departmentRef, dept);
+          byId.set(dept.id, dept);
+          results.push({ ref: row.departmentRef, status: 'created', id: dept.id });
+          continue;
+        }
+        const isActive = row.isActive ?? dept.isActive;
+        if (dept.name !== row.name || dept.isActive !== isActive || !dept.hrisManaged) {
+          dept.name = row.name;
+          dept.isActive = isActive;
+          dept.hrisManaged = true;
+          await repo.save(dept);
+          changed.add(row.departmentRef);
+        }
+        results.push({ ref: row.departmentRef, status: 'unchanged', id: dept.id });
+      }
+
+      // Pass 2 — parents.
+      for (const [i, row] of rows.entries()) {
+        const result = results[i];
+        if (result.status === 'error' || row.parentRef === undefined) continue;
+        const dept = byRef.get(row.departmentRef)!;
+        let parentId: string | null = null;
+        if (row.parentRef !== null) {
+          const parent = byRef.get(row.parentRef);
+          if (parent) parentId = parent.id;
+          else result.warnings = [...(result.warnings ?? []), 'parent_not_found'];
+        }
+        if (dept.parentId !== parentId) {
+          dept.parentId = parentId;
+          await repo.update({ id: dept.id }, { parentId });
+          changed.add(row.departmentRef);
+        }
+      }
+
+      for (const r of results) {
+        if (r.status === 'unchanged' && changed.has(r.ref)) r.status = 'updated';
+      }
+      return results;
+    });
+  }
+
+  /** Maps HRIS departmentRefs to department ids within the organisation (unknown refs are absent). */
+  async getDepartmentIdsByRefs(organisationId: string, refs: string[]): Promise<Map<string, string>> {
+    if (refs.length === 0) return new Map();
+    const depts = await this.deptRepo
+      .createQueryBuilder('d')
+      .select(['d.id', 'd.externalRef'])
+      .where('d.organisation_id = :organisationId', { organisationId })
+      .andWhere('d.external_ref IN (:...refs)', { refs: [...new Set(refs)] })
+      .getMany();
+    return new Map(depts.map((d) => [d.externalRef as string, d.id]));
   }
 
   async deleteDepartment(organisationId: string, id: string): Promise<void> {
     const dept = await this.deptRepo.findOne({ where: { id, organisationId } });
     if (!dept) throw new NotFoundException('Department not found');
+    if (dept.hrisManaged) throw hrisManagedConflict('department', ['isActive']);
 
     const assignedUsers = await this.usersService.findAll(organisationId, { departmentId: id, limit: 1 });
     const userCount = Array.isArray(assignedUsers) ? assignedUsers.length : assignedUsers.total;

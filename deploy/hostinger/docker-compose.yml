@@ -77,6 +77,12 @@ services:
       AZURE_COMMUNICATION_CONNECTION_STRING: ${AZURE_COMMUNICATION_CONNECTION_STRING:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-LeaderPrism}
+      # HRIS integration (docs/integrations/hris-api.md). Optional until an organisation uses it:
+      # signed report links need the signing secret, webhooks need the encryption key.
+      INTEGRATION_URL_SIGNING_SECRET: ${INTEGRATION_URL_SIGNING_SECRET:-}
+      INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
+      # Public base URL of the API (report links); the API is served under the app domain.
+      API_PUBLIC_URL: *app-url
     volumes:
       # PdfService writes generated report PDFs to <cwd>/reports.
       - reports:/app/reports

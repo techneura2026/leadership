@@ -16,6 +16,7 @@ import { ReadinessScoringService } from './readiness-scoring.service';
 import { Uc4ReadinessService } from './uc4-readiness.service';
 import { Uc4ReadinessController } from './uc4-readiness.controller';
 import { EngineModule } from '../engine/engine.module';
+import { ExternalPerformanceScore } from './entities/external-performance-score.entity';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { EngineModule } from '../engine/engine.module';
       PersonalityScore,
       RaterNomination,
       RaterResponse,
+      ExternalPerformanceScore,
     ]),
     EngineModule,
   ],

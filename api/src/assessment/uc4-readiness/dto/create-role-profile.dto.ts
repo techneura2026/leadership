@@ -46,6 +46,12 @@ export class CreateRoleProfileDto {
   @Type(() => RequiredCompetencyItemDto)
   requiredCompetencies?: RequiredCompetencyItemDto[];
 
+  @ApiPropertyOptional({ type: [String], description: 'HRIS designation codes this profile applies to' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  designationRefs?: string[];
+
   @ApiPropertyOptional({
     description: 'Map of Big Five factor -> fit criteria (minTScore/maxTScore/idealTScore/weight)',
   })

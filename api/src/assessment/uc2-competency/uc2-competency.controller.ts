@@ -23,7 +23,7 @@ export class Uc2CompetencyController {
   constructor(private readonly uc2Service: Uc2CompetencyService) {}
 
   @Post(':id/competency/self')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Start self-assessment (creates CA record)' })
   startSelf(
     @Request() req: any,
@@ -40,7 +40,7 @@ export class Uc2CompetencyController {
   }
 
   @Post(':id/competency/self/:caId/submit')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit self-assessment ratings' })
   submitSelf(
     @Request() req: any,

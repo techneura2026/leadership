@@ -45,6 +45,10 @@ export class Organisation {
   @Column({ type: 'jsonb', default: '{}' })
   settings: Record<string, unknown>;
 
+  /** HRIS tenant reference (orgRef), echoed in webhook payloads. */
+  @Column({ name: 'external_ref', type: 'varchar', length: 100, nullable: true })
+  externalRef: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

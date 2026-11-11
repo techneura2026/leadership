@@ -38,6 +38,7 @@ const REFRESH_LIMIT = isTestEnv ? 9999 : 30;
 const FORGOT_PASSWORD_LIMIT = isTestEnv ? 9999 : 5;
 const RESET_PASSWORD_LIMIT = isTestEnv ? 9999 : 10;
 const CHANGE_PASSWORD_LIMIT = isTestEnv ? 9999 : 10;
+const SSO_EXCHANGE_LIMIT = isTestEnv ? 9999 : 20;
 
 function setRefreshCookie(res: Response, token: string) {
   const isProd = process.env.NODE_ENV === 'production';
@@ -100,6 +101,17 @@ export class AuthController {
       clearRefreshCookie(res);
       throw err;
     }
+  }
+
+  @Post('sso/hris/exchange')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: SSO_EXCHANGE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Exchange a one-time HRIS SSO ticket for a session (sets the refresh cookie)' })
+  async ssoExchange(@Body('ticket') ticket: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.loginWithSsoTicket(ticket, req as any);
+    const { refreshToken, ...response } = result;
+    setRefreshCookie(res, refreshToken);
+    return response;
   }
 
   @Post('logout')

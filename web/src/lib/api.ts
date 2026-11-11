@@ -91,7 +91,8 @@ api.interceptors.response.use(
     if (
       original.url?.includes('/auth/refresh') ||
       original.url?.includes('/auth/login') ||
-      original.url?.includes('/auth/register')
+      original.url?.includes('/auth/register') ||
+      original.url?.includes('/auth/sso/') // the SSO landing page shows its own "link expired" message
     ) {
       if (original.url?.includes('/auth/refresh')) {
         useAuthStore.getState().clearAuth();

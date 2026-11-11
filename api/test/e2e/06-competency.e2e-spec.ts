@@ -344,3 +344,75 @@ describe('[QA-COMP] Competency Assessment (UC2)', () => {
     expect(firstItem.gap).toBeNull();
   });
 });
+
+// ─── HRIS D1: people managers can be assessed ───────────────────────────────
+describe('[QA-COMP] Managers as competency participants (HRIS D1)', () => {
+  let app: INestApplication;
+  let ds: DataSource;
+  let org: TestOrg;
+  let competencyIds: string[];
+
+  async function makeUser(role: string, password: string) {
+    const email = `d1-${role}-${uid()}@stp.lk`;
+    const id = await createUserInOrg(ds, org.id, { email, firstName: 'D1', lastName: role, role, password });
+    return { id, email, password };
+  }
+
+  beforeAll(async () => {
+    app = await getApp();
+    ds = getE2EDataSource();
+    org = await registerOrg(app, uniqueOrg(ORGS.strategicTalent));
+    await setOrgPlan(ds, org.id, 'professional');
+    competencyIds = await getSeedCompetencyIds(ds, 3);
+  });
+
+  it('a MANAGER can be added as a competency participant, completes a self-assessment and is rated by their own manager', async () => {
+    const assessed = await makeUser('manager', 'Assessed2026!');
+    const senior = await makeUser('manager', 'Senior2026!');
+    await authPatch(app, org.admin, `/api/v1/users/${assessed.id}`, { managerId: senior.id }).expect(200);
+
+    const assessmentId = await createDraftAssessment(app, org.admin, { title: 'D1 competency', assessmentType: 'competency' });
+    await authPost(app, org.admin, `/api/v1/assessments/${assessmentId}/participants`, { userId: assessed.id }).expect(201);
+    await launchAssessment(app, org.admin, assessmentId);
+    const participantId = (await authGet(app, org.admin, `/api/v1/assessments/${assessmentId}/participants`).expect(200)).body.data[0].id;
+
+    const assessedSession = await login(app, assessed.email, assessed.password);
+    const self = await authPost(app, assessedSession, `/api/v1/assessments/${assessmentId}/competency/self`, { participantId });
+    expect([200, 201]).toContain(self.status);
+    const selfSubmit = await authPost(app, assessedSession, `/api/v1/assessments/${assessmentId}/competency/self/${self.body.data.id}/submit`, {
+      participantId,
+      ratings: competencyIds.map((id) => ({ competencyId: id, levelRated: 2 })),
+    });
+    expect([200, 201]).toContain(selfSubmit.status);
+
+    const seniorSession = await login(app, senior.email, senior.password);
+    const mgr = await authPost(app, seniorSession, `/api/v1/assessments/${assessmentId}/competency/manager`, { participantId });
+    expect([200, 201]).toContain(mgr.status);
+    const mgrSubmit = await authPost(app, seniorSession, `/api/v1/assessments/${assessmentId}/competency/manager/${mgr.body.data.id}/submit`, {
+      ratings: competencyIds.map((id) => ({ competencyId: id, levelRated: 3 })),
+    });
+    expect([200, 201]).toContain(mgrSubmit.status);
+
+    const gap = await authGet(app, org.admin, `/api/v1/assessments/${assessmentId}/competency/gap/${participantId}`).expect(200);
+    expect(gap.body.data[0]).toMatchObject({ selfRating: 2, managerRating: 3, gap: 1 });
+  });
+
+  it('an HR_MANAGER is still rejected as a competency participant', async () => {
+    const hr = await makeUser('hr_manager', 'HrMgr2026!');
+    const assessmentId = await createDraftAssessment(app, org.admin, { title: 'D1 hr', assessmentType: 'competency' });
+    const res = await authPost(app, org.admin, `/api/v1/assessments/${assessmentId}/participants`, { userId: hr.id }).expect(400);
+    expect(res.body.error.message).toBe('HR Managers can only be added as participants to 360-degree feedback assessments');
+  });
+
+  it('a manager cannot submit a self-assessment for a different participant', async () => {
+    const assessed = await makeUser('participant', 'Assessed2026!');
+    const other = await makeUser('manager', 'OtherMgr2026!');
+    const assessmentId = await createDraftAssessment(app, org.admin, { title: 'D1 other', assessmentType: 'competency' });
+    await addParticipant(app, org.admin, assessmentId, assessed.id);
+    await launchAssessment(app, org.admin, assessmentId);
+    const participantId = (await authGet(app, org.admin, `/api/v1/assessments/${assessmentId}/participants`).expect(200)).body.data[0].id;
+    const otherSession = await login(app, other.email, other.password);
+    const res = await authPost(app, otherSession, `/api/v1/assessments/${assessmentId}/competency/self`, { participantId });
+    expect(res.status).toBe(403);
+  });
+});

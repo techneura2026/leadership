@@ -239,11 +239,17 @@ function EditDepartmentModal({ department, onClose, onSaved }: EditDepartmentMod
             {error}
           </div>
         )}
+        {department?.hrisManaged && (
+          <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            Managed by HRIS — the name and status can only be changed in your HRIS.
+          </p>
+        )}
         <Field label="Department Name" required>
           <input
             className={inputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={!!department?.hrisManaged}
             autoFocus
           />
         </Field>
@@ -552,6 +558,7 @@ export default function DepartmentsPage() {
                             <Building2 className="w-4 h-4 text-white" strokeWidth={2} />
                           </div>
                           <span className="font-medium text-gray-900 truncate">{dept.name}</span>
+                          {dept.hrisManaged && <Badge variant="info">Managed by HRIS</Badge>}
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell max-w-xs">
@@ -567,8 +574,8 @@ export default function DepartmentsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Toggle status */}
-                          <button
+                          {/* Toggle status (owned by the HRIS for synced departments) */}
+                          {!dept.hrisManaged && <button
                             onClick={() => setToggleTarget(dept)}
                             title={dept.isActive ? 'Deactivate' : 'Activate'}
                             className={`p-1.5 rounded-lg transition-colors ${dept.isActive
@@ -581,7 +588,7 @@ export default function DepartmentsPage() {
                             ) : (
                               <Power className="w-4 h-4" strokeWidth={2} />
                             )}
-                          </button>
+                          </button>}
 
                           {/* Edit */}
                           <button
@@ -593,13 +600,13 @@ export default function DepartmentsPage() {
                           </button>
 
                           {/* Delete */}
-                          <button
+                          {!dept.hrisManaged && <button
                             onClick={() => setDeleteTarget(dept)}
                             title="Delete"
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" strokeWidth={2} />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

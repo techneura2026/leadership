@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Users, Network } from 'lucide-react';
+import { Building2, Users, Network, Plug, ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const SETTINGS_TABS = [
@@ -23,6 +23,18 @@ const SETTINGS_TABS = [
     label: 'Departments',
     icon: Network,
     gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  },
+  {
+    href: '/settings/integrations',
+    label: 'Integrations',
+    icon: Plug,
+    gradient: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)',
+  },
+  {
+    href: '/settings/audit-log',
+    label: 'Audit log',
+    icon: ScrollText,
+    gradient: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
   },
 ];
 

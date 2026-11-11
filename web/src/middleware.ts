@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/reset-password', '/rater'];
+// /sso: HRIS hand-off links arrive without a session — the page itself exchanges the ticket.
+const PUBLIC_PATHS = ['/login', '/register', '/reset-password', '/rater', '/sso'];
 const AUTH_PATHS = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {

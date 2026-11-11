@@ -5,6 +5,26 @@ import * as path from 'path';
 import { QuestionType, ReportType } from '@leaderprism/shared';
 
 // Register Handlebars helpers
+
+/** Block helper: repeat the block `n` times (competency.hbs level pips). */
+Handlebars.registerHelper('times', function (this: unknown, n: number | null | undefined, options: Handlebars.HelperOptions) {
+  const count = Math.max(0, Math.floor(Number(n) || 0));
+  let out = '';
+  for (let i = 0; i < count; i++) out += options.fn(this);
+  return out;
+});
+
+/** Block helper: repeat the block `max − n` times (the empty pips after `times`). */
+Handlebars.registerHelper(
+  'timesRemaining',
+  function (this: unknown, n: number | null | undefined, max: number, options: Handlebars.HelperOptions) {
+    const count = Math.max(0, Math.floor(Number(max) || 0) - Math.floor(Number(n) || 0));
+    let out = '';
+    for (let i = 0; i < count; i++) out += options.fn(this);
+    return out;
+  },
+);
+
 Handlebars.registerHelper('formatScore', (score: number | null | undefined) => {
   if (score === null || score === undefined) return '—';
   return Number(score).toFixed(2);

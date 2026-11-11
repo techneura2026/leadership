@@ -19,6 +19,8 @@ import { RaterNomination } from '../uc1-feedback/entities/rater-nomination.entit
 import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { allParticipantsDone, allNominationsDone } from '../shared/completion.util';
+import { isReminderDue } from '../shared/reminder-schedule';
+import { AssessmentEventPayload, DomainEvent, DomainEventBus, DomainEventName } from '../../shared/events/domain-events';
 
 // Plan limits map
 const PLAN_LIMITS: Record<Plan, PlanLimits> = {
@@ -128,7 +130,22 @@ export class EngineService {
     private readonly notificationsService: NotificationsService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly events: DomainEventBus,
   ) { }
+
+  /** Publishes assessment.launched / assessment.closed after the status change is saved. */
+  private async emitAssessmentEvent(name: DomainEventName, assessment: Assessment): Promise<void> {
+    const participants = await this.participantRepo.find({ where: { assessmentId: assessment.id }, select: ['userId'] });
+    const payload: AssessmentEventPayload = {
+      orgId: assessment.organisationId,
+      assessmentId: assessment.id,
+      assessmentType: assessment.assessmentType,
+      cycleRef: assessment.cycleRef ?? null,
+      participantUserIds: participants.map((p) => p.userId),
+      occurredAt: new Date().toISOString(),
+    };
+    this.events.emit(name, payload);
+  }
 
   /**
    * Serializes concurrent plan-limit-checking mutations for one org via a Postgres advisory
@@ -143,7 +160,16 @@ export class EngineService {
     });
   }
 
-  async create(orgId: string, userId: string, dto: CreateAssessmentDto): Promise<Assessment> {
+  /**
+   * `origin` is internal-only (not part of the public DTO): it tags assessments created for an
+   * HRIS review cycle with the cycle reference and, for 360, the subject's employeeRef.
+   */
+  async create(
+    orgId: string,
+    userId: string,
+    dto: CreateAssessmentDto,
+    origin?: { cycleRef: string; subjectRef?: string | null; source: 'hris' },
+  ): Promise<Assessment> {
     const org = await this.orgRepo.findOne({ where: { id: orgId } });
     if (!org) {
       throw new NotFoundException('Organisation not found');
@@ -167,11 +193,56 @@ export class EngineService {
       config: dto.config ?? {},
       startDate: dto.startDate ? new Date(dto.startDate) : null,
       endDate: dto.endDate ? new Date(dto.endDate) : null,
+      cycleRef: origin?.cycleRef ?? null,
+      subjectRef: origin?.subjectRef ?? null,
+      source: origin?.source ?? 'app',
     });
 
     const saved = await this.assessmentRepo.save(assessment);
     this.logger.log(`Created assessment ${saved.id} type=${saved.assessmentType} org=${orgId}`);
     return saved;
+  }
+
+  /** The assessment an HRIS cycle already created for this type (and 360 subject), if any. */
+  async findByCycleRef(
+    orgId: string,
+    cycleRef: string,
+    type: AssessmentType,
+    subjectRef?: string,
+  ): Promise<Assessment | null> {
+    return this.assessmentRepo.findOne({
+      where: {
+        organisationId: orgId,
+        cycleRef,
+        assessmentType: type,
+        ...(subjectRef !== undefined ? { subjectRef } : {}),
+      },
+      relations: ['participants'],
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  /**
+   * Active assessments (all organisations) whose config.reminderDays says "remind today" — for the
+   * daily scheduler job only; callers act per assessment with its own organisationId.
+   */
+  async findDueForReminder(today: Date): Promise<Assessment[]> {
+    const active = await this.assessmentRepo
+      .createQueryBuilder('a')
+      .where('a.status = :status', { status: AssessmentStatus.ACTIVE })
+      .andWhere('a.end_date IS NOT NULL')
+      .andWhere(`jsonb_array_length(COALESCE(a.config->'reminderDays', '[]'::jsonb)) > 0`)
+      .getMany();
+    return active.filter((a) => isReminderDue(a.endDate, (a.config as AssessmentConfig | undefined)?.reminderDays, today));
+  }
+
+  /** Every assessment an HRIS cycle created in this organisation. */
+  async findAllByCycleRef(orgId: string, cycleRef: string): Promise<Assessment[]> {
+    return this.assessmentRepo.find({
+      where: { organisationId: orgId, cycleRef },
+      relations: ['participants'],
+      order: { createdAt: 'ASC' },
+    });
   }
 
   async findAll(
@@ -255,7 +326,7 @@ export class EngineService {
   async launch(id: string, orgId: string): Promise<Assessment> {
     await this.findOne(id, orgId); // existence/ownership check
 
-    return this.withOrgLock(orgId, async (manager) => {
+    const launched = await this.withOrgLock(orgId, async (manager) => {
       const assessment = await manager.findOne(Assessment, { where: { id, organisationId: orgId } });
       if (!assessment) throw new NotFoundException(`Assessment ${id} not found`);
 
@@ -302,6 +373,8 @@ export class EngineService {
       this.logger.log(`Launched assessment ${id} org=${orgId} participants=${participantCount}`);
       return saved;
     });
+    await this.emitAssessmentEvent(DomainEvent.AssessmentLaunched, launched);
+    return launched;
   }
 
   async close(id: string, orgId: string): Promise<Assessment> {
@@ -314,6 +387,7 @@ export class EngineService {
     assessment.status = AssessmentStatus.CLOSED;
     const saved = await this.assessmentRepo.save(assessment);
     this.logger.log(`Closed assessment ${id} org=${orgId}`);
+    await this.emitAssessmentEvent(DomainEvent.AssessmentClosed, saved);
     return saved;
   }
 
@@ -354,6 +428,7 @@ export class EngineService {
     assessment.status = AssessmentStatus.CLOSED;
     await this.assessmentRepo.save(assessment);
     this.logger.log(`Auto-closed assessment ${assessmentId} — all participants/raters complete`);
+    await this.emitAssessmentEvent(DomainEvent.AssessmentClosed, assessment);
   }
 
   async addParticipant(
@@ -377,14 +452,12 @@ export class EngineService {
     }
     const userId = user.id;
 
-    // HR Managers and Managers administer assessments for others — they may only ever be
-    // the subject of a 360 assessment, never of Competency/Personality/Readiness.
-    if (
-      assessment.assessmentType !== AssessmentType.FEEDBACK_360 &&
-      (user.role === UserRole.HR_MANAGER || user.role === UserRole.MANAGER)
-    ) {
+    // HR Managers administer assessments for others — they may only ever be the subject of a
+    // 360 assessment. People managers (MANAGER) can be assessed in every type: they are rated by
+    // their own manager (User.managerId), which is what HRIS leadership KPIs need.
+    if (assessment.assessmentType !== AssessmentType.FEEDBACK_360 && user.role === UserRole.HR_MANAGER) {
       throw new BadRequestException(
-        'HR Managers and Managers can only be added as participants to 360-degree feedback assessments',
+        'HR Managers can only be added as participants to 360-degree feedback assessments',
       );
     }
 

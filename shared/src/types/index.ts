@@ -2,6 +2,7 @@ import { AssessmentStatus, AssessmentType, Language, Plan, RaterRelationship, Re
 import { FormQuestion } from './formQuestion';
 
 export * from './formQuestion';
+export * from './integrations';
 
 // ── API Response envelope ────────────────────────────────────
 
@@ -44,6 +45,8 @@ export interface DepartmentDto {
   isActive: boolean;
   parentId: string | null;
   createdAt: string;
+  externalRef?: string | null;
+  hrisManaged?: boolean;
 }
 
 // ── User ─────────────────────────────────────────────────────
@@ -64,6 +67,9 @@ export interface UserDto {
   emailVerified: boolean;
   mustChangePassword: boolean;
   createdAt: string;
+  externalRef?: string | null;
+  hrisManaged?: boolean;
+  employmentStatus?: 'active' | 'probation' | 'left';
 }
 
 // ── Auth ─────────────────────────────────────────────────────
@@ -95,6 +101,8 @@ export interface AssessmentDto {
   startDate: string | null;
   endDate: string | null;
   createdAt: string;
+  cycleRef?: string | null;
+  source?: 'app' | 'hris';
 }
 
 export interface AssessmentConfig {

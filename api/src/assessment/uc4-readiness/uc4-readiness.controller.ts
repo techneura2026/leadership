@@ -46,7 +46,7 @@ export class Uc4ReadinessController {
   // ── SJT ─────────────────────────────────────────────────────────────────
 
   @Get('assessments/:id/sjt/:participantId')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get SJT questionnaire with progress state' })
   getSjtQuestionnaire(
     @Request() req: any,
@@ -63,7 +63,7 @@ export class Uc4ReadinessController {
   }
 
   @Post('assessments/:id/sjt/:participantId/responses')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit a SJT scenario response' })
   submitSjtResponse(
     @Request() req: any,
@@ -85,7 +85,7 @@ export class Uc4ReadinessController {
   // ── Learning Agility ────────────────────────────────────────────────────
 
   @Get('assessments/:id/learning-agility/:participantId')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get learning agility questionnaire' })
   getLearningAgilityQuestionnaire(
     @Request() req: any,
@@ -102,7 +102,7 @@ export class Uc4ReadinessController {
   }
 
   @Post('assessments/:id/learning-agility/:participantId/responses')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Submit a learning agility response' })
   submitLearningAgilityResponse(
     @Request() req: any,
@@ -124,7 +124,7 @@ export class Uc4ReadinessController {
   // ── Readiness Scoring ────────────────────────────────────────────────────
 
   @Post('assessments/:id/readiness/:participantId/compute')
-  @Roles(UserRole.PARTICIPANT, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.PARTICIPANT, UserRole.MANAGER, UserRole.HR_MANAGER, UserRole.ORG_ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Compute readiness score for a participant against a role profile' })
   computeReadiness(
     @Request() req: any,
