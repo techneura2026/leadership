@@ -141,4 +141,6 @@ export interface ResultsPageDto {
 /** Returned once, on creation only. */
 export interface CreatedApiClientDto extends ApiClientDto {
   rawKey: string;
+  /** `https://<rawKey>@<API host>` — built server-side from API_PUBLIC_URL. Creation response only. */
+  connectionString?: string;
 }

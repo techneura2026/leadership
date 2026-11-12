@@ -17,6 +17,12 @@ export function parseApiKey(raw: string): { prefix: string; secret: string } | n
   return m ? { prefix: m[1], secret: m[2] } : null;
 }
 
+/** `https://<api key>@<API host>[:port]` — the single value an HRIS needs. Contains the secret: show once. */
+export function buildHrisConnectionString(rawKey: string, apiPublicUrl: string): string {
+  const u = new URL(apiPublicUrl);
+  return `${u.protocol}//${rawKey}@${u.host}`;
+}
+
 export function hashSecret(secret: string): string {
   return createHash('sha256').update(secret).digest('hex');
 }

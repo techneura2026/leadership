@@ -7,8 +7,10 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
 import { TransformInterceptor } from './shared/interceptors/transform.interceptor';
 import { json, urlencoded } from 'express';
+import { assertPublicUrlsConfigured, getWebBaseUrl } from './shared/public-urls';
 
 async function bootstrap() {
+  assertPublicUrlsConfigured();
   const app = await NestFactory.create(AppModule);
 
   app.use(json({ limit: '10mb' }));
@@ -20,7 +22,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   app.enableCors({
-    origin: process.env.WEB_URL ?? 'http://localhost:3000',
+    origin: getWebBaseUrl(),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

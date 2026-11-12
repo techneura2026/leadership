@@ -26,6 +26,7 @@ import { User } from '../../core/users/entities/user.entity';
 import { NotificationsService } from '../../core/notifications/notifications.service';
 import { EngineService } from '../engine/engine.service';
 import { v4 as uuidv4 } from 'uuid';
+import { getWebBaseUrl } from '../../shared/public-urls';
 
 interface NominateRaterDto {
   raterEmail: string;
@@ -218,7 +219,7 @@ export class Uc1FeedbackService {
       created.push(saved);
       existingEmails.add(email);
 
-      const raterUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/rater/${saved.token}`;
+      const raterUrl = `${getWebBaseUrl()}/rater/${saved.token}`;
       try {
         await this.notificationsService.sendRaterInvitation(
           saved.raterEmail,
@@ -265,7 +266,7 @@ export class Uc1FeedbackService {
       await this.nominationRepo.save(nomination);
 
       // Send rater invitation email
-      const raterUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/rater/${nomination.token}`;
+      const raterUrl = `${getWebBaseUrl()}/rater/${nomination.token}`;
       await this.notificationsService.sendRaterInvitation(
         nomination.raterEmail,
         nomination.raterName ?? 'Colleague',

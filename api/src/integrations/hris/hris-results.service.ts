@@ -16,6 +16,7 @@ import { ItemsService } from '../../assessment/items/items.service';
 import { UsersService } from '../../core/users/users.service';
 import { buildCompetencyBlock, ExportRoleProfile } from './competency-export';
 import { ExportNomination, toOthersAggregate } from './feedback-export';
+import { getApiPublicUrl } from '../../shared/public-urls';
 
 const DEFAULT_RATER_THRESHOLD = 3;
 const DEFAULT_360_SCALE = 5;
@@ -254,7 +255,7 @@ export class HrisResultsService {
   }
 
   private publicUrl(): string {
-    return this.config.get<string>('API_PUBLIC_URL', 'http://localhost:3001');
+    return getApiPublicUrl();
   }
 
   /** Most recently updated role profile linked to the employee's designationRef, if any. */

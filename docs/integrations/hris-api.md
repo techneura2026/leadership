@@ -366,5 +366,11 @@ days before `endDate`.
 |---|---|
 | `INTEGRATION_URL_SIGNING_SECRET` | Signs report links. Required for report links. Generate with `openssl rand -hex 32` |
 | `INTEGRATION_ENCRYPTION_KEY` | 32 bytes (base64); encrypts webhook secrets at rest. Required for webhooks. Generate with `openssl rand -base64 32` |
-| `API_PUBLIC_URL` | Public base URL of the API, used to build report links |
-| `APP_URL` | Base of SSO links (already set for emails) |
+| `APP_URL` | **The single setting for the public web address.** Base of every generated link (one-time sign-in, rater, reset-password, login) and the CORS origin. `WEB_URL` is read only as a fallback. Without either, non-production falls back to `http://localhost:3000`; in production the API refuses to start if neither is set or the value points at localhost. Trailing slashes are stripped. |
+| `API_PUBLIC_URL` | Public base URL of the API. Used for report links and for the HRIS connection string shown once when an API key is created. Defaults to `http://localhost:3001` outside production; in production it is required and must not be localhost (startup fails otherwise). |
+
+### API key permissions and the connection string
+
+- `PATCH /api/v1/integrations/api-clients/:id` with `{ "scopes": [...] }` (organisation admin) replaces a key's scopes without changing its secret; it takes effect on the key's next request. A revoked key returns `409`; an unknown scope returns `400`. The change is audit-logged (`integration.api_client.scopes_updated`).
+- Creating a key returns, once, a `connectionString` of the form `https://<api key>@<API host>[:port]` built from `API_PUBLIC_URL`. It contains the secret and is never returned by list or get.
+- The "HRIS integration" preset is `employees:write`, `sso:issue`, `results:read`; `assessments:write`, `reports:read`, `scores:write` and `talent:read` are optional.

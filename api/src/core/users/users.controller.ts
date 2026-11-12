@@ -22,6 +22,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { CurrentOrgId } from '../../shared/decorators/current-user.decorator';
 import { UserRole } from '@leaderprism/shared';
+import { getWebBaseUrl } from '../../shared/public-urls';
 
 @ApiTags('Users')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -55,7 +56,7 @@ export class UsersController {
       mustChangePassword: true,
     });
 
-    const loginUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/login`;
+    const loginUrl = `${getWebBaseUrl()}/login`;
     try {
       await this.notificationsService.sendUserWelcome(user.email, user.firstName, password, loginUrl, {
         orgId,
