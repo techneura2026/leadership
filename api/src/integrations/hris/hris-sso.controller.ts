@@ -1,13 +1,13 @@
 import { Body, Controller, ForbiddenException, NotFoundException, Post, UseGuards } from '@nestjs/common';
 import { UserRole } from '@leaderprism/shared';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
-import { ConfigService } from '@nestjs/config';
 import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiKeyGuard } from '../api-clients/api-key.guard';
 import { RequireScopes } from '../api-clients/require-scopes.decorator';
 import { IntegrationOrgId } from '../api-clients/integration-context.decorator';
 import { UsersService } from '../../core/users/users.service';
 import { SAFE_REDIRECT_PATH, SsoTicketService } from '../../core/auth/sso/sso-ticket.service';
+import { getWebBaseUrl } from '../../shared/public-urls';
 
 class SsoTicketRequestDto {
   @IsString() @MinLength(1) @MaxLength(100)
@@ -26,7 +26,6 @@ export class HrisSsoController {
   constructor(
     private readonly users: UsersService,
     private readonly tickets: SsoTicketService,
-    private readonly config: ConfigService,
   ) {}
 
   @Post('sso-tickets')
@@ -45,7 +44,6 @@ export class HrisSsoController {
       });
     }
     const { ticket, expiresAt } = await this.tickets.issue(orgId, user.id, dto.redirectPath ?? '/my-assessments');
-    const base = this.config.get<string>('APP_URL', 'http://localhost:3000').replace(/\/+$/, '');
-    return { url: `${base}/sso/hris?ticket=${ticket}`, expiresAt: expiresAt.toISOString() };
+    return { url: `${getWebBaseUrl()}/sso/hris?ticket=${ticket}`, expiresAt: expiresAt.toISOString() };
   }
 }

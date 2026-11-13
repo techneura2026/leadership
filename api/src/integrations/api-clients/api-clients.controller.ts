@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ArrayMinSize, IsArray, IsIn, IsString, MaxLength, MinLength } from 'class-validator';
@@ -15,6 +15,13 @@ class CreateApiClientDto {
   @MaxLength(100)
   name: string;
 
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn([...INTEGRATION_SCOPES], { each: true })
+  scopes: IntegrationScope[];
+}
+
+class UpdateApiClientScopesDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsIn([...INTEGRATION_SCOPES], { each: true })
@@ -38,6 +45,17 @@ export class ApiClientsController {
   @ApiOperation({ summary: 'List integration API clients' })
   list(@CurrentOrgId() orgId: string) {
     return this.apiClients.list(orgId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Replace the scopes of an integration API client (secret unchanged)' })
+  updateScopes(
+    @CurrentOrgId() orgId: string,
+    @CurrentUser() user: AccessTokenPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateApiClientScopesDto,
+  ) {
+    return this.apiClients.updateScopes(orgId, id, dto.scopes, user.sub);
   }
 
   @Delete(':id')

@@ -22,6 +22,46 @@ const SCOPES: { value: IntegrationScope; help: string }[] = [
   { value: 'personality:read', help: 'Read personality profiles (development use only)' },
 ];
 
+/** One-click set for connecting an HRIS: sync employees, sign HR admins in, read results. */
+const HRIS_PRESET: IntegrationScope[] = ['employees:write', 'sso:issue', 'results:read'];
+const OPTIONAL_HRIS = new Set<IntegrationScope>(['assessments:write', 'reports:read', 'scores:write', 'talent:read']);
+
+function ScopePicker({ value, onChange }: { value: IntegrationScope[]; onChange: (s: IntegrationScope[]) => void }) {
+  return (
+    <fieldset>
+      <div className="flex items-center justify-between mb-2">
+        <legend className="block text-xs font-medium text-gray-600">Scopes</legend>
+        <button
+          type="button"
+          onClick={() => onChange([...HRIS_PRESET])}
+          className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+        >
+          HRIS integration
+        </button>
+      </div>
+      <p className="mb-2 text-xs text-gray-500">The HRIS preset ticks employees:write, sso:issue and results:read. Other HRIS scopes are optional.</p>
+      <div className="space-y-2">
+        {SCOPES.map((s) => (
+          <label key={s.value} className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              aria-label={s.value}
+              className="mt-0.5"
+              checked={value.includes(s.value)}
+              onChange={(e) => onChange(e.target.checked ? [...value, s.value] : value.filter((x) => x !== s.value))}
+            />
+            <span>
+              <code className="text-xs text-gray-800">{s.value}</code>
+              {OPTIONAL_HRIS.has(s.value) && <span className="ml-1 text-xs text-gray-400">(optional for HRIS)</span>}
+              <span className="block text-xs text-gray-500">{s.help}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function ApiKeysSection() {
   const { data: clients, isLoading, mutate } = useApi<ApiClientDto[]>('/integrations/api-clients');
   const [createOpen, setCreateOpen] = useState(false);
@@ -30,7 +70,9 @@ export function ApiKeysSection() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedApiClientDto | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'key' | 'connection' | null>(null);
+  const [editing, setEditing] = useState<ApiClientDto | null>(null);
+  const [editScopes, setEditScopes] = useState<IntegrationScope[]>([]);
 
   function resetForm() {
     setName('');
@@ -64,11 +106,36 @@ export function ApiKeysSection() {
     await mutate();
   }
 
-  async function copyKey() {
+  function startEdit(client: ApiClientDto) {
+    setEditing(client);
+    setEditScopes(client.scopes);
+    setError(null);
+  }
+
+  async function savePermissions() {
+    if (!editing) return;
+    if (editScopes.length === 0) {
+      setError('Choose at least one scope.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/integrations/api-clients/${editing.id}`, { scopes: editScopes });
+      setEditing(null);
+      await mutate();
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? 'Could not update the permissions.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copy(kind: 'key' | 'connection') {
     if (!created) return;
-    await navigator.clipboard.writeText(created.rawKey).catch(() => undefined);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    await navigator.clipboard.writeText(kind === 'key' ? created.rawKey : created.connectionString ?? '').catch(() => undefined);
+    setCopied(kind);
+    setTimeout(() => setCopied(null), 1500);
   }
 
   return (
@@ -94,13 +161,31 @@ export function ApiKeysSection() {
               {created.rawKey}
             </code>
             <button
-              onClick={copyKey}
+              onClick={() => copy('key')}
               className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2.5 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100"
             >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copied' : 'Copy'}
+              {copied === 'key' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied === 'key' ? 'Copied' : 'Copy'}
             </button>
           </div>
-          <p className="mt-2 text-xs text-amber-800">This key will not be shown again.</p>
+          {created.connectionString && (
+            <>
+              <p className="mt-3 text-sm font-medium text-amber-900">HRIS connection string</p>
+              <div className="mt-1 flex items-center gap-2">
+                <code data-testid="new-connection-string" className="flex-1 break-all rounded-md bg-white px-3 py-2 text-xs text-gray-800 border border-amber-200">
+                  {created.connectionString}
+                </code>
+                <button
+                  onClick={() => copy('connection')}
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2.5 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  {copied === 'connection' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied === 'connection' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </>
+          )}
+          <p className="mt-2 text-xs text-amber-800">
+            {created.connectionString ? 'This key and connection string will not be shown again.' : 'This key will not be shown again.'}
+          </p>
         </div>
       )}
 
@@ -135,9 +220,14 @@ export function ApiKeysSection() {
                     {c.revokedAt ? (
                       <Badge variant="neutral">Revoked</Badge>
                     ) : (
-                      <button onClick={() => revoke(c)} className="text-sm font-medium text-red-600 hover:text-red-700">
-                        Revoke
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => startEdit(c)} className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                          Edit permissions
+                        </button>
+                        <button onClick={() => revoke(c)} className="text-sm font-medium text-red-600 hover:text-red-700">
+                          Revoke
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -160,28 +250,7 @@ export function ApiKeysSection() {
               className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
             />
           </div>
-          <fieldset>
-            <legend className="block text-xs font-medium text-gray-600 mb-2">Scopes</legend>
-            <div className="space-y-2">
-              {SCOPES.map((s) => (
-                <label key={s.value} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    aria-label={s.value}
-                    className="mt-0.5"
-                    checked={scopes.includes(s.value)}
-                    onChange={(e) =>
-                      setScopes((prev) => (e.target.checked ? [...prev, s.value] : prev.filter((x) => x !== s.value)))
-                    }
-                  />
-                  <span>
-                    <code className="text-xs text-gray-800">{s.value}</code>
-                    <span className="block text-xs text-gray-500">{s.help}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <ScopePicker value={scopes} onChange={setScopes} />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -196,6 +265,26 @@ export function ApiKeysSection() {
               className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
             >
               {saving ? 'Creating…' : 'Create key'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={`Edit permissions${editing ? ` — ${editing.name}` : ''}`}>
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500">The key and its secret do not change. New permissions apply on the key’s next request.</p>
+          <ScopePicker value={editScopes} onChange={setEditScopes} />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={() => setEditing(null)} className="rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">
+              Cancel
+            </button>
+            <button
+              onClick={savePermissions}
+              disabled={saving}
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? 'Saving…' : 'Save permissions'}
             </button>
           </div>
         </div>

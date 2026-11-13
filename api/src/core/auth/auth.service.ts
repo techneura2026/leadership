@@ -17,6 +17,7 @@ import { RegisterOrgDto } from './dto/register-org.dto';
 import { SsoTicketService } from './sso/sso-ticket.service';
 import { AuditService } from '../audit/audit.service';
 import { AccessTokenPayload, AuthResponseDto, UserRole, UserDto, OrganisationDto } from '@leaderprism/shared';
+import { getWebBaseUrl } from '../../shared/public-urls';
 
 @Injectable()
 export class AuthService {
@@ -247,7 +248,7 @@ export class AuthService {
     if (!result) return;
 
     const { user, token } = result;
-    const resetUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/reset-password?token=${token}`;
+    const resetUrl = `${getWebBaseUrl()}/reset-password?token=${token}`;
     try {
       await this.notificationsService.sendPasswordReset(user.email, user.firstName, resetUrl, {
         orgId: user.organisationId,

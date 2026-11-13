@@ -1,10 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { timingSafeEqual } from 'crypto';
 import type { ApiClientDto, CreatedApiClientDto, IntegrationScope } from '@leaderprism/shared';
 import { ApiClient } from './api-client.entity';
-import { generateApiKey, hashSecret, parseApiKey } from './key-format';
+import { buildHrisConnectionString, generateApiKey, hashSecret, parseApiKey } from './key-format';
+import { getApiPublicUrl } from '../../shared/public-urls';
 import { OrganisationsService } from '../../core/organisations/organisations.service';
 import { AuditService } from '../../core/audit/audit.service';
 
@@ -47,7 +48,23 @@ export class ApiClientsService {
     );
     this.logger.log(`Created API client ${client.id} org=${orgId} scopes=${client.scopes.join(',')}`);
     await this.audit.record({ orgId, actorType: 'user', actorId: userId, action: 'integration.api_client.created', entityType: 'api_client', entityId: client.id, after: { name: client.name, scopes: client.scopes } });
-    return { ...this.toDto(client), rawKey: key.raw };
+    return { ...this.toDto(client), rawKey: key.raw, connectionString: buildHrisConnectionString(key.raw, getApiPublicUrl()) };
+  }
+
+  /** Replaces the key's scopes. The secret and prefix are untouched; takes effect on the next request. */
+  async updateScopes(orgId: string, id: string, scopes: IntegrationScope[], userId: string): Promise<ApiClientDto> {
+    const client = await this.clientRepo.findOne({ where: { id, organisationId: orgId } });
+    if (!client) throw new NotFoundException('API client not found');
+    if (client.revokedAt) throw new ConflictException('A revoked API client cannot be edited');
+    const before = [...client.scopes];
+    client.scopes = [...new Set(scopes)];
+    await this.clientRepo.save(client);
+    this.logger.log(`Updated scopes of API client ${id} org=${orgId}`);
+    await this.audit.record({
+      orgId, actorType: 'user', actorId: userId, action: 'integration.api_client.scopes_updated', entityType: 'api_client', entityId: id,
+      before: { scopes: before }, after: { scopes: client.scopes },
+    });
+    return this.toDto(client);
   }
 
   async list(orgId: string): Promise<ApiClientDto[]> {

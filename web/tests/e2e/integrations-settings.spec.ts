@@ -43,6 +43,42 @@ test.describe('Settings → Integrations', () => {
     await expect(row).toContainText('Revoked');
   });
 
+  test('the HRIS preset ticks the right scopes and the created key shows a one-time connection string', async ({ page }) => {
+    await registerAdmin(page);
+    await page.goto('/settings/integrations');
+    await page.getByRole('button', { name: 'Create API key' }).click();
+    await page.getByLabel('Key name').fill('Preset HRIS');
+    await page.getByRole('button', { name: 'HRIS integration' }).click();
+    for (const s of ['employees:write', 'sso:issue', 'results:read']) await expect(page.getByLabel(s)).toBeChecked();
+    for (const s of ['assessments:write', 'reports:read', 'scores:write', 'talent:read']) await expect(page.getByLabel(s)).not.toBeChecked();
+    await page.getByRole('button', { name: 'Create key' }).click();
+
+    const key = ((await page.getByTestId('new-api-key').textContent()) ?? '').trim();
+    await expect(page.getByTestId('new-connection-string')).toContainText(`${key}@`);
+    await expect(page.getByText('This key and connection string will not be shown again.')).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByTestId('new-connection-string')).toHaveCount(0);
+  });
+
+  test('admin edits the permissions of an existing key with the HRIS preset', async ({ page }) => {
+    await registerAdmin(page);
+    await page.goto('/settings/integrations');
+    await page.getByRole('button', { name: 'Create API key' }).click();
+    await page.getByLabel('Key name').fill('Editable');
+    await page.getByLabel('employees:write').check();
+    await page.getByRole('button', { name: 'Create key' }).click();
+    await expect(page.getByTestId('new-api-key')).toBeVisible();
+
+    const row = page.getByRole('row', { name: /Editable/ });
+    await expect(row).not.toContainText('sso:issue');
+    await row.getByRole('button', { name: 'Edit permissions' }).click();
+    await expect(page.getByLabel('employees:write')).toBeChecked();
+    await page.getByRole('button', { name: 'HRIS integration' }).click();
+    await page.getByRole('button', { name: 'Save permissions' }).click();
+    await expect(row).toContainText('sso:issue');
+  });
+
   test('the audit log shows integration changes and can be filtered', async ({ page }) => {
     await registerAdmin(page);
     await page.goto('/settings/integrations');
