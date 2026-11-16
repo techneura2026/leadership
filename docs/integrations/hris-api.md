@@ -34,7 +34,7 @@ expired-trial organisation, gets `401`. A missing scope gets `403 INSUFFICIENT_S
 | `assessments:write` | `POST assessment-requests` |
 | `results:read` | `GET results`, `GET framework`, `GET ping` |
 | `reports:read` | `POST reports` |
-| `sso:issue` | `POST sso-tickets` |
+| `sso:issue` | `POST sso-tickets`, `POST sessions/revoke` |
 | `scores:write` | Phase 2: final performance scores |
 | `talent:read` | Phase 2: readiness, 9-box and succession |
 | `personality:read` | Phase 3: personality profile (development use only) |
@@ -276,6 +276,19 @@ the employee's browser (a new tab is fine). The ticket is **single-use** and exp
 - `redirectPath` must be a same-site path (it starts with a single `/`) and defaults to `/my-assessments`.
 - Useful targets: `/my-assessments`, and `/my-assessments/{assessmentId}` for one assessment.
 - Employees who are unknown, inactive or `left` get `404`.
+- BizOS may send its suite in the `X-Bizos-Suite` header (base64url JSON `{ "v": 1, "home": {…}, "apps": [ … ] }`, every link on
+  BizOS's own origin). LeaderPrism keeps it on the employee and shows it as the **Apps** menu in its header (back to BizOS and the
+  other apps the employee opens from it). A header LeaderPrism cannot read is ignored; the link is issued either way.
+
+### `POST /sessions/revoke` (scope `sso:issue`)
+
+```json
+{ "employeeRef": "E-100" }
+```
+
+Ends every LeaderPrism session of the employee (their refresh tokens are deleted; an access token already issued lapses at its
+15-minute expiry). The HRIS calls it when the person signs out of the HRIS or their access ends. It finds deactivated and `left`
+employees too, is safe to repeat, and answers `{ "revoked": 2 }`; an unknown `employeeRef` gets `404` (`user_not_found`).
 
 ---
 
