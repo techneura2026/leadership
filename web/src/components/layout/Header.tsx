@@ -6,6 +6,7 @@ import { Menu, Bell, Sun, Moon, ChevronDown, LogOut } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { useTheme } from '@/components/ThemeProvider';
+import { AppsMenu } from './AppsMenu';
 
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
@@ -52,6 +53,9 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* BizOS Suite Sign-in plan 2.4: back to BizOS and the other apps (only for people who came from BizOS) */}
+        <AppsMenu />
+
         {/* Theme toggle */}
         <button
           onClick={toggle}

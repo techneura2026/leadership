@@ -1,4 +1,5 @@
 import {
+  Get,
   Body,
   Controller,
   HttpCode,
@@ -134,6 +135,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user from token' })
   async me(@CurrentUser() user: AccessTokenPayload) {
     return this.authService.getMe(user.sub);
+  }
+
+  @Get('suite')
+  @UseGuards(JwtAuthGuard)
+  @SkipPasswordCheck()
+  @ApiOperation({ summary: "The suite BizOS sent with this person's last sign-in link (for the Apps menu), or null" })
+  async suite(@CurrentUser() user: AccessTokenPayload) {
+    return { suite: await this.authService.getSuite(user.orgId, user.sub) };
   }
 
   @Post('change-password')

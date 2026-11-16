@@ -410,6 +410,27 @@ export class UsersService {
     await this.userRepo.update(userId, { lastLoginAt: new Date() });
   }
 
+  /** BizOS Suite Sign-in plan 2.4: keeps the suite BizOS sent with this person's sign-in link (scoped to the organisation). */
+  async setSuite(organisationId: string, userId: string, suite: Record<string, unknown>): Promise<void> {
+    // jsonb through a query builder: TypeORM's update() typing reads a Record column as a nested partial entity.
+    await this.userRepo.createQueryBuilder().update().set({ suite: () => 'CAST(:suite AS jsonb)', suiteAt: () => 'now()' }).setParameter('suite', JSON.stringify(suite))
+      .where('id = :userId AND organisation_id = :organisationId', { userId, organisationId }).execute();
+  }
+
+  /** The stored suite, or null (scoped to the organisation). */
+  async getSuite(organisationId: string, userId: string): Promise<Record<string, unknown> | null> {
+    const row = await this.userRepo.createQueryBuilder('u').select('u.suite', 'suite')
+      .where('u.id = :userId AND u.organisation_id = :organisationId', { userId, organisationId })
+      .getRawOne<{ suite: Record<string, unknown> | null }>();
+    return row?.suite ?? null;
+  }
+
+  /** Plan 2.5: ends every session (refresh token) of this person; returns how many ended. */
+  async revokeUserSessions(userId: string): Promise<number> {
+    const res = await this.sessionRepo.delete({ userId });
+    return res.affected ?? 0;
+  }
+
   async createSession(data: {
     userId: string;
     refreshToken: string;

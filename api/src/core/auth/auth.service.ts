@@ -1,3 +1,4 @@
+import { readSuite, type Suite } from '../../integrations/hris/suite';
 import {
   ConflictException,
   Injectable,
@@ -189,6 +190,11 @@ export class AuthService {
         createdAt: org.createdAt.toISOString(),
       },
     } as AuthResponseDto & { refreshToken: string };
+  }
+
+  /** BizOS Suite Sign-in plan 2.4: the stored suite, checked again (a bad row draws nothing). */
+  async getSuite(orgId: string, userId: string): Promise<Suite | null> {
+    return readSuite(await this.usersService.getSuite(orgId, userId));
   }
 
   async getMe(userId: string): Promise<{ user: UserDto; organisation: OrganisationDto }> {

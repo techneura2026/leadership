@@ -103,6 +103,16 @@ export class User {
   @Column({ name: 'designation_ref', type: 'varchar', length: 100, nullable: true })
   designationRef: string | null;
 
+  /**
+   * BizOS Suite Sign-in plan 2.4: the suite (BizOS and the apps this person opens from it) BizOS sent with their last sign-in
+   * link. Only ever drawn as links in the Apps menu; it grants nothing. See integrations/hris/suite.ts.
+   */
+  @Column({ type: 'jsonb', nullable: true, select: false })
+  suite: Record<string, unknown> | null;
+
+  @Column({ name: 'suite_at', type: 'timestamptz', nullable: true, select: false })
+  suiteAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
