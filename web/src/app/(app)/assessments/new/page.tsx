@@ -2316,7 +2316,8 @@ export default function NewAssessmentPage() {
       tableRows: gq.tableRows ?? [],
       tableColumns: gq.tableColumns ?? [],
     }));
-    setState((prev) => ({ ...prev, questions: [...prev.questions, ...newQuestions] }));
+    // AI questions are custom questions: switch out of competency mode so they show and are saved.
+    setState((prev) => ({ ...prev, questionMode: 'custom', questions: [...prev.questions, ...newQuestions] }));
   }
 
   // ── Personality question management ──────────────────────────────────────────
@@ -2681,7 +2682,7 @@ export default function NewAssessmentPage() {
       </div>
     </div>
 
-    {is360 && state.step === 4 && state.questionMode === 'custom' && (
+    {is360 && state.step === 4 && (
       <AssessmentChatbot
         context="360° Feedback Assessment — Questions Builder. Help the user design effective questionnaire questions."
         onInsertQuestions={insertGeneratedQuestions}
